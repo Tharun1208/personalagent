@@ -1,0 +1,1532 @@
+'use client';
+
+import React, { useState, useMemo, useRef } from 'react';
+import {
+  Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Plus,
+  Sparkles,
+  RotateCcw,
+  Check,
+  X,
+  AlarmClock,
+  Filter,
+  Layers,
+  CalendarDays,
+  CalendarRange,
+  Grid3X3,
+  ListTodo,
+  Trash2,
+  Video,
+  MapPin,
+  Tag,
+  Zap,
+  ArrowRight,
+  Download,
+  Share2,
+} from 'lucide-react';
+import { useApp } from '@/lib/context/AppContext';
+
+export type CalendarViewMode = 'day' | 'week' | 'month' | 'year';
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+const SHORT_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+export default function CalendarView() {
+  const { tasks, reminders, createTask, createReminder, toggleTask, deleteTask, deleteReminder } = useApp();
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [viewMode, setViewMode] = useState<CalendarViewMode>('month');
+  const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const [yearPickerOpen, setYearPickerOpen] = useState(false);
+  const [yearRangeStart, setYearRangeStart] = useState(new Date().getFullYear() - 6);
+
+  // ── Smart dropdown alignment ──────────────────────────────────────────────
+  // Anchors the panel to whichever side has room, so it never runs off-screen
+  // on narrow phone layouts.
+  const viewAnchorRef = useRef<HTMLDivElement>(null);
+  const monthAnchorRef = useRef<HTMLDivElement>(null);
+  const yearAnchorRef = useRef<HTMLDivElement>(null);
+  const [viewAlign, setViewAlign] = useState<'left' | 'right'>('left');
+  const [monthAlign, setMonthAlign] = useState<'left' | 'right'>('left');
+  const [yearAlign, setYearAlign] = useState<'left' | 'right'>('left');
+
+  const pickAlign = (el: HTMLElement | null, panelWidth: number): 'left' | 'right' => {
+    if (!el || typeof window === 'undefined') return 'left';
+    const rect = el.getBoundingClientRect();
+    // Panel opens to the RIGHT of the anchor when there's room, else flips left
+    return window.innerWidth - rect.left >= panelWidth + 12 ? 'left' : 'right';
+  };
+
+  const toggleViewDropdown = () => {
+    if (!viewDropdownOpen) setViewAlign(pickAlign(viewAnchorRef.current, 176));
+    setViewDropdownOpen((o) => !o);
+  };
+  const toggleMonthPicker = () => {
+    if (!monthPickerOpen) setMonthAlign(pickAlign(monthAnchorRef.current, 224));
+    setMonthPickerOpen((o) => !o);
+    setYearPickerOpen(false);
+  };
+  const toggleYearPicker = () => {
+    if (!yearPickerOpen) setYearAlign(pickAlign(yearAnchorRef.current, 176));
+    setYearPickerOpen((o) => !o);
+    setMonthPickerOpen(false);
+  };
+  const [filterType, setFilterType] = useState<'all' | 'tasks' | 'reminders' | 'completed'>('all');
+  
+  // Quick natural language input
+  const [quickInput, setQuickInput] = useState('');
+
+  // Day Details Modal state (Mobile & Desktop interactive sheet)
+  const [isDayDetailsModalOpen, setIsDayDetailsModalOpen] = useState(false);
+
+  // Event Scheduling Modal states
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalDate, setModalDate] = useState(new Date().toISOString().split('T')[0]);
+  const [modalTime, setModalTime] = useState('10:00');
+  const [modalDuration, setModalDuration] = useState('60'); // minutes
+  const [modalType, setModalType] = useState<'event' | 'task' | 'alarm'>('event');
+  const [modalPriority, setModalPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+  const [modalRecurrence, setModalRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
+  const [modalLocation, setModalLocation] = useState('');
+  const [modalNotes, setModalNotes] = useState('');
+
+  // Combined timeline items
+  const timelineItems = useMemo(() => {
+    const items: Array<{
+      id: string;
+      title: string;
+      type: 'task' | 'reminder';
+      dateTime: Date;
+      priority: string;
+      status: string;
+      original: any;
+    }> = [];
+
+    tasks.forEach((t) => {
+      if (t.dueDate) {
+        items.push({
+          id: t.id,
+          title: t.title,
+          type: 'task',
+          dateTime: new Date(t.dueDate),
+          priority: t.priority || 'medium',
+          status: t.status,
+          original: t,
+        });
+      }
+    });
+
+    reminders.forEach((r) => {
+      items.push({
+        id: r.id,
+        title: r.title,
+        type: 'reminder',
+        dateTime: new Date(r.dueDateTime),
+        priority: r.priority || 'high',
+        status: r.status,
+        original: r,
+      });
+    });
+
+    return items
+      .filter((item) => {
+        if (filterType === 'tasks') return item.type === 'task' && item.status !== 'completed';
+        if (filterType === 'reminders') return item.type === 'reminder';
+        if (filterType === 'completed') return item.status === 'completed';
+        return true;
+      })
+      .sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime());
+  }, [tasks, reminders, filterType]);
+
+  // Selected Day Items
+  const selectedDayItems = useMemo(() => {
+    const startOfDay = new Date(selectedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(selectedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return timelineItems.filter(
+      (item) =>
+        item.dateTime.getTime() >= startOfDay.getTime() &&
+        item.dateTime.getTime() <= endOfDay.getTime()
+    );
+  }, [timelineItems, selectedDate]);
+
+  // Navigation Handlers
+  const handlePrev = () => {
+    const nextDate = new Date(selectedDate);
+    if (viewMode === 'day') nextDate.setDate(nextDate.getDate() - 1);
+    else if (viewMode === 'week') nextDate.setDate(nextDate.getDate() - 7);
+    else if (viewMode === 'month') nextDate.setMonth(nextDate.getMonth() - 1);
+    else if (viewMode === 'year') nextDate.setFullYear(nextDate.getFullYear() - 1);
+    setSelectedDate(nextDate);
+  };
+
+  const handleNext = () => {
+    const nextDate = new Date(selectedDate);
+    if (viewMode === 'day') nextDate.setDate(nextDate.getDate() + 1);
+    else if (viewMode === 'week') nextDate.setDate(nextDate.getDate() + 7);
+    else if (viewMode === 'month') nextDate.setMonth(nextDate.getMonth() + 1);
+    else if (viewMode === 'year') nextDate.setFullYear(nextDate.getFullYear() + 1);
+    setSelectedDate(nextDate);
+  };
+
+  const handleToday = () => {
+    setSelectedDate(new Date());
+  };
+
+  const openScheduleModal = (date?: Date, hour?: number) => {
+    const targetDate = date || selectedDate;
+    setModalDate(targetDate.toISOString().split('T')[0]);
+    if (hour !== undefined) {
+      setModalTime(`${hour.toString().padStart(2, '0')}:00`);
+    } else {
+      const now = new Date();
+      setModalTime(`${now.getHours().toString().padStart(2, '0')}:00`);
+    }
+    setModalTitle('');
+    setModalLocation('');
+    setModalNotes('');
+    setIsAddModalOpen(true);
+  };
+
+  const handleDayClick = (dayDate: Date) => {
+    setSelectedDate(dayDate);
+    setIsDayDetailsModalOpen(true);
+  };
+
+  // Quick NL scheduler
+  const handleQuickSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickInput.trim()) return;
+
+    const lower = quickInput.toLowerCase();
+    let scheduledDate = new Date(selectedDate);
+    let timeHours = 10;
+    let timeMins = 0;
+
+    if (lower.includes('tomorrow')) {
+      scheduledDate.setDate(scheduledDate.getDate() + 1);
+    }
+
+    const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+    if (timeMatch) {
+      let h = parseInt(timeMatch[1], 10);
+      const m = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+      const meridiem = timeMatch[3];
+      if (meridiem === 'pm' && h < 12) h += 12;
+      if (meridiem === 'am' && h === 12) h = 0;
+      timeHours = h;
+      timeMins = m;
+    }
+
+    scheduledDate.setHours(timeHours, timeMins, 0, 0);
+
+    const isTask = lower.includes('task') || lower.includes('todo') || lower.includes('finish') || lower.includes('submit');
+    
+    if (isTask) {
+      await createTask(quickInput.trim(), 'medium', scheduledDate.toISOString());
+    } else {
+      await createReminder(quickInput.trim(), scheduledDate.toISOString(), 'none');
+    }
+
+    setQuickInput('');
+  };
+
+  const handleCreateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modalTitle.trim()) return;
+
+    const [year, month, day] = modalDate.split('-').map(Number);
+    const [hours, minutes] = modalTime.split(':').map(Number);
+    const dueTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
+
+    let fullTitle = modalTitle.trim();
+    if (modalLocation.trim()) {
+      fullTitle += ` 📍 ${modalLocation.trim()}`;
+    }
+
+    if (modalType === 'task') {
+      await createTask(fullTitle, modalPriority, dueTime.toISOString());
+    } else {
+      await createReminder(fullTitle, dueTime.toISOString(), modalRecurrence);
+    }
+
+    setModalTitle('');
+    setModalLocation('');
+    setModalNotes('');
+    setIsAddModalOpen(false);
+  };
+
+  // Month Grid Calculator
+  const monthDays = useMemo(() => {
+    const year = selectedDate.getFullYear();
+    const month = selectedDate.getMonth();
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    const startingDayIndex = firstDay.getDay(); // 0 = Sun
+    const totalDays = lastDay.getDate();
+
+    const days: Array<{
+      date: Date;
+      isCurrentMonth: boolean;
+      isToday: boolean;
+      items: typeof timelineItems;
+    }> = [];
+
+    // Previous month padding
+    const prevMonthLastDay = new Date(year, month, 0).getDate();
+    for (let i = startingDayIndex - 1; i >= 0; i--) {
+      const d = new Date(year, month - 1, prevMonthLastDay - i);
+      const start = new Date(d).setHours(0, 0, 0, 0);
+      const end = new Date(d).setHours(23, 59, 59, 999);
+      const dayItems = timelineItems.filter(
+        (it) => it.dateTime.getTime() >= start && it.dateTime.getTime() <= end
+      );
+      days.push({
+        date: d,
+        isCurrentMonth: false,
+        isToday: d.toDateString() === new Date().toDateString(),
+        items: dayItems,
+      });
+    }
+
+    // Current month days
+    for (let i = 1; i <= totalDays; i++) {
+      const d = new Date(year, month, i);
+      const start = new Date(d).setHours(0, 0, 0, 0);
+      const end = new Date(d).setHours(23, 59, 59, 999);
+      const dayItems = timelineItems.filter(
+        (it) => it.dateTime.getTime() >= start && it.dateTime.getTime() <= end
+      );
+      days.push({
+        date: d,
+        isCurrentMonth: true,
+        isToday: d.toDateString() === new Date().toDateString(),
+        items: dayItems,
+      });
+    }
+
+    // Next month padding to fill complete grid of 35 or 42
+    const remaining = (7 - (days.length % 7)) % 7;
+    for (let i = 1; i <= remaining; i++) {
+      const d = new Date(year, month + 1, i);
+      const start = new Date(d).setHours(0, 0, 0, 0);
+      const end = new Date(d).setHours(23, 59, 59, 999);
+      const dayItems = timelineItems.filter(
+        (it) => it.dateTime.getTime() >= start && it.dateTime.getTime() <= end
+      );
+      days.push({
+        date: d,
+        isCurrentMonth: false,
+        isToday: d.toDateString() === new Date().toDateString(),
+        items: dayItems,
+      });
+    }
+
+    return days;
+  }, [selectedDate, timelineItems]);
+
+  // Week Grid Calculator (7 days)
+  const weekDays = useMemo(() => {
+    const curr = new Date(selectedDate);
+    const first = curr.getDate() - curr.getDay();
+    const days = [];
+
+    for (let i = 0; i < 7; i++) {
+      const next = new Date(curr.setDate(first + i));
+      const start = new Date(next).setHours(0, 0, 0, 0);
+      const end = new Date(next).setHours(23, 59, 59, 999);
+      const dayItems = timelineItems.filter(
+        (it) => it.dateTime.getTime() >= start && it.dateTime.getTime() <= end
+      );
+      days.push({
+        date: new Date(next),
+        isToday: next.toDateString() === new Date().toDateString(),
+        items: dayItems,
+      });
+    }
+    return days;
+  }, [selectedDate, timelineItems]);
+
+  // Year View: 12 Month Matrix Data
+  const yearMonths = useMemo(() => {
+    const year = selectedDate.getFullYear();
+    return Array.from({ length: 12 }, (_, monthIdx) => {
+      const monthFirst = new Date(year, monthIdx, 1);
+      const monthLast = new Date(year, monthIdx + 1, 0);
+      const totalDays = monthLast.getDate();
+      const startingDay = monthFirst.getDay();
+
+      const start = new Date(year, monthIdx, 1).setHours(0, 0, 0, 0);
+      const end = new Date(year, monthIdx + 1, 0).setHours(23, 59, 59, 999);
+
+      const monthItems = timelineItems.filter(
+        (it) => it.dateTime.getTime() >= start && it.dateTime.getTime() <= end
+      );
+
+      return {
+        monthIndex: monthIdx,
+        monthName: MONTH_NAMES[monthIdx],
+        totalDays,
+        startingDay,
+        itemsCount: monthItems.length,
+        items: monthItems,
+      };
+    });
+  }, [selectedDate, timelineItems]);
+
+  // Year metrics
+  const yearMetrics = useMemo(() => {
+    const year = selectedDate.getFullYear();
+    const start = new Date(year, 0, 1).setHours(0, 0, 0, 0);
+    const end = new Date(year, 11, 31).setHours(23, 59, 59, 999);
+    const inYear = timelineItems.filter(
+      (it) => it.dateTime.getTime() >= start && it.dateTime.getTime() <= end
+    );
+
+    return {
+      total: inYear.length,
+      tasks: inYear.filter((t) => t.type === 'task').length,
+      alarms: inYear.filter((t) => t.type === 'reminder').length,
+      completed: inYear.filter((t) => t.status === 'completed').length,
+    };
+  }, [selectedDate, timelineItems]);
+
+  // Hours array 6:00 AM to 11:00 PM
+  const exportIcsCalendar = () => {
+    let icsData = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Recall AI//Assistant Calendar//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+    ];
+
+    timelineItems.forEach((item) => {
+      const dt = item.dateTime;
+      const startStr = dt.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      const endDt = new Date(dt.getTime() + 60 * 60 * 1000);
+      const endStr = endDt.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+      icsData.push(
+        'BEGIN:VEVENT',
+        `UID:${item.id}@recall.ai`,
+        `DTSTAMP:${startStr}`,
+        `DTSTART:${startStr}`,
+        `DTEND:${endStr}`,
+        `SUMMARY:${item.title.replace(/[,;]/g, ' ')}`,
+        `DESCRIPTION:Scheduled in Recall Assistant`,
+        'STATUS:CONFIRMED',
+        'END:VEVENT'
+      );
+    });
+
+    icsData.push('END:VCALENDAR');
+    const blob = new Blob([icsData.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `schedule-${new Date().toISOString().split('T')[0]}.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Hours array 6:00 AM to 11:00 PM
+  const hoursGrid: number[] = Array.from({ length: 18 }, (_, i) => i + 6);
+  const isToday = selectedDate.toDateString() === new Date().toDateString();
+
+  return (
+    <div className="flex-1 flex flex-col h-screen overflow-hidden bg-(--bg-primary) text-(--text-primary)">
+      {/* Top Header */}
+      <header className="h-auto min-h-16 py-3 px-3 sm:px-6 border-b border-(--border-subtle)/50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0 bg-(--bg-primary)/90 backdrop-blur-xl z-10">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-gradient-to-tr from-[#4E82EE]/20 via-[#9B72CF]/20 to-[#F27878]/20 border border-[#4E82EE]/30 text-[#4E82EE] dark:text-[#a8c7fa] flex items-center justify-center shadow-xs shrink-0">
+            <CalendarIcon size={17} />
+          </div>
+          <div>
+            <h1 className="font-semibold text-sm sm:text-base text-(--text-primary) flex items-center gap-2 font-sans">
+              Schedule & Calendar
+            </h1>
+            <p className="text-[10px] sm:text-[11px] text-(--text-muted)">
+              Visual Day, Week, Month & Year Event Management
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between sm:justify-end gap-2 pb-1 sm:pb-0">
+          {/* ── View Mode Dropdown ─────────────────────────────── */}
+          <div className="relative shrink-0" ref={viewAnchorRef}>
+            <button
+              onClick={toggleViewDropdown}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:bg-(--bg-card) hover:border-[#4E82EE]/40 text-(--text-primary) text-xs font-semibold transition-all cursor-pointer shadow-xs min-w-[110px] justify-between"
+            >
+              <div className="flex items-center gap-2">
+                {viewMode === 'day'   && <CalendarDays size={14} className="text-[#4E82EE]" />}
+                {viewMode === 'week'  && <CalendarRange size={14} className="text-[#9B72CF]" />}
+                {viewMode === 'month' && <Grid3X3 size={14} className="text-emerald-500" />}
+                {viewMode === 'year'  && <Layers size={14} className="text-amber-500" />}
+                <span className="capitalize">{viewMode} view</span>
+              </div>
+              <ChevronRight
+                size={13}
+                className={`text-(--text-muted) transition-transform duration-200 ${viewDropdownOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            {viewDropdownOpen && (
+              <>
+                {/* Backdrop to close */}
+                <div
+                  className="fixed inset-0 z-20"
+                  onClick={() => setViewDropdownOpen(false)}
+                />
+                <div
+                  className={`absolute top-full mt-2 z-30 w-44 rounded-2xl border border-(--border-subtle) bg-(--bg-card) shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
+                    viewAlign === 'right' ? 'right-0' : 'left-0'
+                  }`}
+                >
+                  <div className="p-1.5 space-y-0.5">
+                    {(
+                      [
+                        { mode: 'day',   Icon: CalendarDays,  label: 'Day',   sub: 'Hour by hour',   color: 'text-[#4E82EE]', bg: 'bg-[#4E82EE]/10' },
+                        { mode: 'week',  Icon: CalendarRange, label: 'Week',  sub: '7-day row view', color: 'text-[#9B72CF]', bg: 'bg-[#9B72CF]/10' },
+                        { mode: 'month', Icon: Grid3X3,       label: 'Month', sub: 'Full grid',      color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+                        { mode: 'year',  Icon: Layers,        label: 'Year',  sub: '12-month atlas', color: 'text-amber-500',  bg: 'bg-amber-500/10' },
+                      ] as const
+                    ).map(({ mode, Icon, label, sub, color, bg }) => (
+                      <button
+                        key={mode}
+                        onClick={() => {
+                          setViewMode(mode as CalendarViewMode);
+                          setViewDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left cursor-pointer transition-all group ${
+                          viewMode === mode
+                            ? `${bg} ${color}`
+                            : 'hover:bg-(--bg-elevated) text-(--text-secondary)'
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${viewMode === mode ? bg : 'bg-(--bg-elevated) group-hover:bg-(--bg-card)'}`}>
+                          <Icon size={15} className={viewMode === mode ? color : 'text-(--text-muted)'} />
+                        </div>
+                        <div>
+                          <div className={`text-xs font-semibold ${viewMode === mode ? color : ''}`}>{label}</div>
+                          <div className="text-[10px] text-(--text-muted)">{sub}</div>
+                        </div>
+                        {viewMode === mode && (
+                          <Check size={13} className={`ml-auto shrink-0 ${color}`} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Export Calendar (.ics) Button */}
+          <button
+            onClick={exportIcsCalendar}
+            title="Export to Apple Calendar / Google Calendar (.ics)"
+            className="px-3 py-1.5 sm:py-2 rounded-full bg-(--bg-elevated) border border-(--border-subtle) hover:bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) text-[11px] sm:text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+          >
+            <Download size={14} />
+            <span className="hidden lg:inline">Sync / Export .ics</span>
+          </button>
+
+          {/* Schedule Event Action Button */}
+          <button
+            onClick={() => openScheduleModal()}
+            className="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-[11px] sm:text-xs font-semibold hover:opacity-95 transition-all cursor-pointer shadow-sm flex items-center gap-1.5 shrink-0"
+          >
+            <Plus size={15} />
+            <span>Schedule Event</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Date Navigation & Quick NL Event Scheduler Bar */}
+      <div className="px-3 sm:px-6 py-2.5 border-b border-(--border-subtle)/40 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 bg-(--bg-sidebar)/40">
+        <div className="flex items-center justify-between sm:justify-start gap-2">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handlePrev}
+              className="p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
+              title="Previous"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              onClick={handleNext}
+              className="p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
+              title="Next"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+
+          <div className="font-semibold text-xs sm:text-sm text-(--text-primary) flex items-center gap-1.5 flex-wrap">
+            {/* ── Month picker (hidden in year view) ── */}
+            {viewMode !== 'year' && (
+              <div className="relative" ref={monthAnchorRef}>
+                <button
+                  onClick={toggleMonthPicker}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-(--bg-elevated) transition-colors cursor-pointer"
+                >
+                  <span>
+                    {viewMode === 'day'
+                      ? MONTH_NAMES[selectedDate.getMonth()]
+                      : viewMode === 'week'
+                      ? `${MONTH_NAMES[weekDays[0]?.date.getMonth()]} ${weekDays[0]?.date.getDate()} – ${MONTH_NAMES[weekDays[6]?.date.getMonth()]} ${weekDays[6]?.date.getDate()}`
+                      : MONTH_NAMES[selectedDate.getMonth()]}
+                  </span>
+                  <ChevronDown size={13} className={`text-(--text-muted) transition-transform ${monthPickerOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {monthPickerOpen && (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setMonthPickerOpen(false)} />
+                    <div
+                      className={`absolute top-full mt-1.5 z-30 w-56 grid grid-cols-3 gap-1 p-2 rounded-2xl border border-(--border-subtle) bg-(--bg-card) shadow-2xl animate-in fade-in zoom-in-95 duration-150 ${
+                        monthAlign === 'right' ? 'right-0' : 'left-0'
+                      }`}
+                    >
+                      {MONTH_NAMES.map((m, idx) => (
+                        <button
+                          key={m}
+                          onClick={() => {
+                            const d = new Date(selectedDate);
+                            d.setMonth(idx);
+                            setSelectedDate(d);
+                            setMonthPickerOpen(false);
+                          }}
+                          className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                            idx === selectedDate.getMonth()
+                              ? 'bg-[#4E82EE]/15 text-[#4E82EE] dark:text-[#a8c7fa]'
+                              : 'text-(--text-secondary) hover:bg-(--bg-elevated)'
+                          }`}
+                        >
+                          {m.slice(0, 3)}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Day-of-month (day view only) */}
+            {viewMode === 'day' && <span>{selectedDate.getDate()},</span>}
+            {viewMode === 'day' && <span className="text-(--text-muted)">{SHORT_WEEKDAYS[selectedDate.getDay()]},</span>}
+
+            {/* ── Year picker ── */}
+            <div className="relative" ref={yearAnchorRef}>
+              <button
+                onClick={toggleYearPicker}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-(--bg-elevated) transition-colors cursor-pointer font-mono"
+              >
+                <span>{selectedDate.getFullYear()}</span>
+                <ChevronDown size={13} className={`text-(--text-muted) transition-transform ${yearPickerOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {yearPickerOpen && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setYearPickerOpen(false)} />
+                  <div
+                    className={`absolute top-full mt-1.5 z-30 w-44 p-2 rounded-2xl border border-(--border-subtle) bg-(--bg-card) shadow-2xl animate-in fade-in zoom-in-95 duration-150 ${
+                      yearAlign === 'right' ? 'right-0' : 'left-0'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between px-1 pb-1.5">
+                      <button
+                        onClick={() => setYearRangeStart((s) => s - 12)}
+                        className="p-1 rounded-md hover:bg-(--bg-elevated) text-(--text-muted) cursor-pointer"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <span className="text-[11px] font-semibold text-(--text-muted)">
+                        {yearRangeStart}–{yearRangeStart + 11}
+                      </span>
+                      <button
+                        onClick={() => setYearRangeStart((s) => s + 12)}
+                        className="p-1 rounded-md hover:bg-(--bg-elevated) text-(--text-muted) cursor-pointer"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1">
+                      {Array.from({ length: 12 }, (_, i) => yearRangeStart + i).map((y) => (
+                        <button
+                          key={y}
+                          onClick={() => {
+                            const d = new Date(selectedDate);
+                            d.setFullYear(y);
+                            setSelectedDate(d);
+                            setYearPickerOpen(false);
+                          }}
+                          className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold font-mono transition-colors cursor-pointer ${
+                            y === selectedDate.getFullYear()
+                              ? 'bg-[#4E82EE]/15 text-[#4E82EE] dark:text-[#a8c7fa]'
+                              : 'text-(--text-secondary) hover:bg-(--bg-elevated)'
+                          }`}
+                        >
+                          {y}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {!isToday && (
+              <button
+                onClick={handleToday}
+                className="text-[10px] px-2 py-0.5 rounded-full bg-(--bg-elevated) hover:bg-[#4E82EE]/10 text-(--text-muted) hover:text-[#4E82EE] transition-colors border border-(--border-subtle) cursor-pointer"
+              >
+                Today
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Event Scheduling Bar */}
+        <form onSubmit={handleQuickSchedule} className="flex-1 max-w-md flex items-center gap-1.5">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              value={quickInput}
+              onChange={(e) => setQuickInput(e.target.value)}
+              placeholder="Quick schedule: e.g. Team Sync tomorrow at 3pm..."
+              className="w-full pl-8 pr-3 py-1.5 rounded-full bg-(--bg-elevated) border border-(--border-subtle) text-xs text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:border-[#4E82EE]"
+            />
+            <Zap size={13} className="absolute left-2.5 top-2.5 text-amber-500" />
+          </div>
+          <button
+            type="submit"
+            className="px-3 py-1.5 rounded-full bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 text-xs font-semibold text-(--text-primary) hover:text-[#4E82EE] transition-colors cursor-pointer shrink-0 shadow-2xs"
+          >
+            Schedule
+          </button>
+        </form>
+
+        {/* Filter Badges */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
+          {(['all', 'tasks', 'reminders', 'completed'] as const).map((ft) => (
+            <button
+              key={ft}
+              onClick={() => setFilterType(ft)}
+              className={`px-2.5 py-1 rounded-full text-[11px] capitalize transition-all cursor-pointer ${
+                filterType === ft
+                  ? 'bg-[#4E82EE]/15 text-[#4E82EE] dark:text-[#a8c7fa] font-bold border border-[#4E82EE]/30'
+                  : 'text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
+              }`}
+            >
+              {ft}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Viewport Content */}
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6 custom-scrollbar">
+        {/* ── 1. MONTH VIEW ─────────────────────────────────────── */}
+        {viewMode === 'month' && (
+          <div className="max-w-6xl mx-auto space-y-2 sm:space-y-3">
+            {/* Weekday Labels */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center text-[10px] sm:text-xs font-semibold text-(--text-muted) uppercase tracking-wider py-1">
+              {SHORT_WEEKDAYS.map((day) => (
+                <div key={day}>{day}</div>
+              ))}
+            </div>
+
+            {/* Monthly Calendar Grid */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
+              {monthDays.map((day, idx) => {
+                const dayNum = day.date.getDate();
+                const isSelected = day.date.toDateString() === selectedDate.toDateString();
+
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => handleDayClick(day.date)}
+                    className={`min-h-[68px] sm:min-h-[110px] p-1.5 sm:p-2.5 rounded-xl sm:rounded-2xl border transition-all cursor-pointer flex flex-col justify-between group relative active:scale-98 ${
+                      isSelected
+                        ? 'border-[#4E82EE] bg-[#4E82EE]/5 ring-1 sm:ring-2 ring-[#4E82EE]/20 shadow-xs'
+                        : day.isCurrentMonth
+                        ? 'bg-(--bg-card) border-(--border-subtle) hover:border-[#4E82EE]/40 hover:bg-(--bg-elevated)'
+                        : 'bg-(--bg-sidebar)/30 border-(--border-subtle)/30 opacity-40'
+                    }`}
+                  >
+                    {/* Header: Date Number + Quick Add Button */}
+                    <div className="flex items-center justify-between pointer-events-none">
+                      <span
+                        className={`text-[10px] sm:text-xs font-bold w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${
+                          day.isToday
+                            ? 'bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white shadow-xs'
+                            : isSelected
+                            ? 'text-[#4E82EE] font-black'
+                            : 'text-(--text-primary)'
+                        }`}
+                      >
+                        {dayNum}
+                      </span>
+
+                      <div className="flex items-center gap-1">
+                        {day.items.length > 0 && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-[#4E82EE]/15 text-[#4E82EE] font-bold">
+                            {day.items.length}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Mobile Dots View (<sm) */}
+                    <div className="flex sm:hidden items-center justify-center gap-1 my-1 flex-wrap pointer-events-none">
+                      {day.items.slice(0, 4).map((item) => (
+                        <span
+                          key={item.id}
+                          className={`w-2 h-2 rounded-full ring-1 ring-black/10 ${
+                            item.status === 'completed'
+                              ? 'bg-emerald-500'
+                              : item.type === 'task'
+                              ? 'bg-[#4E82EE]'
+                              : 'bg-amber-500'
+                          }`}
+                        />
+                      ))}
+                      {day.items.length > 4 && (
+                        <span className="text-[8px] font-bold text-(--text-muted)">+</span>
+                      )}
+                    </div>
+
+                    {/* Tablet/Desktop Day Events Stack (>=sm) */}
+                    <div className="hidden sm:block space-y-1 my-1 flex-1 overflow-hidden pointer-events-none">
+                      {day.items.slice(0, 2).map((item) => (
+                        <div
+                          key={item.id}
+                          className={`text-[11px] truncate px-1.5 py-0.5 rounded-md flex items-center gap-1 font-medium ${
+                            item.status === 'completed'
+                              ? 'bg-(--bg-elevated) text-(--text-muted) line-through'
+                              : item.type === 'task'
+                              ? 'bg-[#4E82EE]/15 text-[#4E82EE] dark:text-[#a8c7fa]'
+                              : 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                          }`}
+                          title={item.title}
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-current" />
+                          <span className="truncate">{item.title}</span>
+                        </div>
+                      ))}
+                      {day.items.length > 2 && (
+                        <div className="text-[10px] text-(--text-muted) font-medium pl-1">
+                          +{day.items.length - 2} more
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bottom Indicator */}
+                    <div className="hidden sm:flex text-[10px] text-(--text-muted) opacity-0 group-hover:opacity-100 transition-opacity justify-between items-center">
+                      <span className="text-[#4E82EE] font-semibold hover:underline">
+                        Details &rarr;
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── 2. YEAR VIEW (12-MONTH MATRIX & HEATMAP) ────────── */}
+        {viewMode === 'year' && (
+          <div className="max-w-6xl mx-auto space-y-6">
+            {/* Year Annual Stats Card */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs">
+              <div className="p-3">
+                <span className="text-[11px] font-semibold text-(--text-muted) uppercase">Total Scheduled</span>
+                <p className="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">{yearMetrics.total}</p>
+              </div>
+              <div className="p-3">
+                <span className="text-[11px] font-semibold text-[#4E82EE] uppercase">Tasks with Deadlines</span>
+                <p className="text-2xl font-bold text-[#4E82EE] font-mono mt-0.5">{yearMetrics.tasks}</p>
+              </div>
+              <div className="p-3">
+                <span className="text-[11px] font-semibold text-amber-500 uppercase">Alarms & Reminders</span>
+                <p className="text-2xl font-bold text-amber-500 font-mono mt-0.5">{yearMetrics.alarms}</p>
+              </div>
+              <div className="p-3">
+                <span className="text-[11px] font-semibold text-emerald-500 uppercase">Completed</span>
+                <p className="text-2xl font-bold text-emerald-500 font-mono mt-0.5">{yearMetrics.completed}</p>
+              </div>
+            </div>
+
+            {/* 12 Months Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {yearMonths.map((m) => {
+                const isSelectedMonth =
+                  selectedDate.getFullYear() === selectedDate.getFullYear() &&
+                  selectedDate.getMonth() === m.monthIndex;
+
+                return (
+                  <div
+                    key={m.monthIndex}
+                    onClick={() => {
+                      const newD = new Date(selectedDate);
+                      newD.setMonth(m.monthIndex);
+                      setSelectedDate(newD);
+                      setViewMode('month');
+                    }}
+                    className={`p-4 rounded-3xl border transition-all cursor-pointer hover:shadow-md ${
+                      isSelectedMonth
+                        ? 'bg-(--bg-card) border-[#4E82EE] shadow-xs'
+                        : 'bg-(--bg-card) border-(--border-subtle) hover:border-[#4E82EE]/50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-bold text-sm text-(--text-primary)">{m.monthName}</h3>
+                      {m.itemsCount > 0 && (
+                        <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#4E82EE]/15 text-[#4E82EE] font-semibold">
+                          {m.itemsCount} events
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Mini Month Grid */}
+                    <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-(--text-muted) mb-1 font-mono">
+                      {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((w, i) => (
+                        <span key={i}>{w}</span>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1 text-center text-[11px]">
+                      {Array.from({ length: m.startingDay }).map((_, i) => (
+                        <span key={`empty_${i}`} className="opacity-0">0</span>
+                      ))}
+
+                      {Array.from({ length: m.totalDays }).map((_, dIdx) => {
+                        const dayNum = dIdx + 1;
+                        const cellDate = new Date(selectedDate.getFullYear(), m.monthIndex, dayNum);
+                        const isDayToday = cellDate.toDateString() === new Date().toDateString();
+
+                        const cellItems = m.items.filter(
+                          (it) => it.dateTime.getDate() === dayNum
+                        );
+                        const hasEvents = cellItems.length > 0;
+
+                        return (
+                          <div
+                            key={`d_${dayNum}`}
+                            className={`w-6 h-6 mx-auto rounded-full flex items-center justify-center text-[10px] font-mono ${
+                              isDayToday
+                                ? 'bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white font-bold'
+                                : hasEvents
+                                ? 'bg-[#4E82EE]/20 text-[#4E82EE] font-bold ring-1 ring-[#4E82EE]/40'
+                                : 'text-(--text-muted) hover:bg-(--bg-elevated)'
+                            }`}
+                          >
+                            {dayNum}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── 3. WEEK VIEW (ROW PER DAY) ───────────────────────── */}
+        {viewMode === 'week' && (
+          <div className="max-w-5xl mx-auto space-y-2.5">
+            {/* Week header — date range */}
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">
+                {MONTH_NAMES[weekDays[0]?.date.getMonth()]} {weekDays[0]?.date.getDate()} – {MONTH_NAMES[weekDays[6]?.date.getMonth()]} {weekDays[6]?.date.getDate()}, {selectedDate.getFullYear()}
+              </span>
+              <span className="text-[11px] text-(--text-muted)">
+                {weekDays.reduce((sum, d) => sum + d.items.length, 0)} events this week
+              </span>
+            </div>
+
+            {weekDays.map((w, wIdx) => {
+              const isSelected = w.date.toDateString() === selectedDate.toDateString();
+              const dayLabel = SHORT_WEEKDAYS[w.date.getDay()];
+              const isWeekend = w.date.getDay() === 0 || w.date.getDay() === 6;
+
+              return (
+                <div
+                  key={wIdx}
+                  className={`flex gap-0 rounded-2xl border overflow-hidden transition-all ${
+                    isSelected
+                      ? 'border-[#4E82EE] shadow-md ring-2 ring-[#4E82EE]/15'
+                      : 'border-(--border-subtle) hover:border-[#4E82EE]/30'
+                  } ${isWeekend ? 'opacity-80' : ''}`}
+                >
+                  {/* Day Label Column */}
+                  <div
+                    onClick={() => {
+                      setSelectedDate(w.date);
+                      setViewMode('day');
+                    }}
+                    className={`w-20 sm:w-24 flex-shrink-0 flex flex-col items-center justify-center py-4 border-r border-(--border-subtle) cursor-pointer transition-all ${
+                      isSelected
+                        ? 'bg-[#4E82EE]/8'
+                        : 'bg-(--bg-elevated) hover:bg-(--bg-card)'
+                    }`}
+                  >
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                      w.isToday ? 'text-[#4E82EE]' : 'text-(--text-muted)'
+                    }`}>
+                      {dayLabel}
+                    </span>
+                    <div className={`w-9 h-9 mt-1 rounded-full flex items-center justify-center font-bold text-base ${
+                      w.isToday
+                        ? 'bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white shadow-sm'
+                        : isSelected
+                        ? 'text-[#4E82EE] bg-[#4E82EE]/10'
+                        : 'text-(--text-primary)'
+                    }`}>
+                      {w.date.getDate()}
+                    </div>
+                    {w.items.length > 0 && (
+                      <span className="mt-1.5 text-[9px] font-semibold text-(--text-muted)">
+                        {w.items.length} event{w.items.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Events Row */}
+                  <div
+                    className={`flex-1 flex items-center gap-2 px-3 py-3 overflow-x-auto custom-scrollbar min-h-[76px] ${
+                      isSelected ? 'bg-[#4E82EE]/4' : 'bg-(--bg-card)'
+                    }`}
+                  >
+                    {w.items.length === 0 ? (
+                      <button
+                        onClick={() => openScheduleModal(w.date)}
+                        className="flex items-center gap-1.5 text-[11px] text-(--text-muted) hover:text-[#4E82EE] transition-colors cursor-pointer group"
+                      >
+                        <div className="w-6 h-6 rounded-lg border border-dashed border-(--border-subtle) group-hover:border-[#4E82EE]/40 flex items-center justify-center transition-colors">
+                          <Plus size={12} className="text-(--text-muted) group-hover:text-[#4E82EE]" />
+                        </div>
+                        <span>No events · Add one</span>
+                      </button>
+                    ) : (
+                      <>
+                        {w.items.map((item) => {
+                          const timeStr = item.dateTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                          const isCompleted = item.status === 'completed';
+                          return (
+                            <div
+                              key={item.id}
+                              className={`flex-shrink-0 flex flex-col justify-between px-3 py-2.5 rounded-xl border min-w-[130px] max-w-[180px] transition-all cursor-pointer ${
+                                isCompleted
+                                  ? 'bg-(--bg-elevated) border-(--border-subtle) opacity-50'
+                                  : item.type === 'task'
+                                  ? 'bg-[#4E82EE]/10 border-[#4E82EE]/25 hover:border-[#4E82EE]/60'
+                                  : 'bg-amber-500/10 border-amber-500/25 hover:border-amber-500/60'
+                              }`}
+                              onClick={() => handleDayClick(w.date)}
+                            >
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <span className={`text-[9px] font-mono font-bold ${
+                                  isCompleted ? 'text-(--text-muted)' : item.type === 'task' ? 'text-[#4E82EE]' : 'text-amber-500'
+                                }`}>
+                                  {timeStr}
+                                </span>
+                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                  isCompleted ? 'bg-emerald-500' : item.type === 'task' ? 'bg-[#4E82EE]' : 'bg-amber-500'
+                                }`} />
+                              </div>
+                              <div className={`text-[11px] font-semibold leading-tight line-clamp-2 ${
+                                isCompleted
+                                  ? 'line-through text-(--text-muted)'
+                                  : item.type === 'task'
+                                  ? 'text-[#4E82EE] dark:text-[#a8c7fa]'
+                                  : 'text-amber-700 dark:text-amber-400'
+                              }`}>
+                                {item.title}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Add event button at end of row */}
+                        <button
+                          onClick={() => openScheduleModal(w.date)}
+                          className="flex-shrink-0 w-8 h-8 rounded-xl border border-dashed border-(--border-subtle) hover:border-[#4E82EE]/40 flex items-center justify-center text-(--text-muted) hover:text-[#4E82EE] transition-all cursor-pointer"
+                          title="Add event"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── 4. DAY VIEW (HOUR-BY-HOUR TIMELINE) ──────────────── */}
+        {viewMode === 'day' && (
+          <div className="max-w-4xl mx-auto space-y-3">
+            {hoursGrid.map((hour) => {
+              const hourItems = selectedDayItems.filter((item) => item.dateTime.getHours() === hour);
+              const hourLabel = `${hour > 12 ? hour - 12 : hour}:00 ${hour >= 12 ? 'PM' : 'AM'}`;
+
+              return (
+                <div key={hour} className="flex gap-4 group min-h-[60px]">
+                  {/* Hour Label */}
+                  <div className="w-20 text-xs font-mono text-(--text-muted) shrink-0 pt-2 text-right">
+                    {hourLabel}
+                  </div>
+
+                  {/* Horizontal Line / Event Container */}
+                  <div className="flex-1 border-t border-(--border-subtle)/60 pt-2 relative">
+                    {hourItems.length === 0 ? (
+                      <div className="h-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+                        <button
+                          onClick={() => openScheduleModal(selectedDate, hour)}
+                          className="text-[11px] text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus size={12} /> Schedule at {hourLabel}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {hourItems.map((item) => {
+                          const isCompleted = item.status === 'completed';
+
+                          return (
+                            <div
+                              key={item.id}
+                              className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${
+                                isCompleted
+                                  ? 'bg-(--bg-elevated)/40 border-(--border-subtle) opacity-60'
+                                  : item.type === 'task'
+                                  ? 'bg-[#4E82EE]/10 border-[#4E82EE]/30'
+                                  : 'bg-amber-500/10 border-amber-500/30'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div
+                                  className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                                    item.type === 'task'
+                                      ? 'bg-[#4E82EE]/20 text-[#4E82EE]'
+                                      : 'bg-amber-500/20 text-amber-500'
+                                  }`}
+                                >
+                                  {item.type === 'task' ? (
+                                    <ListTodo size={16} />
+                                  ) : (
+                                    <AlarmClock size={16} />
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <div
+                                    className={`font-semibold text-xs sm:text-sm text-(--text-primary) truncate ${
+                                      isCompleted ? 'line-through text-(--text-muted)' : ''
+                                    }`}
+                                  >
+                                    {item.title}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-[11px] text-(--text-muted) font-mono">
+                                    <span>{hourLabel}</span>
+                                    <span>•</span>
+                                    <span className="capitalize">{item.priority} Priority</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {item.type === 'task' && (
+                                  <button
+                                    onClick={() => toggleTask(item.id, item.status)}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-all ${
+                                      isCompleted
+                                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                        : 'bg-(--bg-elevated) hover:bg-[#4E82EE]/15 hover:text-[#4E82EE] text-(--text-secondary)'
+                                    }`}
+                                  >
+                                    {isCompleted ? '✓ Done' : 'Mark Done'}
+                                  </button>
+                                )}
+                                {item.type === 'reminder' && (
+                                  <button
+                                    onClick={() => deleteReminder(item.id)}
+                                    className="p-1.5 rounded-full text-(--text-muted) hover:text-red-500 hover:bg-(--bg-card) transition-colors cursor-pointer"
+                                    title="Delete reminder"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Day Details Interactive Modal (Mobile & Desktop) ── */}
+      {isDayDetailsModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3 shrink-0">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#4E82EE]">
+                  {SHORT_WEEKDAYS[selectedDate.getDay()]}
+                </span>
+                <h2 className="font-bold text-base text-(--text-primary)">
+                  {MONTH_NAMES[selectedDate.getMonth()]} {selectedDate.getDate()}, {selectedDate.getFullYear()}
+                </h2>
+              </div>
+              <button
+                onClick={() => setIsDayDetailsModalOpen(false)}
+                className="p-1.5 rounded-full text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* List of events on this day */}
+            <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar py-1">
+              {selectedDayItems.length === 0 ? (
+                <div className="py-8 text-center space-y-2">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-(--bg-elevated) text-(--text-muted) flex items-center justify-center">
+                    <CalendarIcon size={22} />
+                  </div>
+                  <p className="text-xs text-(--text-muted) font-medium">
+                    No scheduled events or tasks for this day.
+                  </p>
+                </div>
+              ) : (
+                selectedDayItems.map((item) => {
+                  const isCompleted = item.status === 'completed';
+                  const timeStr = item.dateTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${
+                        isCompleted
+                          ? 'bg-(--bg-elevated)/40 border-(--border-subtle) opacity-60'
+                          : item.type === 'task'
+                          ? 'bg-[#4E82EE]/10 border-[#4E82EE]/30'
+                          : 'bg-amber-500/10 border-amber-500/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                            item.type === 'task'
+                              ? 'bg-[#4E82EE]/20 text-[#4E82EE]'
+                              : 'bg-amber-500/20 text-amber-500'
+                          }`}
+                        >
+                          {item.type === 'task' ? <ListTodo size={16} /> : <AlarmClock size={16} />}
+                        </div>
+                        <div className="min-w-0">
+                          <div
+                            className={`font-semibold text-xs sm:text-sm text-(--text-primary) truncate ${
+                              isCompleted ? 'line-through text-(--text-muted)' : ''
+                            }`}
+                          >
+                            {item.title}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-(--text-muted) font-mono">
+                            <span>{timeStr}</span>
+                            <span>•</span>
+                            <span className="capitalize">{item.priority} Priority</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {item.type === 'task' && (
+                          <button
+                            onClick={() => toggleTask(item.id, item.status)}
+                            className={`px-3 py-1 rounded-full text-xs font-semibold cursor-pointer transition-all ${
+                              isCompleted
+                                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-(--bg-elevated) hover:bg-[#4E82EE]/15 hover:text-[#4E82EE] text-(--text-secondary)'
+                            }`}
+                          >
+                            {isCompleted ? '✓ Done' : 'Mark Done'}
+                          </button>
+                        )}
+                        {item.type === 'reminder' && (
+                          <button
+                            onClick={() => deleteReminder(item.id)}
+                            className="p-1.5 rounded-full text-(--text-muted) hover:text-red-500 hover:bg-(--bg-card) transition-colors cursor-pointer"
+                            title="Delete reminder"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-3 border-t border-(--border-subtle) flex flex-col sm:flex-row gap-2 shrink-0">
+              <button
+                onClick={() => {
+                  setIsDayDetailsModalOpen(false);
+                  openScheduleModal(selectedDate);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold hover:opacity-95 shadow-xs transition-opacity cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Plus size={15} />
+                <span>+ Schedule on This Day</span>
+              </button>
+              <button
+                onClick={() => {
+                  setIsDayDetailsModalOpen(false);
+                  setViewMode('day');
+                }}
+                className="py-2.5 px-4 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span>Full Hourly Timeline</span>
+                <ArrowRight size={13} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Comprehensive Schedule Event Modal ────────────── */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#4E82EE]/15 text-[#4E82EE] flex items-center justify-center">
+                  <CalendarIcon size={16} />
+                </div>
+                <div>
+                  <h2 className="font-bold text-base text-(--text-primary)">
+                    Schedule Calendar Event
+                  </h2>
+                  <p className="text-[11px] text-(--text-muted)">
+                    Add an event, task deadline, or reminder alarm
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="p-1.5 rounded-full text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateEvent} className="space-y-4">
+              {/* Type Selector */}
+              <div>
+                <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5 uppercase tracking-wider">
+                  Event Type
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalType('event')}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      modalType === 'event'
+                        ? 'bg-[#4E82EE]/15 border-[#4E82EE] text-[#4E82EE] dark:text-[#a8c7fa] shadow-2xs'
+                        : 'bg-(--bg-elevated) border-(--border-subtle) text-(--text-muted)'
+                    }`}
+                  >
+                    <span>📅 Event</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalType('alarm')}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      modalType === 'alarm'
+                        ? 'bg-amber-500/15 border-amber-500 text-amber-600 dark:text-amber-400 shadow-2xs'
+                        : 'bg-(--bg-elevated) border-(--border-subtle) text-(--text-muted)'
+                    }`}
+                  >
+                    <span>⏰ Alarm</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModalType('task')}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      modalType === 'task'
+                        ? 'bg-emerald-500/15 border-emerald-500 text-emerald-600 dark:text-emerald-400 shadow-2xs'
+                        : 'bg-(--bg-elevated) border-(--border-subtle) text-(--text-muted)'
+                    }`}
+                  >
+                    <span>✅ Task</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
+                  Title & Purpose
+                </label>
+                <input
+                  type="text"
+                  value={modalTitle}
+                  onChange={(e) => setModalTitle(e.target.value)}
+                  placeholder="e.g. Q3 Roadmap Review, Client Demo, Dentist..."
+                  autoFocus
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-sm text-(--text-primary) focus:outline-none focus:border-[#4E82EE]"
+                />
+              </div>
+
+              {/* Date & Time Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={modalDate}
+                    onChange={(e) => setModalDate(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-sm text-(--text-primary) focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
+                    Start Time
+                  </label>
+                  <input
+                    type="time"
+                    value={modalTime}
+                    onChange={(e) => setModalTime(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-sm text-(--text-primary) focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Location / Meeting link */}
+              <div>
+                <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider flex items-center gap-1">
+                  <MapPin size={12} /> Location / Video Link (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={modalLocation}
+                  onChange={(e) => setModalLocation(e.target.value)}
+                  placeholder="e.g. Google Meet, Zoom, Main Conference Room..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-sm text-(--text-primary) focus:outline-none"
+                />
+              </div>
+
+              {/* Recurrence / Priority */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5 uppercase tracking-wider">
+                    Recurrence
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      { id: 'none', label: 'Once' },
+                      { id: 'daily', label: 'Daily' },
+                      { id: 'weekly', label: 'Weekly' },
+                      { id: 'monthly', label: 'Monthly' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setModalRecurrence(opt.id as any)}
+                        className={`py-2 px-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer text-center ${
+                          modalRecurrence === opt.id
+                            ? 'border-[#4E82EE] bg-[#4E82EE]/20 text-[#4E82EE] dark:text-[#a8c7fa] ring-2 ring-[#4E82EE]/30 font-bold'
+                            : 'border-(--border-subtle) bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary)'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5 uppercase tracking-wider">
+                    Priority
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      { id: 'low', label: 'Low', activeClass: 'border-slate-400 bg-slate-500/20 text-slate-200 ring-2 ring-slate-500/40 font-bold' },
+                      { id: 'medium', label: 'Medium', activeClass: 'border-blue-500 bg-blue-500/20 text-blue-400 ring-2 ring-blue-500/40 font-bold' },
+                      { id: 'high', label: 'High', activeClass: 'border-amber-500 bg-amber-500/20 text-amber-400 ring-2 ring-amber-500/40 font-bold' },
+                      { id: 'urgent', label: 'Urgent', activeClass: 'border-rose-500 bg-rose-500/20 text-rose-400 ring-2 ring-rose-500/40 font-bold' },
+                    ].map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setModalPriority(p.id as any)}
+                        className={`py-2 px-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer text-center ${
+                          modalPriority === p.id
+                            ? p.activeClass
+                            : 'border-(--border-subtle) bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary)'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-3 border-t border-(--border-subtle)">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-full bg-(--bg-elevated) text-xs font-semibold text-(--text-secondary) hover:bg-(--bg-card) border border-(--border-subtle) transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-full bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-semibold hover:opacity-95 shadow-sm transition-opacity cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Check size={15} />
+                  <span>Confirm Schedule</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

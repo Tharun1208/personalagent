@@ -1,0 +1,16 @@
+{
+  "appId": "ai.assistance.app",
+  "appName": "Assistance AI",
+  "webDir": "out",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0c111d",
+      "showSpinner": false
+    }
+  }
+}

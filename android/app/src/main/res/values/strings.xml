@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Assistance</string>
+    <string name="title_activity_main">Assistance</string>
+    <string name="package_name">com.assistance.ai</string>
+    <string name="custom_url_scheme">com.assistance.ai</string>
+</resources>

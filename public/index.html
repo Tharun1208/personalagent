@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Assistance AI Agent</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #0c111d;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+    }
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(78, 130, 238, 0.2);
+      border-radius: 50%;
+      border-top-color: #4e82ee;
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    h2 { font-size: 1.25rem; margin: 0 0 8px 0; font-weight: 600; }
+    p { font-size: 0.85rem; color: #94a3b8; margin: 0; }
+  </style>
+</head>
+<body>
+  <div class="spinner"></div>
+  <h2>Launching Assistance...</h2>
+  <p>Connecting to AI Agent Intelligence</p>
+  <script>
+    // Redirect to main entry point
+    if (window.location.pathname.endsWith('index.html')) {
+      window.location.replace('/');
+    }
+  </script>
+</body>
+</html>

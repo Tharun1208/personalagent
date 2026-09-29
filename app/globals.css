@@ -1,0 +1,275 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-montserrat), "Montserrat", sans-serif;
+  --font-serif: var(--font-cormorant), "Cormorant Garamond", serif;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
+}
+
+@layer base {
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f0f4f9;
+    --bg-sidebar: #f0f4f9;
+    --bg-card: #ffffff;
+    --bg-elevated: #e9eef6;
+    --bg-bubble-user: #f0f4f9;
+    --bg-composer: #f0f4f9;
+    --text-primary: #1f1f1f;
+    --text-secondary: #444746;
+    --text-muted: #727775;
+    --border-subtle: #e3e3e3;
+    --border-medium: #c4c7c5;
+    --border-composer: #d3d7dc;
+    --accent: #1a73e8;
+    --accent-hover: #1557b0;
+    --accent-contrast: #ffffff;
+    --send-btn-bg: #1a73e8;
+    --send-btn-text: #ffffff;
+    --brand-indigo: #4e82ee;
+    --brand-emerald: #10a37f;
+    --brand-amber: #d97706;
+    --brand-rose: #ef4444;
+    --memory-badge-bg: #e8f0fe;
+    --memory-badge-text: #174ea6;
+    --memory-badge-border: #d2e3fc;
+    --code-bg: #1e1f20;
+    --code-header-bg: #282a2c;
+  }
+
+  .dark {
+    --bg-primary: #131314;
+    --bg-secondary: #1e1f20;
+    --bg-sidebar: #1e1f20;
+    --bg-card: #1e1f20;
+    --bg-elevated: #282a2c;
+    --bg-bubble-user: #282a2c;
+    --bg-composer: #1e1f20;
+    --text-primary: #e3e3e3;
+    --text-secondary: #c4c7c5;
+    --text-muted: #8e918f;
+    --border-subtle: #282a2c;
+    --border-medium: #3c4043;
+    --border-composer: #3c4043;
+    --accent: #a8c7fa;
+    --accent-hover: #d3e3fd;
+    --accent-contrast: #041e49;
+    --send-btn-bg: #a8c7fa;
+    --send-btn-text: #041e49;
+    --brand-indigo: #4e82ee;
+    --brand-emerald: #10a37f;
+    --brand-amber: #f59e0b;
+    --brand-rose: #f87171;
+    --memory-badge-bg: #072711;
+    --memory-badge-text: #6ee7b7;
+    --memory-badge-border: #137333;
+    --code-bg: #1e1f20;
+    --code-header-bg: #282a2c;
+  }
+
+  html,
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-montserrat), "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-optical-sizing: auto;
+    font-size: 16px;
+    line-height: 1.65;
+    letter-spacing: -0.011em;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  code,
+  kbd,
+  samp,
+  pre,
+  .font-mono {
+    font-family: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    font-optical-sizing: auto;
+  }
+
+  .font-montserrat {
+    font-family: var(--font-montserrat), "Montserrat", sans-serif;
+    font-optical-sizing: auto;
+  }
+
+  .font-cormorant,
+  .font-serif {
+    font-family: var(--font-cormorant), "Cormorant Garamond", serif;
+    font-optical-sizing: auto;
+  }
+}
+
+/* Custom modern scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Code block highlight styling */
+.chat-code-block {
+  background-color: var(--code-bg);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  margin: 1.25rem 0;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.chat-code-header {
+  background-color: var(--code-header-bg);
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #a3a3a3;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.chat-code-content {
+  padding: 1.1rem 1.25rem;
+  overflow-x: auto;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: #f1f5f9;
+}
+
+:not(pre) > code {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: 0.2rem 0.45rem;
+  border-radius: 0.375rem;
+  font-size: 0.88em;
+  font-weight: 500;
+  border: 1px solid var(--border-subtle);
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Markdown typography in chat */
+.prose-recall {
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--text-primary);
+}
+.prose-recall p {
+  margin-bottom: 1rem;
+}
+.prose-recall p:last-child {
+  margin-bottom: 0;
+}
+.prose-recall h1,
+.prose-recall h2,
+.prose-recall h3,
+.prose-recall h4 {
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+.prose-recall h1 { font-size: 1.6rem; }
+.prose-recall h2 { font-size: 1.35rem; }
+.prose-recall h3 { font-size: 1.18rem; }
+.prose-recall h4 { font-size: 1.05rem; }
+
+.prose-recall ul,
+.prose-recall ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+.prose-recall ul {
+  list-style-type: disc;
+}
+.prose-recall ol {
+  list-style-type: decimal;
+}
+.prose-recall li {
+  margin-bottom: 0.45rem;
+}
+.prose-recall blockquote {
+  border-left: 3px solid var(--text-muted);
+  padding: 0.5rem 1rem;
+  margin: 1rem 0;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+.prose-recall hr {
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  margin: 1.5rem 0;
+}
+
+/* Markdown Tables */
+.prose-recall table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+  font-size: 0.95rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+.prose-recall th,
+.prose-recall td {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-subtle);
+  text-align: left;
+}
+.prose-recall th {
+  background-color: var(--bg-elevated);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.prose-recall a {
+  color: var(--brand-indigo);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 500;
+}
+.prose-recall strong {
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+/* Bottom composer gradient fade overlay */
+.composer-gradient-fade {
+  background: linear-gradient(180deg, transparent 0%, var(--bg-primary) 35%);
+}
+
+/* Hide Next.js dev indicator ("N" symbol) */
+nextjs-portal,
+[data-nextjs-toast],
+[data-nextjs-dialog-overlay],
+[data-nextjs-dev-tools],
+[data-nextjs-dev-indicator],
+div[data-nextjs-route-announcer],
+nextjs-toast,
+#nextjs-dev-overlay,
+#__next-build-watcher,
+div:has(> svg[data-nextjs-dev-indicator]) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Hide scrollbar but keep scrollability (used in full-screen sidebar drawer) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
