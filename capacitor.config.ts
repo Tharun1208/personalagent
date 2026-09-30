@@ -15,8 +15,8 @@ const config: CapacitorConfig = {
   appName: 'Personal Agent',
   webDir: 'public',
   server: {
-    // Public Cloudflare tunnel URL — works on all networks globally
-    url: 'https://removal-aberdeen-brochure-impact.trycloudflare.com',
+    // Production 24/7 Vercel Cloud deployment URL
+    url: 'https://personalagent-one.vercel.app',
     cleartext: false,
     androidScheme: 'https',
   },
