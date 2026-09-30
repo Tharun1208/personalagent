@@ -1,7 +1,7 @@
 /**
  * Web Audio API & HTML5 Audio Sound Synthesizer Engine
  * Generates custom alarm tones, sound effects, and reliable mobile-style alarm loops.
- * Compliant with modern browser Autoplay policies (Chrome, Safari, Edge, Mobile).
+ * Strictly compliant with browser Autoplay policies (Chrome, Safari, Edge, Android/iOS).
  */
 
 function generateAlarmWavUri(freq = 880, duration = 0.5): string {
@@ -30,7 +30,6 @@ function generateAlarmWavUri(freq = 880, duration = 0.5): string {
 
   for (let i = 0; i < numSamples; i++) {
     const t = i / sampleRate;
-    // Rapid dual pulse alarm beep (classic mobile phone clock pattern)
     const isBeeping = (t % 0.25) < 0.12;
     const sample = isBeeping ? Math.sin(2 * Math.PI * freq * t) * 0.9 : 0;
     view.setInt16(44 + i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
@@ -55,7 +54,7 @@ class SoundEngine {
   constructor() {
     if (typeof window !== 'undefined') {
       const unlockHandler = () => {
-        this.unlockAudio();
+        this.unlockFromUserGesture();
       };
 
       const events = ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'];
@@ -93,10 +92,23 @@ class SoundEngine {
     return this.unlocked;
   }
 
+  private canActivateAudio(): boolean {
+    if (typeof window === 'undefined') return false;
+    if (this.unlocked && this.ctx && this.ctx.state === 'running') return true;
+    if (
+      typeof navigator !== 'undefined' &&
+      'userActivation' in navigator &&
+      (navigator as any).userActivation?.hasBeenActive
+    ) {
+      return true;
+    }
+    return false;
+  }
+
   /**
-   * Unlock Web Audio context safely on user gesture
+   * Unlock Web Audio directly from a user gesture (trusted interaction)
    */
-  public unlockAudio(): void {
+  public unlockFromUserGesture(): void {
     if (typeof window === 'undefined') return;
 
     try {
@@ -115,20 +127,27 @@ class SoundEngine {
               this.unlocked = true;
               this.playSilentBuffer();
               this.notifyState();
-              this.resumePendingAlarm();
+              this.startPendingLoopIfAny();
             })
             .catch(() => {});
         } else if (this.ctx.state === 'running') {
           this.unlocked = true;
           this.notifyState();
-          this.resumePendingAlarm();
+          this.startPendingLoopIfAny();
         }
       }
     } catch {}
   }
 
   /**
-   * Silent 1-sample buffer playback to warm up iOS Safari and mobile Chrome WebAudio pipelines
+   * Public unlock handler (safe to call anywhere)
+   */
+  public unlockAudio(): void {
+    this.unlockFromUserGesture();
+  }
+
+  /**
+   * Play silent 1-sample buffer to warm up mobile WebAudio output
    */
   private playSilentBuffer(): void {
     if (!this.ctx || this.ctx.state !== 'running') return;
@@ -141,35 +160,28 @@ class SoundEngine {
     } catch {}
   }
 
-  private resumePendingAlarm(): void {
+  private startPendingLoopIfAny(): void {
     if (this.pendingAlarm && this.isLooping) {
       const { tone, volume, customUrl } = this.pendingAlarm;
       this.pendingAlarm = null;
-      this.startLoudAlarmLoop(tone, volume, customUrl);
+      this.executeLoop(tone, volume, customUrl);
     }
   }
 
   private getContextSafe(): AudioContext | null {
     if (typeof window === 'undefined') return null;
 
-    if (!this.ctx) {
-      // Only create AudioContext if user has already interacted or if allowed
-      const hasInteraction =
-        typeof navigator !== 'undefined' &&
-        'userActivation' in navigator &&
-        (navigator as any).userActivation?.hasBeenActive;
-
-      if (hasInteraction || this.unlocked) {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx) {
-          try {
-            this.ctx = new AudioCtx();
-          } catch {}
-        }
+    // Only create AudioContext if browser allows it without user gesture error
+    if (!this.ctx && this.canActivateAudio()) {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        try {
+          this.ctx = new AudioCtx();
+        } catch {}
       }
     }
 
-    if (this.ctx && this.ctx.state === 'suspended' && this.unlocked) {
+    if (this.ctx && this.ctx.state === 'suspended' && this.canActivateAudio()) {
       this.ctx.resume().catch(() => {});
     }
 
@@ -177,7 +189,7 @@ class SoundEngine {
   }
 
   /**
-   * Play synthesized alarm tone by key or custom URL (Loud & Clear)
+   * Play synthesized alarm tone by key or custom URL
    */
   public playAlarm(tone: string = 'digital', volume: number = 1.0, customUrl?: string): void {
     if (tone === 'custom' && customUrl) {
@@ -187,8 +199,10 @@ class SoundEngine {
 
     const ctx = this.getContextSafe();
     if (!ctx || ctx.state !== 'running') {
-      // If Web Audio is not ready, try fallback HTML5 Audio
-      this.playFallbackBeep(volume);
+      // AudioContext is not ready yet - only play fallback if permitted
+      if (this.canActivateAudio()) {
+        this.playFallbackBeep(volume);
+      }
       return;
     }
 
@@ -286,12 +300,11 @@ class SoundEngine {
 
         case 'digital':
         default: {
-          // Classic loud 4-pulse digital alarm clock beep
           [0, 0.12, 0.24, 0.36].forEach((delay) => {
             const osc = ctx.createOscillator();
             const oscGain = ctx.createGain();
             osc.type = 'square';
-            osc.frequency.setValueAtTime(1046.5, now + delay); // C6
+            osc.frequency.setValueAtTime(1046.5, now + delay);
             oscGain.gain.setValueAtTime(effectiveVol * 0.5, now + delay);
             oscGain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.08);
             osc.connect(oscGain);
@@ -303,12 +316,14 @@ class SoundEngine {
         }
       }
     } catch {
-      this.playFallbackBeep(volume);
+      if (this.canActivateAudio()) {
+        this.playFallbackBeep(volume);
+      }
     }
   }
 
   /**
-   * Fallback loud audio element beep if Web Audio context is not yet running
+   * Fallback loud audio element beep
    */
   public playFallbackBeep(volume: number = 1.0): void {
     if (typeof window === 'undefined') return;
@@ -326,24 +341,32 @@ class SoundEngine {
             this.unlocked = true;
             this.notifyState();
           })
-          .catch(() => {
-            // Browser autoplay policy prevented playback until gesture
-          });
+          .catch(() => {});
       }
     } catch {}
   }
 
   /**
    * Continuous Loud Mobile Alarm Loop
-   * Rings continuously until stopped (just like iOS / Android alarm clock)
+   * Rings continuously until stopped
    */
   public startLoudAlarmLoop(tone: string = 'digital', volume: number = 1.0, customUrl?: string): void {
     this.stopLoudAlarmLoop();
     this.isLooping = true;
     this.pendingAlarm = { tone, volume, customUrl };
 
-    // Try unlock if user gesture was already registered
-    this.unlockAudio();
+    if (!this.canActivateAudio()) {
+      // Audio is restricted by browser autoplay policy until user gesture
+      // DO NOT call AudioContext.resume() or new AudioContext() here to avoid console errors!
+      this.notifyState();
+      return;
+    }
+
+    this.executeLoop(tone, volume, customUrl);
+  }
+
+  private executeLoop(tone: string, volume: number, customUrl?: string): void {
+    if (!this.isLooping) return;
 
     if (tone === 'custom' && customUrl) {
       this.playCustomAudio(customUrl, volume);
@@ -359,7 +382,9 @@ class SoundEngine {
     };
 
     ring();
-    this.alarmLoopTimer = setInterval(ring, 1200);
+    if (!this.alarmLoopTimer) {
+      this.alarmLoopTimer = setInterval(ring, 1200);
+    }
   }
 
   /**
@@ -381,9 +406,6 @@ class SoundEngine {
     }
   }
 
-  /**
-   * Play custom uploaded audio / URL
-   */
   public playCustomAudio(url: string, volume: number = 1.0): void {
     try {
       this.stopCustomAudio();
@@ -395,13 +417,16 @@ class SoundEngine {
           this.unlocked = true;
           this.notifyState();
         }).catch(() => {
-          // Fallback if blocked
-          this.playFallbackBeep(volume);
+          if (this.canActivateAudio()) {
+            this.playFallbackBeep(volume);
+          }
         });
       }
       this.currentCustomAudio = audio;
     } catch {
-      this.playFallbackBeep(volume);
+      if (this.canActivateAudio()) {
+        this.playFallbackBeep(volume);
+      }
     }
   }
 

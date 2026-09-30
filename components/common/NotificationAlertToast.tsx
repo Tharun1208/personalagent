@@ -132,6 +132,7 @@ export default function NotificationAlertToast() {
 
   const handleTapScreen = () => {
     soundEngine.unlockAudio();
+    setIsAudioUnlocked(true);
   };
 
   const handleDismiss = (id: string) => {
@@ -229,12 +230,15 @@ export default function NotificationAlertToast() {
 
         {/* Sound & Audio Visualizer Status / Tap Prompt */}
         {!isAudioUnlocked ? (
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold animate-pulse shadow-lg cursor-pointer">
-            <Volume2 size={16} />
-            <span>Tap screen to unmute loud sound</span>
-          </div>
+          <button
+            onClick={handleTapScreen}
+            className="w-full max-w-xs py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-red-500 hover:from-amber-400 hover:to-red-400 text-white font-extrabold text-sm tracking-wide shadow-2xl shadow-rose-500/50 flex items-center justify-center gap-2.5 animate-bounce cursor-pointer active:scale-95 border border-white/20"
+          >
+            <Volume2 size={20} />
+            <span>TAP TO UNMUTE LOUD SOUND</span>
+          </button>
         ) : (
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-white/90 text-xs font-semibold backdrop-blur-md">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 text-white/90 text-xs font-semibold backdrop-blur-md">
             <Volume2 size={15} className="text-rose-400 animate-pulse" />
             <span>Loud Alarm Tone Ringing</span>
           </div>
