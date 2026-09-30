@@ -96,14 +96,6 @@ const NAV_ITEMS: NavItem[] = [
     glow: 'shadow-teal-500/25',
   },
   {
-    key: 'apps',
-    title: 'Dynamic Apps',
-    subtitle: 'Interactive tools & AI sandbox',
-    icon: Boxes,
-    gradient: 'from-violet-600 to-indigo-600',
-    glow: 'shadow-violet-500/25',
-  },
-  {
     key: 'calendar',
     title: 'Calendar & Schedule',
     subtitle: 'Events & timeline',
@@ -187,9 +179,9 @@ export default function Sidebar({ onClose }: SidebarProps) {
         </div>
       </div>
 
-      {/* ── Main Navigation List ── */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5 custom-scrollbar">
-        <div className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-(--text-muted)">
+      {/* ── Main Navigation List (No scrolling, fits cleanly) ── */}
+      <div className="flex-1 overflow-hidden px-3 py-1.5 space-y-1">
+        <div className="px-3 pt-0.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-(--text-muted)">
           Workspace Modules
         </div>
 
@@ -205,9 +197,9 @@ export default function Sidebar({ onClose }: SidebarProps) {
                 setActiveTab(item.key as any);
                 if (onClose) onClose();
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left transition-all duration-200 cursor-pointer group relative ${
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-all duration-200 cursor-pointer group relative ${
                 isActive
-                  ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg ${item.glow}`
+                  ? `bg-gradient-to-r ${item.gradient} text-white shadow-md ${item.glow}`
                   : 'text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
               }`}
             >

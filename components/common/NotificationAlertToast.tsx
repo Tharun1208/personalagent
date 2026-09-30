@@ -8,35 +8,13 @@ import {
   X,
   Volume2,
   VolumeX,
-  Sparkles,
-  ArrowRight,
   RotateCcw,
   AlarmClock,
+  Radio,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { AppNotification } from '@/types';
 import { soundEngine } from '@/lib/audio/soundEngine';
-
-let alarmIntervalId: any = null;
-
-function startAlarmSound(tone: string = 'digital', volume: number = 0.8, customUrl?: string) {
-  try {
-    const play = () => soundEngine.playAlarm(tone, volume, customUrl);
-    play();
-    if (alarmIntervalId) clearInterval(alarmIntervalId);
-    alarmIntervalId = setInterval(play, 2000);
-  } catch (err) {
-    console.warn('Alarm audio error', err);
-  }
-}
-
-function stopAlarmSound() {
-  if (alarmIntervalId) {
-    clearInterval(alarmIntervalId);
-    alarmIntervalId = null;
-  }
-  soundEngine.stopCustomAudio();
-}
 
 export default function NotificationAlertToast() {
   const {
@@ -50,6 +28,20 @@ export default function NotificationAlertToast() {
 
   const [activeAlerts, setActiveAlerts] = useState<AppNotification[]>([]);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [currentTime, setCurrentTime] = useState<string>('');
+
+  // Live clock for mobile alarm screen
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTime(
+        now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      );
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Request browser notification permission once on mount
   useEffect(() => {
@@ -68,17 +60,17 @@ export default function NotificationAlertToast() {
       if (newItems.length > 0) {
         setActiveAlerts((prev) => [...newItems, ...prev]);
 
-        // Start loud looping alarm with user's selected tone
-        startAlarmSound(
+        // Start loud looping mobile alarm tone
+        soundEngine.startLoudAlarmLoop(
           user?.preferences?.alarmTone || 'digital',
-          user?.preferences?.alarmVolume ?? 0.8,
+          user?.preferences?.alarmVolume ?? 1.0,
           user?.preferences?.customAlarmUrl
         );
 
-        // Native Haptic Vibration for Mobile
+        // Native Mobile Haptic Vibration loop
         if (typeof window !== 'undefined' && 'navigator' in window && navigator.vibrate) {
           try {
-            navigator.vibrate([250, 100, 250, 100, 400]);
+            navigator.vibrate([400, 150, 400, 150, 600]);
           } catch {}
         }
 
@@ -88,26 +80,37 @@ export default function NotificationAlertToast() {
             try {
               new Notification(item.title || 'Assistance Alarm', {
                 body: item.message,
-                icon: '/logo.svg',
-                badge: '/logo.svg',
+                icon: '/logo.png',
+                badge: '/logo.png',
                 tag: item.id,
                 requireInteraction: true,
               });
-            } catch {
-              // silent fallback
-            }
+            } catch {}
           });
         }
       }
     } else if (activeAlerts.length === 0) {
-      stopAlarmSound();
+      soundEngine.stopLoudAlarmLoop();
     }
   }, [notifications, dismissedIds, activeAlerts, user]);
+
+  // Periodic mobile vibration while ringing
+  useEffect(() => {
+    if (activeAlerts.length === 0) return;
+    const vibInterval = setInterval(() => {
+      if (typeof window !== 'undefined' && 'navigator' in window && navigator.vibrate) {
+        try {
+          navigator.vibrate([400, 150, 400, 150, 600]);
+        } catch {}
+      }
+    }, 1800);
+    return () => clearInterval(vibInterval);
+  }, [activeAlerts.length]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopAlarmSound();
+      soundEngine.stopLoudAlarmLoop();
     };
   }, []);
 
@@ -117,12 +120,11 @@ export default function NotificationAlertToast() {
     setActiveAlerts(next);
     markNotificationRead(id);
     if (next.length === 0) {
-      stopAlarmSound();
+      soundEngine.stopLoudAlarmLoop();
     }
   };
 
   const handleComplete = (alert: AppNotification) => {
-    // Try to find matching pending task to complete as well
     const alertTitle = alert.title.toLowerCase();
     const matchedTask = tasks.find(
       (t) =>
@@ -143,84 +145,101 @@ export default function NotificationAlertToast() {
 
   if (activeAlerts.length === 0) return null;
 
+  // The primary active alarm
+  const primaryAlert = activeAlerts[0];
+
   return (
-    <div className="fixed top-3 sm:top-5 inset-x-3 sm:inset-x-0 mx-auto max-w-lg z-50 pointer-events-auto flex flex-col gap-2.5 animate-in slide-in-from-top-4 duration-250">
-      {activeAlerts.map((alert) => (
-        <div
-          key={alert.id}
-          className="w-full rounded-3xl bg-(--bg-card) border border-[#4E82EE]/40 shadow-2xl p-4 sm:p-5 text-(--text-primary) backdrop-blur-xl relative overflow-hidden"
+    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex flex-col items-center justify-between p-6 sm:p-10 select-none animate-in fade-in duration-300">
+      
+      {/* Top Header: Brand & Dismiss */}
+      <div className="w-full max-w-md flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+          <span className="text-xs font-bold uppercase tracking-widest text-rose-400">
+            Alarm Ringing
+          </span>
+        </div>
+        <button
+          onClick={() => handleDismiss(primaryAlert.id)}
+          className="p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          title="Dismiss"
         >
-          {/* Top glowing ambient gradient banner */}
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] animate-pulse" />
+          <X size={20} />
+        </button>
+      </div>
 
-          {/* Top Row: App Icon, Brand, Time, Close */}
-          <div className="flex items-center justify-between gap-3 mb-2.5">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 text-white flex items-center justify-center shrink-0 shadow-md">
-                <AlarmClock size={18} className="animate-bounce" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-bold text-xs tracking-tight text-(--text-primary)">
-                    Assistance Alarm
-                  </span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping shrink-0" />
-                </div>
-                <div className="text-[10px] text-(--text-muted) font-mono">
-                  {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => handleDismiss(alert.id)}
-              className="p-1.5 rounded-full text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) transition-colors cursor-pointer"
-              title="Dismiss"
-            >
-              <X size={16} />
-            </button>
-          </div>
-
-          {/* Alert Title & Message */}
-          <div className="space-y-0.5 mb-3.5 pl-0.5">
-            <h3 className="font-bold text-sm sm:text-base text-(--text-primary) leading-snug">
-              {alert.title.replace(/^Reminder:\s*/i, '')}
-            </h3>
-            {alert.message && (
-              <p className="text-xs text-(--text-secondary) leading-relaxed">
-                {alert.message}
-              </p>
-            )}
-          </div>
-
-          {/* Action Buttons Row */}
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => handleDismiss(alert.id)}
-              className="py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 shadow-xs"
-            >
-              <VolumeX size={14} />
-              <span>Stop</span>
-            </button>
-
-            <button
-              onClick={() => handleSnooze(alert)}
-              className="py-2 px-3 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) font-semibold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
-            >
-              <RotateCcw size={13} className="text-[#4E82EE]" />
-              <span>Snooze 5m</span>
-            </button>
-
-            <button
-              onClick={() => handleComplete(alert)}
-              className="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 shadow-xs"
-            >
-              <CheckCircle2 size={13} />
-              <span>Done</span>
-            </button>
+      {/* Center: Mobile Alarm Clock UI */}
+      <div className="w-full max-w-md flex flex-col items-center text-center space-y-6 my-auto">
+        
+        {/* Pulsing Animated Bell Ring */}
+        <div className="relative flex items-center justify-center">
+          <div className="absolute w-36 h-36 rounded-full bg-rose-500/20 animate-ping" />
+          <div className="absolute w-28 h-28 rounded-full bg-rose-500/30 animate-pulse" />
+          <div className="relative w-22 h-22 rounded-full bg-gradient-to-tr from-rose-600 via-orange-500 to-amber-500 text-white flex items-center justify-center shadow-2xl shadow-rose-500/50">
+            <AlarmClock size={44} className="animate-bounce" />
           </div>
         </div>
-      ))}
+
+        {/* Live Digital Clock Digits (Mobile Alarm Clock style) */}
+        <div className="space-y-1">
+          <div className="text-4xl sm:text-5xl font-mono font-black tracking-tight text-white drop-shadow-md">
+            {currentTime || '09:00:00 AM'}
+          </div>
+          <div className="text-xs text-rose-300/80 font-medium tracking-wide">
+            Assistance Mobile Alarm Clock
+          </div>
+        </div>
+
+        {/* Alarm Title & Message */}
+        <div className="space-y-2 px-4 max-w-sm">
+          <h2 className="text-xl sm:text-2xl font-black text-white leading-snug tracking-tight">
+            {primaryAlert.title.replace(/^Reminder:\s*/i, '')}
+          </h2>
+          {primaryAlert.message && (
+            <p className="text-sm text-white/75 font-medium leading-relaxed">
+              {primaryAlert.message}
+            </p>
+          )}
+        </div>
+
+        {/* Sound & Audio Visualizer Status */}
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-white/90 text-xs font-semibold backdrop-blur-md">
+          <Volume2 size={15} className="text-rose-400 animate-pulse" />
+          <span>Loud Alarm Tone Ringing</span>
+        </div>
+      </div>
+
+      {/* Bottom: Mobile Touch Action Buttons */}
+      <div className="w-full max-w-md space-y-3">
+        {/* Big Stop Alarm Button (Full Width Mobile Style) */}
+        <button
+          onClick={() => handleDismiss(primaryAlert.id)}
+          className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-extrabold text-base tracking-wide transition-all shadow-xl shadow-rose-600/40 flex items-center justify-center gap-2.5 active:scale-[0.98] cursor-pointer"
+        >
+          <VolumeX size={20} />
+          <span>STOP ALARM</span>
+        </button>
+
+        {/* Snooze & Complete Row */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => handleSnooze(primaryAlert)}
+            className="py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+          >
+            <RotateCcw size={15} className="text-amber-400" />
+            <span>Snooze (5m)</span>
+          </button>
+
+          <button
+            onClick={() => handleComplete(primaryAlert)}
+            className="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-md shadow-emerald-600/30"
+          >
+            <CheckCircle2 size={15} />
+            <span>Done / Complete</span>
+          </button>
+        </div>
+      </div>
+
     </div>
   );
 }

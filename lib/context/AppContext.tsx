@@ -583,7 +583,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     loadMessages();
   }, [activeConversationId]);
 
-  // Real-time Reminder & Notification Checker (every 10s & on focus)
+  // Real-time Reminder & Notification Checker (1s high-precision local check + 10s API sync)
   useEffect(() => {
     if (!user) return;
 
@@ -599,14 +599,56 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    // Instant 1-second local check so alarms trigger to the exact second (mobile app behavior)
+    const checkLocalAlarms = () => {
+      const now = Date.now();
+      const pending = reminders.filter((r) => r.status === 'pending' && r.dueDateTime);
+      let triggeredAny = false;
+
+      for (const r of pending) {
+        const due = new Date(r.dueDateTime).getTime();
+        if (!isNaN(due) && due <= now) {
+          triggeredAny = true;
+          // Optimistically update reminder status locally
+          setReminders((prev) =>
+            prev.map((item) => (item.id === r.id ? { ...item, status: 'triggered' } : item))
+          );
+          // Create instant alarm notification
+          const newNotif: AppNotification = {
+            id: `notif_alarm_${r.id}_${Date.now()}`,
+            userId: user.id,
+            title: r.title || 'Alarm',
+            message: r.notes || `Your alarm "${r.title || 'Alarm'}" is ringing now!`,
+            type: 'reminder',
+            read: false,
+            actionUrl: '/reminders',
+            createdAt: new Date().toISOString(),
+          };
+          setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)]);
+          apiFetch(`/api/reminders/${r.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'triggered' }),
+          }).catch(() => {});
+        }
+      }
+
+      if (triggeredAny) {
+        checkNotifications();
+      }
+    };
+
     checkNotifications();
-    const interval = setInterval(checkNotifications, 10000);
+    const localInterval = setInterval(checkLocalAlarms, 1000);
+    const syncInterval = setInterval(checkNotifications, 10000);
     window.addEventListener('focus', checkNotifications);
+
     return () => {
-      clearInterval(interval);
+      clearInterval(localInterval);
+      clearInterval(syncInterval);
       window.removeEventListener('focus', checkNotifications);
     };
-  }, []);
+  }, [user, reminders]);
 
   const currentConversation = conversations.find((c) => c.id === activeConversationId) || null;
   const unreadNotificationCount = notifications.filter((n) => !n.read).length;
