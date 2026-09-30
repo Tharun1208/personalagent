@@ -674,6 +674,124 @@ Explain what you see clearly, extract any key text/details, and answer the user'
     }
 
     // ─────────────────────────────────────────────────────────────
+    // STEP 2.5: COMPREHENSIVE DAILY BRIEFING & UPDATES
+    // ─────────────────────────────────────────────────────────────
+    const isDailyBriefingQuery =
+      /\b(?:daily (?:briefing|update|updates|standup|overview|summary|brief)|morning (?:briefing|brief|update)|what(?:'s| is) on my plate|today'?s? agenda|my agenda today|brief me|summary of today|daily plan)\b/i.test(lower) ||
+      lower === 'daily update' ||
+      lower === 'daily updates' ||
+      lower === 'daily briefing' ||
+      lower === 'brief' ||
+      lower === 'agenda';
+
+    if (isDailyBriefingQuery) {
+      toolSteps.push({
+        toolName: 'BriefingTool',
+        action: 'generateDailyBriefing',
+        input: { timezone },
+        status: 'executing',
+      });
+
+      const userObj = db.getUserById(userId);
+      const userName = (userObj?.preferences as any)?.displayName || userObj?.name || 'User';
+      const tz = timezone || (userObj?.preferences as any)?.timezone || 'Asia/Kolkata';
+
+      const now = new Date();
+      const dayOfWeek = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: tz }).format(now);
+      const fullDate = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: tz }).format(now);
+      const fullTime = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz }).format(now);
+
+      const allTasks = db.getTasks(userId);
+      const pendingTasks = allTasks.filter((t) => t.status !== 'completed' && t.status !== 'cancelled');
+
+      const allReminders = db.getReminders(userId);
+      const pendingReminders = allReminders.filter((r) => r.status === 'pending');
+
+      const allGoals = db.getGoals(userId).filter((g) => g.status === 'active');
+      const allHabits = db.getHabits(userId);
+      const allLedger = db.getLedgerEntries(userId).filter((l) => l.status === 'pending');
+
+      const receivableTotal = allLedger.filter((l) => l.type === 'receive').reduce((sum, l) => sum + (l.amount || 0), 0);
+      const payableTotal = allLedger.filter((l) => l.type === 'give').reduce((sum, l) => sum + (l.amount || 0), 0);
+
+      toolSteps[toolSteps.length - 1] = {
+        toolName: 'BriefingTool',
+        action: 'generateDailyBriefing',
+        input: { timezone: tz },
+        output: { pendingTasks: pendingTasks.length, reminders: pendingReminders.length, goals: allGoals.length },
+        status: 'success',
+      };
+
+      let reply = `## 🌅 Daily Executive Briefing for ${userName}\n`;
+      reply += `📅 **${dayOfWeek}, ${fullDate}** • ⏰ **${fullTime}** (*${tz}*)\n\n`;
+      reply += `---\n\n`;
+
+      // 1. Pending Tasks Section
+      reply += `### 📋 Priority Tasks (${pendingTasks.length} pending)\n`;
+      if (pendingTasks.length === 0) {
+        reply += `*✓ All caught up! No pending tasks on your plate right now.*\n\n`;
+      } else {
+        for (const t of pendingTasks.slice(0, 5)) {
+          const badge = t.priority === 'urgent' ? '🔴 **[URGENT]**' : t.priority === 'high' ? '🟠 **[HIGH]**' : '🟢';
+          const due = t.dueDate ? ` *(Due: ${new Date(t.dueDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })})*` : '';
+          reply += `* ${badge} **${t.title}**${due}\n`;
+        }
+        if (pendingTasks.length > 5) {
+          reply += `*...and **${pendingTasks.length - 5}** more tasks.*\n`;
+        }
+        reply += `\n`;
+      }
+
+      // 2. Upcoming Reminders & Alarms Section
+      reply += `### ⏰ Scheduled Alarms & Reminders (${pendingReminders.length} active)\n`;
+      if (pendingReminders.length === 0) {
+        reply += `*No alarms or reminders scheduled for today.*\n\n`;
+      } else {
+        for (const r of pendingReminders.slice(0, 4)) {
+          const formatted = new Date(r.dueDateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+          reply += `* 🔔 **${r.title}** — **${formatted}**\n`;
+        }
+        reply += `\n`;
+      }
+
+      // 3. Habits Check-in
+      if (allHabits.length > 0) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const completedToday = allHabits.filter((h) => h.lastCompletedDate?.startsWith(todayStr) || h.history?.some((d) => d.startsWith(todayStr))).length;
+        reply += `### 💪 Daily Habits (${completedToday}/${allHabits.length} checked in today)\n`;
+        for (const h of allHabits.slice(0, 4)) {
+          const isDone = h.lastCompletedDate?.startsWith(todayStr) || h.history?.some((d) => d.startsWith(todayStr));
+          reply += `* ${isDone ? '✅' : '⚪'} **${h.title}** (${h.streak || 0}-day streak)\n`;
+        }
+        reply += `\n`;
+      }
+
+      // 4. Financial Ledger Dues
+      if (allLedger.length > 0) {
+        reply += `### 💰 Money Ledger & Dues\n`;
+        if (receivableTotal > 0) reply += `* 🟢 **To Receive:** ₹${receivableTotal.toLocaleString()} (owed to you)\n`;
+        if (payableTotal > 0) reply += `* 🔴 **To Pay:** ₹${payableTotal.toLocaleString()} (you owe)\n`;
+        reply += `\n`;
+      }
+
+      // 5. Active Goals
+      if (allGoals.length > 0) {
+        reply += `### 🎯 Active Goals & OKRs\n`;
+        for (const g of allGoals.slice(0, 3)) {
+          reply += `* 🚀 **${g.title}** — ${g.progress}% progress\n`;
+        }
+        reply += `\n`;
+      }
+
+      reply += `*Type any task or alarm to schedule new updates immediately!*`;
+
+      return {
+        reply,
+        toolSteps,
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // STEP 3: TASK CREATION, COMPLETION & RETRIEVAL
     // ─────────────────────────────────────────────────────────────
     const taskIntent = parseTaskIntent(trimmed);

@@ -129,19 +129,34 @@ export default function ChatView() {
             <div className="flex flex-wrap gap-2 w-full pt-2">
               {[
                 {
-                  icon: '⏰',
-                  label: 'Task & alarm',
-                  desc: 'task is to complete the UID assignment\ndue is today 6pm\npriority is high\nand remind me at 6pm',
-                },
-                {
-                  icon: '📅',
-                  label: "Today's date & time",
-                  desc: "What is today's date, day, and current time?",
+                  icon: '🌅',
+                  label: 'Daily Briefing',
+                  desc: 'Give me my daily briefing and today\'s schedule',
                 },
                 {
                   icon: '📋',
-                  label: 'Pending tasks',
-                  desc: 'Show all my current tasks and scheduled alarms',
+                  label: 'Pending Tasks',
+                  desc: 'What are my pending tasks?',
+                },
+                {
+                  icon: '⏰',
+                  label: 'Today\'s Alarms',
+                  desc: 'Show my scheduled alarms and reminders',
+                },
+                {
+                  icon: '💪',
+                  label: 'Daily Habits',
+                  desc: 'Show my habits for today',
+                },
+                {
+                  icon: '💰',
+                  label: 'Money Dues',
+                  desc: 'Who owes me money and what are my dues?',
+                },
+                {
+                  icon: '📅',
+                  label: 'Date & Time',
+                  desc: 'What is today\'s date, day, and current local time?',
                 },
               ].map((item, idx) => (
                 <button

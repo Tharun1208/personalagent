@@ -33,14 +33,14 @@ interface SidebarProps {
 
 // ── Modern & Sleek Nav Items (Pure Lucide Icons) ───────────────────────────
 const NAV_ITEMS = [
-  { key: 'chat',      title: 'Chat',            icon: Sparkles },
   { key: 'dashboard', title: 'Executive KPI',   icon: Compass },
-  { key: 'tasks',     title: 'Tasks',           icon: ListTodo },
-  { key: 'habits',    title: 'Habits & Streaks', icon: Flame },
+  { key: 'chat',      title: 'AI Chat',         icon: Sparkles },
+  { key: 'tasks',     title: 'Tasks & Todos',   icon: ListTodo },
   { key: 'reminders', title: 'Alarms & Alerts', icon: AlarmClock },
+  { key: 'habits',    title: 'Habits & Streaks', icon: Flame },
   { key: 'goals',     title: 'Goals & OKRs',    icon: Trophy },
-  { key: 'calendar',  title: 'Calendar',        icon: Calendar },
   { key: 'ledger',    title: 'Ledger & Spending', icon: CreditCard },
+  { key: 'calendar',  title: 'Calendar',        icon: Calendar },
 ] as const;
 
 export default function Sidebar({ onClose, isCollapsed, onToggleCollapse }: SidebarProps) {
