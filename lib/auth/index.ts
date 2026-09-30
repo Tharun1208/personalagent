@@ -35,7 +35,28 @@ export const auth = {
       const payload = auth.verifyToken(token);
       if (!payload?.userId) return null;
 
-      return db.getUserById(payload.userId);
+      const u = db.getUserById(payload.userId);
+      if (u) return u;
+
+      // Recover valid user from verified JWT payload
+      const recoveredUser: User = {
+        id: payload.userId,
+        email: payload.email || 'user@assistance.ai',
+        name: payload.email ? payload.email.split('@')[0] : 'Personal User',
+        createdAt: new Date().toISOString(),
+        preferences: {
+          theme: 'dark',
+          aiProvider: 'builtin',
+          model: 'Recall Core Ultra',
+          voiceEnabled: true,
+          voiceAutoRead: false,
+          proactiveReminders: true,
+          soundEffects: true,
+          confirmDestructiveActions: true,
+        },
+      };
+      db.createUser(recoveredUser, 'recovered_hash');
+      return recoveredUser;
     } catch {
       return null;
     }
@@ -43,30 +64,46 @@ export const auth = {
 
   getUserFromRequest(req: NextRequest): User | null {
     try {
+      let payload: TokenPayload | null = null;
+
       // 1. Check cookie
       const token = req.cookies.get(COOKIE_NAME)?.value;
       if (token) {
-        const payload = auth.verifyToken(token);
-        if (payload?.userId) {
-          const u = db.getUserById(payload.userId);
-          if (u) return u;
+        payload = auth.verifyToken(token);
+      }
+
+      // 2. Check Authorization Header if cookie not found or invalid
+      if (!payload) {
+        const authHeader = req.headers.get('authorization');
+        if (authHeader?.startsWith('Bearer ')) {
+          payload = auth.verifyToken(authHeader.substring(7));
         }
       }
 
-      // 2. Check Authorization Header
-      const authHeader = req.headers.get('authorization');
-      if (authHeader?.startsWith('Bearer ')) {
-        const bearerToken = authHeader.substring(7);
-        const payload = auth.verifyToken(bearerToken);
-        if (payload?.userId) {
-          const u = db.getUserById(payload.userId);
-          if (u) return u;
-        }
-      }
+      if (!payload?.userId) return null;
 
-      // No session → no user. Never fall back to a shared/seeded account:
-      // that would leak one user's data into guest sessions.
-      return null;
+      const u = db.getUserById(payload.userId);
+      if (u) return u;
+
+      // Recover valid user from verified JWT payload if DB mirror hasn't seeded this specific ID
+      const recoveredUser: User = {
+        id: payload.userId,
+        email: payload.email || 'user@assistance.ai',
+        name: payload.email ? payload.email.split('@')[0] : 'Personal User',
+        createdAt: new Date().toISOString(),
+        preferences: {
+          theme: 'dark',
+          aiProvider: 'builtin',
+          model: 'Recall Core Ultra',
+          voiceEnabled: true,
+          voiceAutoRead: false,
+          proactiveReminders: true,
+          soundEffects: true,
+          confirmDestructiveActions: true,
+        },
+      };
+      db.createUser(recoveredUser, 'recovered_hash');
+      return recoveredUser;
     } catch {
       return null;
     }

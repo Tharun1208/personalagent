@@ -11,6 +11,7 @@ import {
   Radio,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
+import { apiFetch } from '@/lib/api';
 
 export default function LiveVoiceModal({
   isOpen,
@@ -95,7 +96,7 @@ export default function LiveVoiceModal({
   const handleSendVoice = async (text: string) => {
     if (!text.trim()) return;
     try {
-      const res = await fetch('/api/chat', {
+      const res = await apiFetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text.trim(), conversationId: 'conv_voice_live' }),

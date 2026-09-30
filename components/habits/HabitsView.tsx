@@ -1,5 +1,4 @@
 'use client';
-
 import React, { useState, useEffect } from 'react';
 import {
   Flame,
@@ -12,6 +11,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { Habit } from '@/types';
+import { apiFetch } from '@/lib/api';
 
 export default function HabitsView() {
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -21,7 +21,7 @@ export default function HabitsView() {
 
   const fetchHabits = async () => {
     try {
-      const res = await fetch('/api/habits');
+      const res = await apiFetch('/api/habits');
       const data = await res.json();
       if (data.habits) setHabits(data.habits);
     } catch (err) {
@@ -40,7 +40,7 @@ export default function HabitsView() {
     if (!newTitle.trim()) return;
 
     try {
-      const res = await fetch('/api/habits', {
+      const res = await apiFetch('/api/habits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newTitle.trim(), frequency: 'daily' }),
@@ -58,7 +58,7 @@ export default function HabitsView() {
 
   const handleToggle = async (id: string) => {
     try {
-      const res = await fetch('/api/habits', {
+      const res = await apiFetch('/api/habits', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
@@ -74,7 +74,7 @@ export default function HabitsView() {
 
   const handleDelete = async (id: string) => {
     try {
-      await fetch(`/api/habits?id=${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/habits?id=${id}`, { method: 'DELETE' });
       setHabits((prev) => prev.filter((h) => h.id !== id));
     } catch (err) {
       console.error('Failed to delete habit', err);

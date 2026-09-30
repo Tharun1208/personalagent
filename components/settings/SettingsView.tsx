@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { soundEngine } from '@/lib/audio/soundEngine';
+import { apiFetch } from '@/lib/api';
 
 const BUILT_IN_TONES = [
   { id: 'digital', name: 'Digital Pulse', desc: 'Crisp high-tech triple electronic beep', IconComponent: Zap, color: 'text-amber-500 bg-amber-500/10' },
@@ -149,7 +150,7 @@ export default function SettingsView() {
 
   const handleExportData = async () => {
     try {
-      const res = await fetch('/api/settings', {
+      const res = await apiFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'export' }),
@@ -176,7 +177,7 @@ export default function SettingsView() {
       type: 'danger',
       onConfirm: async () => {
         try {
-          await fetch('/api/settings', {
+          await apiFetch('/api/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'wipe' }),

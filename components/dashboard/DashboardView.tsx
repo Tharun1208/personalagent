@@ -43,6 +43,7 @@ import { useApp } from '@/lib/context/AppContext';
 import { Habit } from '@/types';
 import DailyBriefingModal from '@/components/briefing/DailyBriefingModal';
 import { LiveWeatherData, LiveMarketQuote, LiveNewsItem } from '@/lib/tools/realtimeData';
+import { apiFetch } from '@/lib/api';
 
 
 // Storage key for daily spending to pull real-time financial KPI
@@ -96,7 +97,7 @@ export default function DashboardView() {
   const fetchRealtimeData = async (city = weatherCity, topic = newsTopic) => {
     try {
       setIsRealtimeLoading(true);
-      const res = await fetch(`/api/realtime?location=${encodeURIComponent(city)}&news=${encodeURIComponent(topic)}`);
+      const res = await apiFetch(`/api/realtime?location=${encodeURIComponent(city)}&news=${encodeURIComponent(topic)}`);
       const data = await res.json();
       if (data.success) {
         if (data.weather) setLiveWeather(data.weather);
@@ -132,7 +133,7 @@ export default function DashboardView() {
   useEffect(() => {
     const fetchHabits = async () => {
       try {
-        const res = await fetch('/api/habits');
+        const res = await apiFetch('/api/habits');
         const data = await res.json();
         if (data.habits) setHabits(data.habits);
       } catch {}
@@ -142,7 +143,7 @@ export default function DashboardView() {
 
   const handleToggleHabit = async (id: string) => {
     try {
-      const res = await fetch('/api/habits', {
+      const res = await apiFetch('/api/habits', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),

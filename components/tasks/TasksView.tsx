@@ -26,6 +26,7 @@ import { useApp } from '@/lib/context/AppContext';
 import { Task, SubTask } from '@/types';
 import { KanbanBoard, type KanbanColumn, type KanbanTask } from '@/components/ui/kanban-board';
 import { renderTextWithIosEmojis } from '@/lib/utils/iosEmoji';
+import { apiFetch } from '@/lib/api';
 
 interface DateTaskGroup {
   id: string;
@@ -180,7 +181,7 @@ export default function TasksView() {
   const handleBreakdown = async (taskId: string) => {
     setBreakingDownId(taskId);
     try {
-      const res = await fetch(`/api/tasks/${taskId}/breakdown`, { method: 'POST' });
+      const res = await apiFetch(`/api/tasks/${taskId}/breakdown`, { method: 'POST' });
       const data = await res.json();
       if (data.task) {
         refreshAll();
@@ -194,7 +195,7 @@ export default function TasksView() {
 
   const handleToggleSubtask = async (taskId: string, subtaskId: string) => {
     try {
-      await fetch(`/api/tasks/${taskId}/breakdown`, {
+      await apiFetch(`/api/tasks/${taskId}/breakdown`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subtaskId }),

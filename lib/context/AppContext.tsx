@@ -364,16 +364,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       let userRes = await apiFetch('/api/auth/me');
       let userData = await safeJson(userRes);
 
-      // If signed out and no valid token, auto-initialize guest session to prevent 401s
-      if (!userData?.user && !token) {
+      // If signed out or no valid user returned, auto-initialize guest session to prevent 401s
+      if (!userData?.user) {
         try {
           const guestRes = await apiFetch('/api/auth/guest', { method: 'POST' });
           const guestData = await safeJson(guestRes);
           if (guestData?.user) {
             userData = { user: guestData.user };
             token = guestData.token || null;
-            if (token) localStorage.setItem('recall_token', token);
-            localStorage.setItem('recall_user', JSON.stringify(guestData.user));
+            if (token && typeof window !== 'undefined') localStorage.setItem('recall_token', token);
+            if (typeof window !== 'undefined') localStorage.setItem('recall_user', JSON.stringify(guestData.user));
           }
         } catch {}
       }

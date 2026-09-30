@@ -97,15 +97,18 @@ function lean<T = any>(doc: any): T {
   return JSON.parse(JSON.stringify(doc));
 }
 
+let isHydrated = false;
+
 /**
  * Hydrate the mirror from Atlas. Safe to call repeatedly — the promise is
  * cached, and every NEW serverless invocation gets a fresh module scope,
  * so each cold start re-hydrates automatically.
  */
 export async function hydrateStore(): Promise<DbSchema> {
-  if (mirror) return mirror;
+  if (isHydrated && mirror) return mirror;
   if (!isMongoConfigured()) {
     mirror = emptySchema();
+    isHydrated = true;
     return mirror;
   }
   if (hydrationPromise) return hydrationPromise;
@@ -128,11 +131,12 @@ export async function hydrateStore(): Promise<DbSchema> {
         (data as any)[name] = docs.map(lean);
       } catch (err) {
         console.error(`⚠️ hydrate ${name} failed:`, err);
-        (data as any)[name] = [];
+        (data as any)[name] = (data as any)[name] || [];
       }
     });
 
     await Promise.all(loads);
+    isHydrated = true;
     console.log(
       `✅ MongoStore hydrated: ${data.users.length} users, ${data.conversations.length} conversations, ${data.tasks.length} tasks`,
     );
