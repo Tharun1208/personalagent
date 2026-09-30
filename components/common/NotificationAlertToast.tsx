@@ -10,11 +10,26 @@ import {
   VolumeX,
   RotateCcw,
   AlarmClock,
-  Radio,
+  Sparkles,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { AppNotification } from '@/types';
 import { soundEngine } from '@/lib/audio/soundEngine';
+
+function safeVibrate(pattern: number | number[]) {
+  if (typeof window === 'undefined' || !navigator.vibrate) return;
+  try {
+    // Avoid Chrome intervention error if user hasn't interacted with page yet
+    if (
+      'userActivation' in navigator &&
+      (navigator as any).userActivation &&
+      !(navigator as any).userActivation.hasBeenActive
+    ) {
+      return;
+    }
+    navigator.vibrate(pattern);
+  } catch {}
+}
 
 export default function NotificationAlertToast() {
   const {
@@ -29,6 +44,15 @@ export default function NotificationAlertToast() {
   const [activeAlerts, setActiveAlerts] = useState<AppNotification[]>([]);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [currentTime, setCurrentTime] = useState<string>('');
+  const [isAudioUnlocked, setIsAudioUnlocked] = useState<boolean>(true);
+
+  // Monitor sound engine unlock state
+  useEffect(() => {
+    const unsub = soundEngine.subscribeState((unlocked) => {
+      setIsAudioUnlocked(unlocked);
+    });
+    return unsub;
+  }, []);
 
   // Live clock for mobile alarm screen
   useEffect(() => {
@@ -68,11 +92,7 @@ export default function NotificationAlertToast() {
         );
 
         // Native Mobile Haptic Vibration loop
-        if (typeof window !== 'undefined' && 'navigator' in window && navigator.vibrate) {
-          try {
-            navigator.vibrate([400, 150, 400, 150, 600]);
-          } catch {}
-        }
+        safeVibrate([400, 150, 400, 150, 600]);
 
         // Native OS Desktop & Mobile Push Notification
         if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
@@ -98,11 +118,7 @@ export default function NotificationAlertToast() {
   useEffect(() => {
     if (activeAlerts.length === 0) return;
     const vibInterval = setInterval(() => {
-      if (typeof window !== 'undefined' && 'navigator' in window && navigator.vibrate) {
-        try {
-          navigator.vibrate([400, 150, 400, 150, 600]);
-        } catch {}
-      }
+      safeVibrate([400, 150, 400, 150, 600]);
     }, 1800);
     return () => clearInterval(vibInterval);
   }, [activeAlerts.length]);
@@ -113,6 +129,10 @@ export default function NotificationAlertToast() {
       soundEngine.stopLoudAlarmLoop();
     };
   }, []);
+
+  const handleTapScreen = () => {
+    soundEngine.unlockAudio();
+  };
 
   const handleDismiss = (id: string) => {
     setDismissedIds((prev) => new Set(prev).add(id));
@@ -149,18 +169,24 @@ export default function NotificationAlertToast() {
   const primaryAlert = activeAlerts[0];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex flex-col items-center justify-between p-6 sm:p-10 select-none animate-in fade-in duration-300">
-      
+    <div
+      onClick={handleTapScreen}
+      onTouchStart={handleTapScreen}
+      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-2xl flex flex-col items-center justify-between p-6 sm:p-10 select-none animate-in fade-in duration-300"
+    >
       {/* Top Header: Brand & Dismiss */}
       <div className="w-full max-w-md flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+          <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
           <span className="text-xs font-bold uppercase tracking-widest text-rose-400">
-            Alarm Ringing
+            {isAudioUnlocked ? 'Alarm Ringing' : 'Alarm Ready'}
           </span>
         </div>
         <button
-          onClick={() => handleDismiss(primaryAlert.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDismiss(primaryAlert.id);
+          }}
           className="p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           title="Dismiss"
         >
@@ -170,19 +196,18 @@ export default function NotificationAlertToast() {
 
       {/* Center: Mobile Alarm Clock UI */}
       <div className="w-full max-w-md flex flex-col items-center text-center space-y-6 my-auto">
-        
         {/* Pulsing Animated Bell Ring */}
         <div className="relative flex items-center justify-center">
           <div className="absolute w-36 h-36 rounded-full bg-rose-500/20 animate-ping" />
           <div className="absolute w-28 h-28 rounded-full bg-rose-500/30 animate-pulse" />
-          <div className="relative w-22 h-22 rounded-full bg-gradient-to-tr from-rose-600 via-orange-500 to-amber-500 text-white flex items-center justify-center shadow-2xl shadow-rose-500/50">
-            <AlarmClock size={44} className="animate-bounce" />
+          <div className="relative w-24 h-24 rounded-full bg-gradient-to-tr from-rose-600 via-orange-500 to-amber-500 text-white flex items-center justify-center shadow-2xl shadow-rose-500/50">
+            <AlarmClock size={48} className="animate-bounce" />
           </div>
         </div>
 
         {/* Live Digital Clock Digits (Mobile Alarm Clock style) */}
         <div className="space-y-1">
-          <div className="text-4xl sm:text-5xl font-mono font-black tracking-tight text-white drop-shadow-md">
+          <div className="text-5xl sm:text-6xl font-mono font-black tracking-tight text-white drop-shadow-lg">
             {currentTime || '09:00:00 AM'}
           </div>
           <div className="text-xs text-rose-300/80 font-medium tracking-wide">
@@ -202,15 +227,22 @@ export default function NotificationAlertToast() {
           )}
         </div>
 
-        {/* Sound & Audio Visualizer Status */}
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-white/90 text-xs font-semibold backdrop-blur-md">
-          <Volume2 size={15} className="text-rose-400 animate-pulse" />
-          <span>Loud Alarm Tone Ringing</span>
-        </div>
+        {/* Sound & Audio Visualizer Status / Tap Prompt */}
+        {!isAudioUnlocked ? (
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold animate-pulse shadow-lg cursor-pointer">
+            <Volume2 size={16} />
+            <span>Tap screen to unmute loud sound</span>
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-white/90 text-xs font-semibold backdrop-blur-md">
+            <Volume2 size={15} className="text-rose-400 animate-pulse" />
+            <span>Loud Alarm Tone Ringing</span>
+          </div>
+        )}
       </div>
 
       {/* Bottom: Mobile Touch Action Buttons */}
-      <div className="w-full max-w-md space-y-3">
+      <div className="w-full max-w-md space-y-3" onClick={(e) => e.stopPropagation()}>
         {/* Big Stop Alarm Button (Full Width Mobile Style) */}
         <button
           onClick={() => handleDismiss(primaryAlert.id)}
@@ -239,7 +271,6 @@ export default function NotificationAlertToast() {
           </button>
         </div>
       </div>
-
     </div>
   );
 }

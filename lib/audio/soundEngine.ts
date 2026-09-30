@@ -1,6 +1,7 @@
 /**
  * Web Audio API & HTML5 Audio Sound Synthesizer Engine
  * Generates custom alarm tones, sound effects, and reliable mobile-style alarm loops.
+ * Compliant with modern browser Autoplay policies (Chrome, Safari, Edge, Mobile).
  */
 
 function generateAlarmWavUri(freq = 880, duration = 0.5): string {
@@ -44,44 +45,134 @@ function generateAlarmWavUri(freq = 880, duration = 0.5): string {
 class SoundEngine {
   private ctx: AudioContext | null = null;
   private currentCustomAudio: HTMLAudioElement | null = null;
-  private fallbackAlarmAudio: HTMLAudioElement | null = null;
+  private fallbackAudio: HTMLAudioElement | null = null;
   private alarmLoopTimer: any = null;
   private isLooping = false;
+  private unlocked = false;
+  private pendingAlarm: { tone: string; volume: number; customUrl?: string } | null = null;
+  private listeners: Set<(unlocked: boolean) => void> = new Set();
 
   constructor() {
     if (typeof window !== 'undefined') {
-      const unlock = () => {
+      const unlockHandler = () => {
         this.unlockAudio();
-        window.removeEventListener('click', unlock);
-        window.removeEventListener('touchstart', unlock);
-        window.removeEventListener('keydown', unlock);
       };
-      window.addEventListener('click', unlock, { passive: true });
-      window.addEventListener('touchstart', unlock, { passive: true });
-      window.addEventListener('keydown', unlock, { passive: true });
+
+      const events = ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'];
+      events.forEach((evt) => {
+        window.addEventListener(evt, unlockHandler, { passive: true, capture: true });
+      });
     }
   }
 
+  public subscribeState(cb: (unlocked: boolean) => void): () => void {
+    this.listeners.add(cb);
+    cb(this.isUnlocked());
+    return () => this.listeners.delete(cb);
+  }
+
+  private notifyState(): void {
+    const isUnlocked = this.isUnlocked();
+    this.listeners.forEach((cb) => {
+      try {
+        cb(isUnlocked);
+      } catch {}
+    });
+  }
+
+  public isUnlocked(): boolean {
+    if (typeof window === 'undefined') return false;
+    if (this.unlocked && this.ctx && this.ctx.state === 'running') return true;
+    if (
+      typeof navigator !== 'undefined' &&
+      'userActivation' in navigator &&
+      (navigator as any).userActivation?.hasBeenActive
+    ) {
+      return true;
+    }
+    return this.unlocked;
+  }
+
+  /**
+   * Unlock Web Audio context safely on user gesture
+   */
   public unlockAudio(): void {
+    if (typeof window === 'undefined') return;
+
     try {
-      const ctx = this.getContext();
-      if (ctx && ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
+      if (!this.ctx) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          this.ctx = new AudioCtx();
+        }
+      }
+
+      if (this.ctx) {
+        if (this.ctx.state === 'suspended') {
+          this.ctx
+            .resume()
+            .then(() => {
+              this.unlocked = true;
+              this.playSilentBuffer();
+              this.notifyState();
+              this.resumePendingAlarm();
+            })
+            .catch(() => {});
+        } else if (this.ctx.state === 'running') {
+          this.unlocked = true;
+          this.notifyState();
+          this.resumePendingAlarm();
+        }
       }
     } catch {}
   }
 
-  private getContext(): AudioContext | null {
+  /**
+   * Silent 1-sample buffer playback to warm up iOS Safari and mobile Chrome WebAudio pipelines
+   */
+  private playSilentBuffer(): void {
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    try {
+      const buffer = this.ctx.createBuffer(1, 1, 22050);
+      const source = this.ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(this.ctx.destination);
+      source.start(0);
+    } catch {}
+  }
+
+  private resumePendingAlarm(): void {
+    if (this.pendingAlarm && this.isLooping) {
+      const { tone, volume, customUrl } = this.pendingAlarm;
+      this.pendingAlarm = null;
+      this.startLoudAlarmLoop(tone, volume, customUrl);
+    }
+  }
+
+  private getContextSafe(): AudioContext | null {
     if (typeof window === 'undefined') return null;
+
     if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtx) {
-        this.ctx = new AudioCtx();
+      // Only create AudioContext if user has already interacted or if allowed
+      const hasInteraction =
+        typeof navigator !== 'undefined' &&
+        'userActivation' in navigator &&
+        (navigator as any).userActivation?.hasBeenActive;
+
+      if (hasInteraction || this.unlocked) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          try {
+            this.ctx = new AudioCtx();
+          } catch {}
+        }
       }
     }
-    if (this.ctx && this.ctx.state === 'suspended') {
+
+    if (this.ctx && this.ctx.state === 'suspended' && this.unlocked) {
       this.ctx.resume().catch(() => {});
     }
+
     return this.ctx;
   }
 
@@ -94,17 +185,14 @@ class SoundEngine {
       return;
     }
 
-    const ctx = this.getContext();
-    if (!ctx) {
+    const ctx = this.getContextSafe();
+    if (!ctx || ctx.state !== 'running') {
+      // If Web Audio is not ready, try fallback HTML5 Audio
       this.playFallbackBeep(volume);
       return;
     }
 
     try {
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
-      }
-
       const now = ctx.currentTime;
       const gainNode = ctx.createGain();
       const effectiveVol = Math.min(1.0, Math.max(0.1, volume));
@@ -214,21 +302,34 @@ class SoundEngine {
           break;
         }
       }
-    } catch (e) {
+    } catch {
       this.playFallbackBeep(volume);
     }
   }
 
   /**
-   * Fallback loud audio element beep if Web Audio context is restricted
+   * Fallback loud audio element beep if Web Audio context is not yet running
    */
   public playFallbackBeep(volume: number = 1.0): void {
+    if (typeof window === 'undefined') return;
     try {
-      if (typeof window === 'undefined') return;
-      const wavUri = generateAlarmWavUri(987.77, 0.5);
-      const audio = new Audio(wavUri);
-      audio.volume = Math.min(1.0, Math.max(0.1, volume));
-      audio.play().catch(() => {});
+      if (!this.fallbackAudio) {
+        const wavUri = generateAlarmWavUri(987.77, 0.5);
+        this.fallbackAudio = new Audio(wavUri);
+      }
+      this.fallbackAudio.volume = Math.min(1.0, Math.max(0.1, volume));
+      this.fallbackAudio.currentTime = 0;
+      const playPromise = this.fallbackAudio.play();
+      if (playPromise) {
+        playPromise
+          .then(() => {
+            this.unlocked = true;
+            this.notifyState();
+          })
+          .catch(() => {
+            // Browser autoplay policy prevented playback until gesture
+          });
+      }
     } catch {}
   }
 
@@ -239,6 +340,9 @@ class SoundEngine {
   public startLoudAlarmLoop(tone: string = 'digital', volume: number = 1.0, customUrl?: string): void {
     this.stopLoudAlarmLoop();
     this.isLooping = true;
+    this.pendingAlarm = { tone, volume, customUrl };
+
+    // Try unlock if user gesture was already registered
     this.unlockAudio();
 
     if (tone === 'custom' && customUrl) {
@@ -252,7 +356,6 @@ class SoundEngine {
     const ring = () => {
       if (!this.isLooping) return;
       this.playAlarm(tone, volume);
-      this.playFallbackBeep(volume);
     };
 
     ring();
@@ -264,15 +367,16 @@ class SoundEngine {
    */
   public stopLoudAlarmLoop(): void {
     this.isLooping = false;
+    this.pendingAlarm = null;
     if (this.alarmLoopTimer) {
       clearInterval(this.alarmLoopTimer);
       this.alarmLoopTimer = null;
     }
     this.stopCustomAudio();
-    if (this.fallbackAlarmAudio) {
+    if (this.fallbackAudio) {
       try {
-        this.fallbackAlarmAudio.pause();
-        this.fallbackAlarmAudio = null;
+        this.fallbackAudio.pause();
+        this.fallbackAudio.currentTime = 0;
       } catch {}
     }
   }
@@ -285,13 +389,19 @@ class SoundEngine {
       this.stopCustomAudio();
       const audio = new Audio(url);
       audio.volume = Math.min(1.0, Math.max(0.1, volume));
-      audio.play().catch((err) => {
-        console.warn('Audio playback error, falling back to synthesizer:', err);
-        this.playAlarm('digital', volume);
-      });
+      const p = audio.play();
+      if (p) {
+        p.then(() => {
+          this.unlocked = true;
+          this.notifyState();
+        }).catch(() => {
+          // Fallback if blocked
+          this.playFallbackBeep(volume);
+        });
+      }
       this.currentCustomAudio = audio;
     } catch {
-      this.playAlarm('digital', volume);
+      this.playFallbackBeep(volume);
     }
   }
 
