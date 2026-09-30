@@ -1,51 +1,37 @@
 /**
- * Shared guest-mode helpers.
- * Guest users get a real DB user record (so all data stays isolated per user id),
- * but their session expires after 24h and data can be garbage-collected later.
+ * Guest mode removed — single full persistent primary user account with unlimited access.
  */
 
-export const GUEST_EMAIL_DOMAIN = 'guest.assistance.ai';
-export const GUEST_EMAILS = ['guest@assistance.ai', 'alex@example.com'];
-export const GUEST_PROMPT_LIMIT = 5;
-export const GUEST_SESSION_HOURS = 24;
+export const GUEST_EMAIL_DOMAIN = 'assistance.ai';
+export const GUEST_EMAILS: string[] = [];
+export const GUEST_PROMPT_LIMIT = 999999999;
+export const GUEST_SESSION_HOURS = 87600; // 10 years
 
-/** localStorage key for the guest prompt counter */
 export const GUEST_PROMPT_COUNT_KEY = 'recall_guest_prompts';
-/** localStorage key marking that the guest session was started */
 export const GUEST_SESSION_KEY = 'recall_guest_session';
 
 export function isGuestEmail(email?: string | null): boolean {
-  if (!email) return true;
-  return GUEST_EMAILS.includes(email) || email.endsWith(`@${GUEST_EMAIL_DOMAIN}`);
+  return false; // Never restrict any user
 }
 
 export function makeGuestEmail(): string {
-  return `guest_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}@${GUEST_EMAIL_DOMAIN}`;
+  return `user@assistance.ai`;
 }
 
 export function readGuestPromptCount(): number {
-  if (typeof window === 'undefined') return 0;
-  const raw = window.localStorage.getItem(GUEST_PROMPT_COUNT_KEY);
-  const n = raw ? parseInt(raw, 10) : 0;
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  return 0;
 }
 
 export function incrementGuestPromptCount(): number {
-  const next = readGuestPromptCount() + 1;
-  try {
-    window.localStorage.setItem(GUEST_PROMPT_COUNT_KEY, String(next));
-  } catch {}
-  return next;
+  return 0;
 }
 
 export function resetGuestPromptCount(): void {
   try {
-    window.localStorage.removeItem(GUEST_PROMPT_COUNT_KEY);
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(GUEST_PROMPT_COUNT_KEY);
+    }
   } catch {}
 }
 
-export function markGuestSession(): void {
-  try {
-    window.localStorage.setItem(GUEST_SESSION_KEY, new Date().toISOString());
-  } catch {}
-}
+export function markGuestSession(): void {}

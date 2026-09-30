@@ -139,23 +139,63 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promi
   return fetch(input, { ...init, headers, credentials: 'same-origin' });
 }
 
+function getInitialUser(): User | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const cached = localStorage.getItem('recall_user');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed?.name) return parsed;
+    }
+  } catch {}
+  return {
+    id: 'guest_instant',
+    name: 'Guest User',
+    email: 'guest@agent.local',
+    avatar: '',
+    createdAt: new Date().toISOString(),
+    preferences: {
+      theme: 'light',
+      aiProvider: 'builtin',
+      model: 'gemini-1.5-flash',
+      voiceEnabled: true,
+      voiceAutoRead: false,
+      proactiveReminders: true,
+      soundEffects: true,
+      confirmDestructiveActions: true,
+    },
+  };
+}
+
+function getInitialList<T>(key: string): T[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const cached = localStorage.getItem(key);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(getInitialUser);
   const [theme, setThemeState] = useState<'light' | 'dark'>('light');
   const [activeTab, setActiveTab] = useState<AppTab>('chat');
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>(() => getInitialList<Conversation>('recall_conversations'));
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const [memories, setMemories] = useState<Memory[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
+  const [memories, setMemories] = useState<Memory[]>(() => getInitialList<Memory>('recall_memories'));
+  const [tasks, setTasks] = useState<Task[]>(() => getInitialList<Task>('recall_tasks'));
+  const [reminders, setReminders] = useState<Reminder[]>(() => getInitialList<Reminder>('recall_reminders'));
+  const [goals, setGoals] = useState<Goal[]>(() => getInitialList<Goal>('recall_goals'));
+  const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>(() => getInitialList<LedgerEntry>('recall_ledger'));
   const [agentActions, setAgentActions] = useState<AgentAction[]>([]);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => getInitialList<AppNotification>('recall_notifications'));
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const [liveVoiceOpen, setLiveVoiceOpen] = useState(false);
@@ -277,6 +317,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setUser(data.user);
         try {
           localStorage.setItem('recall_user', JSON.stringify(data.user));
+          if (data.token) {
+            localStorage.setItem('recall_token', data.token);
+          }
         } catch {}
       }
     } catch (err) {
@@ -312,12 +355,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Fetch initial data
+  // Fetch initial data concurrently
   const refreshAll = useCallback(async () => {
     try {
-      // 1. User
-      const userRes = await apiFetch('/api/auth/me');
-      const userData = await safeJson(userRes);
+      let token = typeof window !== 'undefined' ? localStorage.getItem('recall_token') : null;
+
+      // 1. Check current authenticated user session
+      let userRes = await apiFetch('/api/auth/me');
+      let userData = await safeJson(userRes);
+
+      // If signed out and no valid token, auto-initialize guest session to prevent 401s
+      if (!userData?.user && !token) {
+        try {
+          const guestRes = await apiFetch('/api/auth/guest', { method: 'POST' });
+          const guestData = await safeJson(guestRes);
+          if (guestData?.user) {
+            userData = { user: guestData.user };
+            token = guestData.token || null;
+            if (token) localStorage.setItem('recall_token', token);
+            localStorage.setItem('recall_user', JSON.stringify(guestData.user));
+          }
+        } catch {}
+      }
+
       if (userData?.user) {
         setUser(userData.user);
         try {
@@ -325,18 +385,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         } catch {}
       }
 
-      // Do not hit protected collection endpoints while signed out. This also
-      // prevents a burst of expected 401s during the initial auth check.
+      // If still not authenticated, avoid firing protected collection requests to prevent 401s
       if (!userData?.user) {
-        setUser(null);
-        try {
-          localStorage.removeItem('recall_token');
-          localStorage.removeItem('recall_user');
-        } catch {}
         return;
       }
 
-      // Parallelized concurrent data fetch across all collections
+      // Parallelized concurrent data fetch across all collections with authenticated session
       const [
         convResult,
         memResult,
@@ -359,6 +413,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (convResult.status === 'fulfilled' && convResult.value?.conversations) {
         setConversations(convResult.value.conversations);
+        try { localStorage.setItem('recall_conversations', JSON.stringify(convResult.value.conversations)); } catch {}
         if (!initialLoadedRef.current) {
           initialLoadedRef.current = true;
           // Start with a fresh new chat session on launch / reload as requested
@@ -369,18 +424,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (memResult.status === 'fulfilled' && memResult.value?.memories) {
         setMemories(memResult.value.memories);
+        try { localStorage.setItem('recall_memories', JSON.stringify(memResult.value.memories)); } catch {}
       }
 
       if (taskResult.status === 'fulfilled' && taskResult.value?.tasks) {
         setTasks(taskResult.value.tasks);
+        try { localStorage.setItem('recall_tasks', JSON.stringify(taskResult.value.tasks)); } catch {}
       }
 
       if (remResult.status === 'fulfilled' && remResult.value?.reminders) {
         setReminders(remResult.value.reminders);
+        try { localStorage.setItem('recall_reminders', JSON.stringify(remResult.value.reminders)); } catch {}
       }
 
       if (goalResult.status === 'fulfilled' && goalResult.value?.goals) {
         setGoals(goalResult.value.goals);
+        try { localStorage.setItem('recall_goals', JSON.stringify(goalResult.value.goals)); } catch {}
       }
 
       if (actResult.status === 'fulfilled' && actResult.value?.actions) {
@@ -389,10 +448,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (notifResult.status === 'fulfilled' && notifResult.value?.notifications) {
         setNotifications(notifResult.value.notifications);
+        try { localStorage.setItem('recall_notifications', JSON.stringify(notifResult.value.notifications)); } catch {}
       }
 
       if (ledgerResult.status === 'fulfilled' && ledgerResult.value?.ledger) {
         setLedgerEntries(ledgerResult.value.ledger);
+        try { localStorage.setItem('recall_ledger', JSON.stringify(ledgerResult.value.ledger)); } catch {}
       }
     } catch (err) {
       console.error('Failed to load initial application state', err);
@@ -470,6 +531,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.removeItem('recall_token');
       localStorage.removeItem('recall_user');
+      localStorage.removeItem('recall_conversations');
+      localStorage.removeItem('recall_memories');
+      localStorage.removeItem('recall_tasks');
+      localStorage.removeItem('recall_reminders');
+      localStorage.removeItem('recall_goals');
+      localStorage.removeItem('recall_notifications');
+      localStorage.removeItem('recall_ledger');
       localStorage.removeItem('recall_onboarded');
       localStorage.removeItem(GUEST_PROMPT_COUNT_KEY);
     } catch {}
@@ -497,13 +565,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const loadMessages = async () => {
       try {
-      const res = await apiFetch(`/api/conversations/${activeConversationId}`);
+        const res = await apiFetch(`/api/conversations/${activeConversationId}`);
+        if (res.status === 404) {
+          setConversations((prev) => prev.filter((c) => c.id !== activeConversationId));
+          setMessages([]);
+          return;
+        }
         const data = await safeJson(res);
         if (data?.messages) {
           setMessages(data.messages);
         }
       } catch (err) {
-        console.error('Error fetching conversation messages:', err);
+        console.warn('Notice loading conversation messages:', err);
       }
     };
 
@@ -543,13 +616,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const hasAttachments = attachments && attachments.length > 0;
     if ((!content.trim() && !hasAttachments) || isSending) return;
 
-    // ── Guest prompt limit (client-side gate; server enforces too) ──
-    if (isGuest && guestPromptsUsed >= GUEST_PROMPT_LIMIT) {
-      showToast(`Guest limit reached (${GUEST_PROMPT_LIMIT} messages). Please sign in to continue.`, 'warning', 5000);
-      setAuthModalOpen(true);
-      return;
-    }
-
     const effectiveContent = content.trim() || (hasAttachments ? (attachments.length === 1 ? `Analyze this file: ${attachments[0].name}` : 'Analyze these attached files.') : '');
 
     // Optimistic user message
@@ -579,20 +645,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const data = await safeJson(res);
       if (data?.success) {
-        // Count prompts for the guest limit (403 = server-side limit hit)
-        if (res.status === 403 || data.guestLimitReached) {
-          showToast('Guest limit reached. Sign in to continue chatting.', 'warning', 5000);
-          setAuthModalOpen(true);
-        } else if (isGuest) {
-          setGuestPromptsUsed(incrementGuestPromptCount());
-        }
-
-        if (data.error && res.status === 403) {
-          setMessages((prev) => [...prev]);
-          return;
-        }
-
         if (!activeConversationId || activeConversationId !== data.conversationId) {
+
           setActiveConversationId(data.conversationId);
         }
 

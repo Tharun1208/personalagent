@@ -20,12 +20,9 @@ import NotificationDrawer from '@/components/common/NotificationDrawer';
 import NotificationAlertToast from '@/components/common/NotificationAlertToast';
 import LiveVoiceModal from '@/components/voice/LiveVoiceModal';
 import TimerWidget from '@/components/widgets/TimerWidget';
-import AuthModal from '@/components/auth/AuthModal';
-import AuthScreen from '@/components/auth/AuthScreen';
 import CustomConfirmModal from '@/components/common/CustomConfirmModal';
 import CustomToastAlert from '@/components/common/CustomToastAlert';
-
-const GUEST_EMAILS = ['guest@assistance.ai', 'alex@example.com'];
+import SplashScreen from '@/components/common/SplashScreen';
 
 export default function AppLayout() {
   const {
@@ -37,9 +34,7 @@ export default function AppLayout() {
     authModalOpen,
     setAuthModalOpen,
     user,
-    isGuest,
-    guestPromptsUsed,
-    guestPromptLimit,
+    continueAsGuest,
     toasts,
     dismissToast,
     confirmDialog,
@@ -48,66 +43,21 @@ export default function AppLayout() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [guestLimitHit, setGuestLimitHit] = useState(false);
 
-  // ── SSR-safe auth gate ────────────────────────────────────────────────────
-  // All localStorage reads MUST happen inside useEffect to avoid hydration
-  // mismatch (server has no localStorage; client does).
+  // ── SSR-safe mount gate (no localStorage on server) ──────────────────────
   const [mounted, setMounted] = useState(false);
-  const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
-    // A valid session exists only if BOTH a token and a cached user are present.
-    // (Old sessions that only had `recall_onboarded` are treated as signed out.)
-    setHasSession(!!localStorage.getItem('recall_token') && !!localStorage.getItem('recall_user'));
     setMounted(true);
-  }, []);
-
-  // Re-check session whenever user changes (e.g. after sign-in / sign-out)
-  useEffect(() => {
-    if (mounted) {
-      setHasSession(!!localStorage.getItem('recall_token') && !!localStorage.getItem('recall_user'));
+    // Auto-continue as guest in background if no token exists yet
+    const hasToken = !!localStorage.getItem('recall_token');
+    if (!hasToken) {
+      continueAsGuest().catch(() => {});
     }
-  }, [user, mounted]);
+  }, [continueAsGuest]);
 
-  // If the guest burns all free prompts while inside the app, force the auth screen
-  useEffect(() => {
-    if (mounted && isGuest && user && guestPromptsUsed >= guestPromptLimit) {
-      setGuestLimitHit(true);
-    }
-  }, [mounted, isGuest, user, guestPromptsUsed, guestPromptLimit]);
-
-  // No session at all → AuthScreen (covers first visit AND post-sign-out)
   if (!mounted) {
-    return (
-      <div className="flex h-[100dvh] w-screen items-center justify-center bg-(--bg-primary)">
-        <div className="w-8 h-8 rounded-full border-2 border-(--border-subtle) border-t-[#4E82EE] animate-spin" />
-      </div>
-    );
-  }
-
-  if (!hasSession || !user) {
-    return (
-      <>
-        <AuthScreen />
-        <CustomConfirmModal dialog={confirmDialog} onClose={dismissConfirm} />
-        <CustomToastAlert toasts={toasts} onDismiss={dismissToast} />
-      </>
-    );
-  }
-
-  // Guest who used up their free prompts → back to auth with a notice
-  if (guestLimitHit) {
-    return (
-      <>
-        <AuthScreen
-          notice={`You've used all ${guestPromptLimit} free guest messages. Sign in or create an account to keep chatting — your sign-in will restore your saved history.`}
-          hideGuest
-        />
-        <CustomConfirmModal dialog={confirmDialog} onClose={dismissConfirm} />
-        <CustomToastAlert toasts={toasts} onDismiss={dismissToast} />
-      </>
-    );
+    return null;
   }
 
   const renderActiveView = () => {
@@ -127,7 +77,12 @@ export default function AppLayout() {
   };
 
   return (
-    <div className="flex h-[100dvh] w-screen overflow-hidden bg-(--bg-primary) text-(--text-primary)">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+      className="flex h-[100dvh] w-screen overflow-hidden bg-(--bg-primary) text-(--text-primary)"
+    >
 
       {/* Desktop Left Sidebar */}
       {!sidebarCollapsed && (
@@ -138,6 +93,7 @@ export default function AppLayout() {
           />
         </div>
       )}
+
 
       {/* Mobile Drawer Sidebar — full screen, slides in/out */}
       <AnimatePresence>
@@ -179,8 +135,19 @@ export default function AppLayout() {
           onToggleSidebar={() => setSidebarCollapsed((p) => !p)}
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
         />
-        <main className="flex-1 flex flex-col h-full overflow-hidden">
-          {renderActiveView()}
+        <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 6, scale: 0.998 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.998 }}
+              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              className="flex-1 flex flex-col h-full overflow-hidden w-full"
+            >
+              {renderActiveView()}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 
@@ -189,10 +156,8 @@ export default function AppLayout() {
       <NotificationDrawer />
       <NotificationAlertToast />
 
-      {/* AuthModal — still available from Settings > Security (signed-in view / sign-out) */}
-      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
-
       <LiveVoiceModal isOpen={liveVoiceOpen} onClose={() => setLiveVoiceOpen(false)} />
+
 
       {/* Global in-app confirm dialog */}
       <CustomConfirmModal dialog={confirmDialog} onClose={dismissConfirm} />
@@ -205,6 +170,9 @@ export default function AppLayout() {
           <TimerWidget onClose={() => setFocusTimerOpen(false)} />
         </div>
       )}
-    </div>
+
+      {/* Native App Opening Splash Animation */}
+      <SplashScreen durationMs={1100} />
+    </motion.div>
   );
 }

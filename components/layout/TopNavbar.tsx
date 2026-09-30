@@ -97,16 +97,11 @@ export default function TopNavbar({
               startNewChat();
             }
           }}
-          className="flex items-center gap-2.5 cursor-pointer group"
+          className="flex items-center cursor-pointer group"
         >
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl overflow-hidden shadow-xs group-hover:scale-105 transition-transform flex items-center justify-center bg-[#0c111d] shrink-0">
-            <img src="/logo.svg" alt="Assistance Logo" className="w-full h-full object-contain" />
-          </div>
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="font-bold text-sm sm:text-base tracking-tight text-(--text-primary) font-sans">
-              Assistance
-            </span>
-          </div>
+          <span className="font-bold text-base sm:text-lg tracking-tight text-(--text-primary) font-sans">
+            Assistance
+          </span>
         </div>
 
         {/* Quick New Chat Button */}
@@ -154,24 +149,16 @@ export default function TopNavbar({
           )}
         </button>
 
-        {/* User Profile Avatar (Click goes directly to Profile in Settings!) */}
+        {/* User Profile Avatar */}
         <button
           onClick={() => setActiveTab('settings')}
           className="flex items-center gap-2 pl-1 sm:pl-1.5 pr-1 sm:pr-2.5 py-1 rounded-full bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/40 transition-all cursor-pointer shadow-2xs group"
           title={`Profile: ${user?.name || 'User'} (Click to open Profile Settings)`}
         >
           <div className="relative shrink-0">
-            {user?.avatar ? (
-              <img
-                src={user.avatar}
-                alt={user.name || 'User'}
-                className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover"
-              />
-            ) : (
-              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white flex items-center justify-center font-bold text-[11px] sm:text-xs">
-                {user?.name?.[0] ? user.name[0].toUpperCase() : 'U'}
-              </div>
-            )}
+            <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white flex items-center justify-center font-bold text-[11px] sm:text-xs shadow-2xs">
+              {user?.name?.[0] ? user.name[0].toUpperCase() : 'U'}
+            </div>
             <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-(--bg-card)" />
           </div>
           <span className="hidden sm:inline text-xs font-semibold text-(--text-primary) max-w-[90px] truncate">

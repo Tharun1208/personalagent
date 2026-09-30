@@ -42,6 +42,7 @@ import {
 import { useApp } from '@/lib/context/AppContext';
 import { Message, ToolExecutionStep } from '@/types';
 import ChatComposer from './ChatComposer';
+import { renderTextWithIosEmojis, renderChildrenWithIosEmoji } from '@/lib/utils/iosEmoji';
 
 export default function ChatView() {
   const {
@@ -215,7 +216,7 @@ export default function ChatView() {
                         })}
                       </div>
                     )}
-                    <div className="whitespace-pre-wrap break-words">{msg.content}</div>
+                    <div className="whitespace-pre-wrap break-words">{renderTextWithIosEmojis(msg.content)}</div>
                   </div>
                 ) : (
                   /* Assistant Message Clean Gemini Layout */
@@ -230,7 +231,7 @@ export default function ChatView() {
                       {msg.memorySaved && msg.memorySaved.length > 0 && (
                         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-(--memory-badge-bg) border border-(--memory-badge-border) text-(--memory-badge-text) text-xs font-medium">
                           <CheckCircle2 size={15} />
-                          <span>Saved to memory: "{msg.memorySaved[0].content}"</span>
+                          <span>Saved to memory: "{renderTextWithIosEmojis(msg.memorySaved[0].content)}"</span>
                         </div>
                       )}
 
@@ -239,6 +240,30 @@ export default function ChatView() {
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
+                            p({ children, ...props }: any) {
+                              return <p {...props}>{renderChildrenWithIosEmoji(children)}</p>;
+                            },
+                            li({ children, ...props }: any) {
+                              return <li {...props}>{renderChildrenWithIosEmoji(children)}</li>;
+                            },
+                            h1({ children, ...props }: any) {
+                              return <h1 {...props}>{renderChildrenWithIosEmoji(children)}</h1>;
+                            },
+                            h2({ children, ...props }: any) {
+                              return <h2 {...props}>{renderChildrenWithIosEmoji(children)}</h2>;
+                            },
+                            h3({ children, ...props }: any) {
+                              return <h3 {...props}>{renderChildrenWithIosEmoji(children)}</h3>;
+                            },
+                            strong({ children, ...props }: any) {
+                              return <strong {...props}>{renderChildrenWithIosEmoji(children)}</strong>;
+                            },
+                            em({ children, ...props }: any) {
+                              return <em {...props}>{renderChildrenWithIosEmoji(children)}</em>;
+                            },
+                            span({ children, ...props }: any) {
+                              return <span {...props}>{renderChildrenWithIosEmoji(children)}</span>;
+                            },
                             code({ node, inline, className, children, ...props }: any) {
                               const match = /language-(\w+)/.exec(className || '');
                               const codeString = String(children).replace(/\n$/, '');

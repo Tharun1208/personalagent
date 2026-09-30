@@ -7,6 +7,10 @@
 }
 
 @layer base {
+  body {
+    font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  }
+
   :root {
     --bg-primary: #ffffff;
     --bg-secondary: #f0f4f9;
@@ -77,8 +81,25 @@
     line-height: 1.65;
     letter-spacing: -0.011em;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: manipulation;
+    text-rendering: optimizeLegibility;
   }
+
+  /* GPU Compositing and Mobile Smooth Scrolling */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Hardware Acceleration utility for smooth mobile lists & modals */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+  }
+
 
   code,
   kbd,

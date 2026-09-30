@@ -33,9 +33,12 @@ export const metadata: Metadata = {
     title: 'Assistance',
   },
   icons: {
-    icon: '/logo.svg',
+    icon: [
+      { url: '/favicon.ico', sizes: '48x48' },
+      { url: '/icon.png', sizes: '512x512', type: 'image/png' },
+    ],
     shortcut: '/favicon.ico',
-    apple: '/logo.svg',
+    apple: '/apple-touch-icon.png',
   },
 };
 
@@ -55,12 +58,6 @@ export default function RootLayout({
         <meta name="theme-color" content="#0c111d" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300..700;1,300..700&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap"
-          rel="stylesheet"
-        />
       </head>
       <body className={`${montserrat.className} antialiased select-none`} suppressHydrationWarning>
         <AppProvider>{children}</AppProvider>

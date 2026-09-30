@@ -25,6 +25,7 @@ import {
 import { useApp } from '@/lib/context/AppContext';
 import { Task, SubTask } from '@/types';
 import { KanbanBoard, type KanbanColumn, type KanbanTask } from '@/components/ui/kanban-board';
+import { renderTextWithIosEmojis } from '@/lib/utils/iosEmoji';
 
 interface DateTaskGroup {
   id: string;
@@ -492,14 +493,14 @@ export default function TasksView() {
                                     isDone ? 'line-through text-(--text-muted)' : 'text-(--text-primary)'
                                   }`}
                                 >
-                                  {task.title}
+                                  {renderTextWithIosEmojis(task.title)}
                                 </span>
                                 {getPriorityBadge(task.priority)}
                               </div>
 
                               {task.description && (
                                 <p className="text-xs text-(--text-secondary) leading-relaxed">
-                                  {task.description}
+                                  {renderTextWithIosEmojis(task.description)}
                                 </p>
                               )}
 
@@ -562,7 +563,7 @@ export default function TasksView() {
                                     className="rounded text-indigo-600 cursor-pointer"
                                   />
                                   <span className={sub.completed ? 'line-through text-(--text-muted)' : 'text-(--text-primary)'}>
-                                    {sub.title}
+                                    {renderTextWithIosEmojis(sub.title)}
                                   </span>
                                 </div>
                               ))}

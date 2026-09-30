@@ -45,41 +45,19 @@ export default function CalendarView() {
   const { tasks, reminders, createTask, createReminder, toggleTask, deleteTask, deleteReminder } = useApp();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<CalendarViewMode>('month');
-  const [viewDropdownOpen, setViewDropdownOpen] = useState(false);
-  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
-  const [yearPickerOpen, setYearPickerOpen] = useState(false);
-  const [yearRangeStart, setYearRangeStart] = useState(new Date().getFullYear() - 6);
-
-  // ── Smart dropdown alignment ──────────────────────────────────────────────
-  // Anchors the panel to whichever side has room, so it never runs off-screen
-  // on narrow phone layouts.
-  const viewAnchorRef = useRef<HTMLDivElement>(null);
-  const monthAnchorRef = useRef<HTMLDivElement>(null);
-  const yearAnchorRef = useRef<HTMLDivElement>(null);
-  const [viewAlign, setViewAlign] = useState<'left' | 'right'>('left');
-  const [monthAlign, setMonthAlign] = useState<'left' | 'right'>('left');
-  const [yearAlign, setYearAlign] = useState<'left' | 'right'>('left');
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const datePickerAnchorRef = useRef<HTMLDivElement>(null);
+  const [datePickerAlign, setDatePickerAlign] = useState<'left' | 'right'>('left');
 
   const pickAlign = (el: HTMLElement | null, panelWidth: number): 'left' | 'right' => {
     if (!el || typeof window === 'undefined') return 'left';
     const rect = el.getBoundingClientRect();
-    // Panel opens to the RIGHT of the anchor when there's room, else flips left
     return window.innerWidth - rect.left >= panelWidth + 12 ? 'left' : 'right';
   };
 
-  const toggleViewDropdown = () => {
-    if (!viewDropdownOpen) setViewAlign(pickAlign(viewAnchorRef.current, 176));
-    setViewDropdownOpen((o) => !o);
-  };
-  const toggleMonthPicker = () => {
-    if (!monthPickerOpen) setMonthAlign(pickAlign(monthAnchorRef.current, 224));
-    setMonthPickerOpen((o) => !o);
-    setYearPickerOpen(false);
-  };
-  const toggleYearPicker = () => {
-    if (!yearPickerOpen) setYearAlign(pickAlign(yearAnchorRef.current, 176));
-    setYearPickerOpen((o) => !o);
-    setMonthPickerOpen(false);
+  const toggleDatePicker = () => {
+    if (!datePickerOpen) setDatePickerAlign(pickAlign(datePickerAnchorRef.current, 240));
+    setDatePickerOpen((o) => !o);
   };
   const [filterType, setFilterType] = useState<'all' | 'tasks' | 'reminders' | 'completed'>('all');
   
@@ -168,7 +146,11 @@ export default function CalendarView() {
     const nextDate = new Date(selectedDate);
     if (viewMode === 'day') nextDate.setDate(nextDate.getDate() - 1);
     else if (viewMode === 'week') nextDate.setDate(nextDate.getDate() - 7);
-    else if (viewMode === 'month') nextDate.setMonth(nextDate.getMonth() - 1);
+    else if (viewMode === 'month') {
+      const targetMonth = nextDate.getMonth() - 1;
+      nextDate.setDate(1);
+      nextDate.setMonth(targetMonth);
+    }
     else if (viewMode === 'year') nextDate.setFullYear(nextDate.getFullYear() - 1);
     setSelectedDate(nextDate);
   };
@@ -177,7 +159,11 @@ export default function CalendarView() {
     const nextDate = new Date(selectedDate);
     if (viewMode === 'day') nextDate.setDate(nextDate.getDate() + 1);
     else if (viewMode === 'week') nextDate.setDate(nextDate.getDate() + 7);
-    else if (viewMode === 'month') nextDate.setMonth(nextDate.getMonth() + 1);
+    else if (viewMode === 'month') {
+      const targetMonth = nextDate.getMonth() + 1;
+      nextDate.setDate(1);
+      nextDate.setMonth(targetMonth);
+    }
     else if (viewMode === 'year') nextDate.setFullYear(nextDate.getFullYear() + 1);
     setSelectedDate(nextDate);
   };
@@ -342,20 +328,31 @@ export default function CalendarView() {
 
   // Week Grid Calculator (7 days)
   const weekDays = useMemo(() => {
-    const curr = new Date(selectedDate);
-    const first = curr.getDate() - curr.getDay();
+    const year = selectedDate.getFullYear();
+    const month = selectedDate.getMonth();
+    const day = selectedDate.getDate();
+    const dayOfWeek = selectedDate.getDay(); // 0 = Sun, 6 = Sat
+
+    // Start of the current week (Sunday)
+    const startOfWeek = new Date(year, month, day - dayOfWeek);
+    startOfWeek.setHours(0, 0, 0, 0);
+
     const days = [];
 
     for (let i = 0; i < 7; i++) {
-      const next = new Date(curr.setDate(first + i));
-      const start = new Date(next).setHours(0, 0, 0, 0);
-      const end = new Date(next).setHours(23, 59, 59, 999);
+      const dayDate = new Date(
+        startOfWeek.getFullYear(),
+        startOfWeek.getMonth(),
+        startOfWeek.getDate() + i
+      );
+      const start = new Date(dayDate).setHours(0, 0, 0, 0);
+      const end = new Date(dayDate).setHours(23, 59, 59, 999);
       const dayItems = timelineItems.filter(
         (it) => it.dateTime.getTime() >= start && it.dateTime.getTime() <= end
       );
       days.push({
-        date: new Date(next),
-        isToday: next.toDateString() === new Date().toDateString(),
+        date: dayDate,
+        isToday: dayDate.toDateString() === new Date().toDateString(),
         items: dayItems,
       });
     }
@@ -469,91 +466,48 @@ export default function CalendarView() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between sm:justify-end gap-2 pb-1 sm:pb-0">
-          {/* ── View Mode Dropdown ─────────────────────────────── */}
-          <div className="relative shrink-0" ref={viewAnchorRef}>
-            <button
-              onClick={toggleViewDropdown}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:bg-(--bg-card) hover:border-[#4E82EE]/40 text-(--text-primary) text-xs font-semibold transition-all cursor-pointer shadow-xs min-w-[110px] justify-between"
-            >
-              <div className="flex items-center gap-2">
-                {viewMode === 'day'   && <CalendarDays size={14} className="text-[#4E82EE]" />}
-                {viewMode === 'week'  && <CalendarRange size={14} className="text-[#9B72CF]" />}
-                {viewMode === 'month' && <Grid3X3 size={14} className="text-emerald-500" />}
-                {viewMode === 'year'  && <Layers size={14} className="text-amber-500" />}
-                <span className="capitalize">{viewMode} view</span>
-              </div>
-              <ChevronRight
-                size={13}
-                className={`text-(--text-muted) transition-transform duration-200 ${viewDropdownOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-
-            {viewDropdownOpen && (
-              <>
-                {/* Backdrop to close */}
-                <div
-                  className="fixed inset-0 z-20"
-                  onClick={() => setViewDropdownOpen(false)}
-                />
-                <div
-                  className={`absolute top-full mt-2 z-30 w-44 rounded-2xl border border-(--border-subtle) bg-(--bg-card) shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
-                    viewAlign === 'right' ? 'right-0' : 'left-0'
+        <div className="flex items-center justify-between sm:justify-end gap-2 pb-1 sm:pb-0 flex-wrap">
+          {/* ── View Mode Segmented Control (1-Click Instant Switching) ── */}
+          <div className="flex items-center p-1 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) shadow-2xs">
+            {(
+              [
+                { mode: 'day',   label: 'Day' },
+                { mode: 'week',  label: 'Week' },
+                { mode: 'month', label: 'Month' },
+                { mode: 'year',  label: 'Year' },
+              ] as const
+            ).map(({ mode, label }) => {
+              const isActive = viewMode === mode;
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-(--bg-card) text-[#4E82EE] shadow-2xs font-bold'
+                      : 'text-(--text-muted) hover:text-(--text-primary)'
                   }`}
                 >
-                  <div className="p-1.5 space-y-0.5">
-                    {(
-                      [
-                        { mode: 'day',   Icon: CalendarDays,  label: 'Day',   sub: 'Hour by hour',   color: 'text-[#4E82EE]', bg: 'bg-[#4E82EE]/10' },
-                        { mode: 'week',  Icon: CalendarRange, label: 'Week',  sub: '7-day row view', color: 'text-[#9B72CF]', bg: 'bg-[#9B72CF]/10' },
-                        { mode: 'month', Icon: Grid3X3,       label: 'Month', sub: 'Full grid',      color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-                        { mode: 'year',  Icon: Layers,        label: 'Year',  sub: '12-month atlas', color: 'text-amber-500',  bg: 'bg-amber-500/10' },
-                      ] as const
-                    ).map(({ mode, Icon, label, sub, color, bg }) => (
-                      <button
-                        key={mode}
-                        onClick={() => {
-                          setViewMode(mode as CalendarViewMode);
-                          setViewDropdownOpen(false);
-                        }}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left cursor-pointer transition-all group ${
-                          viewMode === mode
-                            ? `${bg} ${color}`
-                            : 'hover:bg-(--bg-elevated) text-(--text-secondary)'
-                        }`}
-                      >
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${viewMode === mode ? bg : 'bg-(--bg-elevated) group-hover:bg-(--bg-card)'}`}>
-                          <Icon size={15} className={viewMode === mode ? color : 'text-(--text-muted)'} />
-                        </div>
-                        <div>
-                          <div className={`text-xs font-semibold ${viewMode === mode ? color : ''}`}>{label}</div>
-                          <div className="text-[10px] text-(--text-muted)">{sub}</div>
-                        </div>
-                        {viewMode === mode && (
-                          <Check size={13} className={`ml-auto shrink-0 ${color}`} />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
+                  {label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Export Calendar (.ics) Button */}
           <button
             onClick={exportIcsCalendar}
             title="Export to Apple Calendar / Google Calendar (.ics)"
-            className="px-3 py-1.5 sm:py-2 rounded-full bg-(--bg-elevated) border border-(--border-subtle) hover:bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) text-[11px] sm:text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+            className="px-3 py-1.5 sm:py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) text-[11px] sm:text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
           >
             <Download size={14} />
-            <span className="hidden lg:inline">Sync / Export .ics</span>
+            <span className="hidden lg:inline">Export .ics</span>
           </button>
 
           {/* Schedule Event Action Button */}
           <button
             onClick={() => openScheduleModal()}
-            className="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-[11px] sm:text-xs font-semibold hover:opacity-95 transition-all cursor-pointer shadow-sm flex items-center gap-1.5 shrink-0"
+            className="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-[11px] sm:text-xs font-semibold hover:opacity-95 transition-all cursor-pointer shadow-sm flex items-center gap-1.5 shrink-0"
           >
             <Plus size={15} />
             <span>Schedule Event</span>
@@ -567,14 +521,14 @@ export default function CalendarView() {
           <div className="flex items-center gap-1">
             <button
               onClick={handlePrev}
-              className="p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
               title="Previous"
             >
               <ChevronLeft size={18} />
             </button>
             <button
               onClick={handleNext}
-              className="p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
               title="Next"
             >
               <ChevronRight size={18} />
@@ -582,111 +536,89 @@ export default function CalendarView() {
           </div>
 
           <div className="font-semibold text-xs sm:text-sm text-(--text-primary) flex items-center gap-1.5 flex-wrap">
-            {/* ── Month picker (hidden in year view) ── */}
-            {viewMode !== 'year' && (
-              <div className="relative" ref={monthAnchorRef}>
-                <button
-                  onClick={toggleMonthPicker}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-(--bg-elevated) transition-colors cursor-pointer"
-                >
-                  <span>
-                    {viewMode === 'day'
-                      ? MONTH_NAMES[selectedDate.getMonth()]
-                      : viewMode === 'week'
-                      ? `${MONTH_NAMES[weekDays[0]?.date.getMonth()]} ${weekDays[0]?.date.getDate()} – ${MONTH_NAMES[weekDays[6]?.date.getMonth()]} ${weekDays[6]?.date.getDate()}`
-                      : MONTH_NAMES[selectedDate.getMonth()]}
-                  </span>
-                  <ChevronDown size={13} className={`text-(--text-muted) transition-transform ${monthPickerOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {monthPickerOpen && (
-                  <>
-                    <div className="fixed inset-0 z-20" onClick={() => setMonthPickerOpen(false)} />
-                    <div
-                      className={`absolute top-full mt-1.5 z-30 w-56 grid grid-cols-3 gap-1 p-2 rounded-2xl border border-(--border-subtle) bg-(--bg-card) shadow-2xl animate-in fade-in zoom-in-95 duration-150 ${
-                        monthAlign === 'right' ? 'right-0' : 'left-0'
-                      }`}
-                    >
-                      {MONTH_NAMES.map((m, idx) => (
-                        <button
-                          key={m}
-                          onClick={() => {
-                            const d = new Date(selectedDate);
-                            d.setMonth(idx);
-                            setSelectedDate(d);
-                            setMonthPickerOpen(false);
-                          }}
-                          className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
-                            idx === selectedDate.getMonth()
-                              ? 'bg-[#4E82EE]/15 text-[#4E82EE] dark:text-[#a8c7fa]'
-                              : 'text-(--text-secondary) hover:bg-(--bg-elevated)'
-                          }`}
-                        >
-                          {m.slice(0, 3)}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Day-of-month (day view only) */}
-            {viewMode === 'day' && <span>{selectedDate.getDate()},</span>}
-            {viewMode === 'day' && <span className="text-(--text-muted)">{SHORT_WEEKDAYS[selectedDate.getDay()]},</span>}
-
-            {/* ── Year picker ── */}
-            <div className="relative" ref={yearAnchorRef}>
+            {/* ── Unified Date & Month Popover ── */}
+            <div className="relative" ref={datePickerAnchorRef}>
               <button
-                onClick={toggleYearPicker}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-(--bg-elevated) transition-colors cursor-pointer font-mono"
+                onClick={toggleDatePicker}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/40 text-(--text-primary) text-xs font-bold transition-all cursor-pointer shadow-2xs group"
               >
-                <span>{selectedDate.getFullYear()}</span>
-                <ChevronDown size={13} className={`text-(--text-muted) transition-transform ${yearPickerOpen ? 'rotate-180' : ''}`} />
+                <span>
+                  {viewMode === 'day'
+                    ? `${MONTH_NAMES[selectedDate.getMonth()]} ${selectedDate.getDate()}, ${selectedDate.getFullYear()}`
+                    : viewMode === 'week'
+                    ? weekDays[0] && weekDays[6]
+                      ? weekDays[0].date.getMonth() === weekDays[6].date.getMonth()
+                        ? `${MONTH_NAMES[weekDays[0].date.getMonth()]} ${weekDays[0].date.getDate()} – ${weekDays[6].date.getDate()}, ${weekDays[6].date.getFullYear()}`
+                        : `${MONTH_NAMES[weekDays[0].date.getMonth()]} ${weekDays[0].date.getDate()} – ${MONTH_NAMES[weekDays[6].date.getMonth()]} ${weekDays[6].date.getDate()}, ${weekDays[6].date.getFullYear()}`
+                      : `${MONTH_NAMES[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`
+                    : viewMode === 'year'
+                    ? `${selectedDate.getFullYear()}`
+                    : `${MONTH_NAMES[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`}
+                </span>
+                <ChevronDown size={13} className={`text-(--text-muted) group-hover:text-[#4E82EE] transition-transform duration-200 ${datePickerOpen ? 'rotate-180 text-[#4E82EE]' : ''}`} />
               </button>
-              {yearPickerOpen && (
+
+              {datePickerOpen && (
                 <>
-                  <div className="fixed inset-0 z-20" onClick={() => setYearPickerOpen(false)} />
+                  <div className="fixed inset-0 z-30" onClick={() => setDatePickerOpen(false)} />
                   <div
-                    className={`absolute top-full mt-1.5 z-30 w-44 p-2 rounded-2xl border border-(--border-subtle) bg-(--bg-card) shadow-2xl animate-in fade-in zoom-in-95 duration-150 ${
-                      yearAlign === 'right' ? 'right-0' : 'left-0'
+                    className={`absolute top-full mt-2 z-40 w-64 p-3 rounded-2xl border border-(--border-subtle) bg-(--bg-card) shadow-2xl animate-in fade-in zoom-in-95 duration-150 ${
+                      datePickerAlign === 'right' ? 'right-0' : 'left-0'
                     }`}
                   >
-                    <div className="flex items-center justify-between px-1 pb-1.5">
+                    {/* Year Header Navigator */}
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-(--border-subtle)">
                       <button
-                        onClick={() => setYearRangeStart((s) => s - 12)}
-                        className="p-1 rounded-md hover:bg-(--bg-elevated) text-(--text-muted) cursor-pointer"
+                        onClick={() => {
+                          const d = new Date(selectedDate);
+                          d.setFullYear(d.getFullYear() - 1);
+                          setSelectedDate(d);
+                        }}
+                        className="p-1 rounded-lg hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
+                        title="Previous Year"
                       >
-                        <ChevronLeft size={14} />
+                        <ChevronLeft size={16} />
                       </button>
-                      <span className="text-[11px] font-semibold text-(--text-muted)">
-                        {yearRangeStart}–{yearRangeStart + 11}
+                      <span className="text-sm font-bold font-mono text-(--text-primary)">
+                        {selectedDate.getFullYear()}
                       </span>
                       <button
-                        onClick={() => setYearRangeStart((s) => s + 12)}
-                        className="p-1 rounded-md hover:bg-(--bg-elevated) text-(--text-muted) cursor-pointer"
+                        onClick={() => {
+                          const d = new Date(selectedDate);
+                          d.setFullYear(d.getFullYear() + 1);
+                          setSelectedDate(d);
+                        }}
+                        className="p-1 rounded-lg hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
+                        title="Next Year"
                       >
-                        <ChevronRight size={14} />
+                        <ChevronRight size={16} />
                       </button>
                     </div>
-                    <div className="grid grid-cols-3 gap-1">
-                      {Array.from({ length: 12 }, (_, i) => yearRangeStart + i).map((y) => (
-                        <button
-                          key={y}
-                          onClick={() => {
-                            const d = new Date(selectedDate);
-                            d.setFullYear(y);
-                            setSelectedDate(d);
-                            setYearPickerOpen(false);
-                          }}
-                          className={`px-2 py-1.5 rounded-lg text-[11px] font-semibold font-mono transition-colors cursor-pointer ${
-                            y === selectedDate.getFullYear()
-                              ? 'bg-[#4E82EE]/15 text-[#4E82EE] dark:text-[#a8c7fa]'
-                              : 'text-(--text-secondary) hover:bg-(--bg-elevated)'
-                          }`}
-                        >
-                          {y}
-                        </button>
-                      ))}
+
+                    {/* 12 Months Grid */}
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {MONTH_NAMES.map((m, idx) => {
+                        const isSelected = idx === selectedDate.getMonth();
+                        return (
+                          <button
+                            key={m}
+                            onClick={() => {
+                              const d = new Date(selectedDate);
+                              d.setDate(1);
+                              d.setMonth(idx);
+                              setSelectedDate(d);
+                              setDatePickerOpen(false);
+                            }}
+                            className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#4E82EE] text-white shadow-xs font-bold'
+                                : 'text-(--text-secondary) hover:bg-(--bg-elevated) hover:text-(--text-primary)'
+                            }`}
+                          >
+                            {m.slice(0, 3)}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </>
@@ -957,7 +889,11 @@ export default function CalendarView() {
             {/* Week header — date range */}
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">
-                {MONTH_NAMES[weekDays[0]?.date.getMonth()]} {weekDays[0]?.date.getDate()} – {MONTH_NAMES[weekDays[6]?.date.getMonth()]} {weekDays[6]?.date.getDate()}, {selectedDate.getFullYear()}
+                {weekDays[0] && weekDays[6]
+                  ? weekDays[0].date.getMonth() === weekDays[6].date.getMonth()
+                    ? `${MONTH_NAMES[weekDays[0].date.getMonth()]} ${weekDays[0].date.getDate()} – ${weekDays[6].date.getDate()}, ${weekDays[6].date.getFullYear()}`
+                    : `${MONTH_NAMES[weekDays[0].date.getMonth()]} ${weekDays[0].date.getDate()} – ${MONTH_NAMES[weekDays[6].date.getMonth()]} ${weekDays[6].date.getDate()}, ${weekDays[6].date.getFullYear()}`
+                  : ''}
               </span>
               <span className="text-[11px] text-(--text-muted)">
                 {weekDays.reduce((sum, d) => sum + d.items.length, 0)} events this week

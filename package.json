@@ -5,10 +5,12 @@
   "scripts": {
     "dev": "next dev --turbopack -H 0.0.0.0",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "db:view": "node scripts/view-db.js",
     "cap:sync": "npx cap sync",
+    "cap:sync:local": "node scripts/sync-local-ip.js && npx cap sync",
+    "cap:sync:tunnel": "node scripts/sync-tunnel-url.js && npx cap sync",
     "cap:open:android": "npx cap open android",
     "cap:add:android": "npx cap add android"
   },

@@ -3,6 +3,8 @@
 import React from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
+import { renderTextWithIosEmojis } from '@/lib/utils/iosEmoji';
+
 export interface ToastAlertState {
   id: string;
   message: string;
@@ -49,7 +51,7 @@ export default function CustomToastAlert({ toasts, onDismiss }: CustomToastAlert
                 </div>
               )}
               <div className="text-xs sm:text-sm font-medium text-(--text-primary) leading-snug">
-                {toast.message}
+                {renderTextWithIosEmojis(toast.message)}
               </div>
             </div>
 

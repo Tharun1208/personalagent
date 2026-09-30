@@ -70,11 +70,11 @@ if (isMongoConfigured()) {
 }
 
 function ensureDbFile(): Schema {
+  if (memoryDb) return memoryDb;
+
   // Mongo mirror is the primary store when configured
   if (isMongoConfigured()) {
-    if (!memoryDb) {
-      memoryDb = getMirror() as unknown as Schema;
-    }
+    memoryDb = getMirror() as unknown as Schema;
     return memoryDb;
   }
 
@@ -495,6 +495,16 @@ export const db = {
     return user;
   },
 
+  deleteUser(userId: string): boolean {
+    const data = ensureDbFile();
+    const initialLen = data.users.length;
+    data.users = data.users.filter((u) => u.id !== userId);
+    data.userCredentials = data.userCredentials.filter((c) => c.userId !== userId);
+    persistDb();
+    deleteFromStore('users', userId);
+    return data.users.length < initialLen;
+  },
+
   // --- CONVERSATIONS ---
   getConversations(userId: string): Conversation[] {
     const data = ensureDbFile();
@@ -514,7 +524,16 @@ export const db = {
 
   getConversationById(id: string, userId: string): Conversation | null {
     const data = ensureDbFile();
-    return data.conversations.find((c) => c.id === id && c.userId === userId) || null;
+    let conv = data.conversations.find((c) => c.id === id && c.userId === userId);
+    if (!conv) {
+      conv = data.conversations.find((c) => c.id === id);
+      if (conv) {
+        conv.userId = userId;
+        persistDb();
+        persistDocs('conversations', conv);
+      }
+    }
+    return conv || null;
   },
 
   createConversation(conv: Conversation): Conversation {
@@ -527,9 +546,12 @@ export const db = {
 
   updateConversation(id: string, userId: string, patch: Partial<Conversation>): Conversation | null {
     const data = ensureDbFile();
-    const idx = data.conversations.findIndex((c) => c.id === id && c.userId === userId);
+    let idx = data.conversations.findIndex((c) => c.id === id && c.userId === userId);
+    if (idx === -1) {
+      idx = data.conversations.findIndex((c) => c.id === id);
+    }
     if (idx === -1) return null;
-    data.conversations[idx] = { ...data.conversations[idx], ...patch, updatedAt: new Date().toISOString() };
+    data.conversations[idx] = { ...data.conversations[idx], ...patch, userId, updatedAt: new Date().toISOString() };
     persistDb();
     persistDocs('conversations', data.conversations[idx]);
     return data.conversations[idx];
@@ -538,8 +560,8 @@ export const db = {
   deleteConversation(id: string, userId: string): boolean {
     const data = ensureDbFile();
     const initialLen = data.conversations.length;
-    const removed = data.conversations.find((c) => c.id === id && c.userId === userId);
-    data.conversations = data.conversations.filter((c) => !(c.id === id && c.userId === userId));
+    const removed = data.conversations.find((c) => c.id === id && (c.userId === userId || !c.userId));
+    data.conversations = data.conversations.filter((c) => c.id !== id);
     data.messages = data.messages.filter((m) => m.conversationId !== id);
     persistDb();
     if (removed) deleteFromStore('conversations', id);

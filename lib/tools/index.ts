@@ -802,4 +802,81 @@ export const toolRegistry: Record<string, ToolModule> = {
       return { success: false, message: `Unknown ledger action: ${action}` };
     },
   },
+
+  // ── 10. REAL-TIME WEATHER TOOL ─────────────────────────────
+  WeatherTool: {
+    name: 'WeatherTool',
+    description: 'Fetches 100% live weather conditions, temperature, humidity, wind, and forecasts for any city or location globally.',
+    actions: {
+      getWeather: {
+        name: 'getWeather',
+        description: 'Gets current weather and multi-day forecast for a city.',
+        parameters: {
+          location: { type: 'string', description: 'City name (e.g. Bangalore, London, New York, Tokyo)', required: true },
+        },
+        permissionLevel: 'READ',
+      },
+    },
+    async execute(action, args) {
+      const { getLiveWeather } = await import('./realtimeData');
+      const data = await getLiveWeather(args.location || 'Bangalore');
+      return {
+        success: true,
+        data,
+        message: `Current weather in ${data.location}, ${data.country}: ${data.temperature}°C (${data.condition}), Humidity: ${data.humidity}%, Wind: ${data.windSpeed} km/h.`,
+      };
+    },
+  },
+
+  // ── 11. REAL-TIME MARKET & STOCK TOOL ───────────────────────
+  StockTool: {
+    name: 'StockTool',
+    description: 'Fetches real-time live stock prices, cryptocurrency quotes (BTC, ETH, SOL), 24h change, and market caps.',
+    actions: {
+      getQuote: {
+        name: 'getQuote',
+        description: 'Gets live quote for stocks or cryptos.',
+        parameters: {
+          symbols: { type: 'string', description: 'Comma separated ticker symbols (e.g. BTC, ETH, AAPL, NVDA, TSLA)' },
+        },
+        permissionLevel: 'READ',
+      },
+    },
+    async execute(action, args) {
+      const { getLiveMarketQuotes } = await import('./realtimeData');
+      const symList = args.symbols ? args.symbols.split(',').map((s: string) => s.trim()) : ['BTC', 'ETH', 'SOL', 'AAPL', 'NVDA', 'TSLA'];
+      const quotes = await getLiveMarketQuotes(symList);
+      return {
+        success: true,
+        data: quotes,
+        message: `Retrieved live market quotes for ${quotes.map((q) => `${q.symbol}: ${q.currency}${q.price} (${q.changePercent24h >= 0 ? '+' : ''}${q.changePercent24h}%)`).join(', ')}.`,
+      };
+    },
+  },
+
+  // ── 12. REAL-TIME LIVE NEWS TOOL ───────────────────────────
+  NewsTool: {
+    name: 'NewsTool',
+    description: 'Fetches real-time live breaking news, tech headlines, global events, market updates, and topic-specific news.',
+    actions: {
+      getNews: {
+        name: 'getNews',
+        description: 'Retrieves live news headlines or searches news on any topic.',
+        parameters: {
+          topic: { type: 'string', description: 'News topic or category (e.g. "technology", "artificial intelligence", "world news", "markets", or specific query)' },
+        },
+        permissionLevel: 'READ',
+      },
+    },
+    async execute(action, args) {
+      const { getLiveNews } = await import('./realtimeData');
+      const news = await getLiveNews(args.topic || 'all');
+      return {
+        success: true,
+        data: news,
+        message: `Found ${news.length} live news stories for "${args.topic || 'latest headlines'}".`,
+      };
+    },
+  },
 };
+

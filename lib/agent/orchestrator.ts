@@ -1298,6 +1298,105 @@ Explain what you see clearly, extract any key text/details, and answer the user'
     }
 
     // ─────────────────────────────────────────────────────────────
+    // STEP 7.5: REAL-TIME WEATHER TOOL
+    // ─────────────────────────────────────────────────────────────
+    const isWeatherQuery =
+      lower.includes('weather') ||
+      lower.includes('temperature') ||
+      lower.includes('forecast') ||
+      lower.includes('is it raining') ||
+      lower.includes('climate in');
+
+    if (isWeatherQuery) {
+      let location = 'Bangalore';
+      const cityMatch = trimmed.match(/(?:in|at|for)\s+([A-Za-z\s]+)/i);
+      if (cityMatch && cityMatch[1]) {
+        location = cityMatch[1].replace(/[?.,!]/g, '').trim();
+      }
+
+      toolSteps.push({
+        toolName: 'WeatherTool',
+        action: 'getWeather',
+        input: { location },
+        status: 'executing',
+      });
+
+      const res = await toolRegistry.WeatherTool.execute('getWeather', { location }, userId);
+      toolSteps[toolSteps.length - 1] = {
+        toolName: 'WeatherTool',
+        action: 'getWeather',
+        input: { location },
+        output: res.data,
+        status: 'success',
+      };
+
+      const w = res.data;
+      let reply = `### 🌤️ Live Weather for **${w.location}, ${w.country}**\n\n`;
+      reply += `* **Current Temperature:** **${w.temperature}°C** (${w.condition})\n`;
+      reply += `* **Humidity:** ${w.humidity}%\n`;
+      reply += `* **Wind Speed:** ${w.windSpeed} km/h\n\n`;
+      if (w.forecast && w.forecast.length > 0) {
+        reply += `#### 📅 Multi-Day Forecast\n`;
+        for (const f of w.forecast) {
+          reply += `* **${f.day}:** ${f.tempMax}°C / ${f.tempMin}°C — ${f.condition}\n`;
+        }
+      }
+      reply += `\n---\n*Live data provided in real time via Open-Meteo Global Satellite Forecast.*`;
+      return { reply, toolSteps };
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // STEP 7.6: REAL-TIME MARKET & STOCK/CRYPTO TOOL
+    // ─────────────────────────────────────────────────────────────
+    const isMarketQuery =
+      lower.includes('stock price') ||
+      lower.includes('crypto price') ||
+      lower.includes('market price') ||
+      lower.includes('bitcoin') ||
+      lower.includes('btc price') ||
+      lower.includes('ethereum') ||
+      lower.includes('solana') ||
+      lower.includes('nvidia stock') ||
+      lower.includes('apple stock') ||
+      lower.includes('tesla stock') ||
+      lower.includes('market quote');
+
+    if (isMarketQuery) {
+      let symbols = 'BTC,ETH,SOL,AAPL,NVDA,TSLA';
+      if (lower.includes('bitcoin') || lower.includes('btc')) symbols = 'BTC';
+      else if (lower.includes('ethereum') || lower.includes('eth')) symbols = 'ETH';
+      else if (lower.includes('solana') || lower.includes('sol')) symbols = 'SOL';
+      else if (lower.includes('nvidia') || lower.includes('nvda')) symbols = 'NVDA';
+      else if (lower.includes('apple') || lower.includes('aapl')) symbols = 'AAPL';
+      else if (lower.includes('tesla') || lower.includes('tsla')) symbols = 'TSLA';
+
+      toolSteps.push({
+        toolName: 'StockTool',
+        action: 'getQuote',
+        input: { symbols },
+        status: 'executing',
+      });
+
+      const res = await toolRegistry.StockTool.execute('getQuote', { symbols }, userId);
+      toolSteps[toolSteps.length - 1] = {
+        toolName: 'StockTool',
+        action: 'getQuote',
+        input: { symbols },
+        output: res.data,
+        status: 'success',
+      };
+
+      const quotes = res.data as any[];
+      let reply = `### 📈 Real-Time Live Market Intelligence\n\n`;
+      for (const q of quotes) {
+        const sign = q.changePercent24h >= 0 ? '+' : '';
+        reply += `* **${q.symbol}** (${q.name}): **${q.currency}${q.price.toLocaleString('en-US')}** (${sign}${q.changePercent24h}% 24h)\n`;
+      }
+      reply += `\n*Last updated: ${new Date().toLocaleTimeString()}* — *Live data powered by Global Market & CoinGecko Feeds.*`;
+      return { reply, toolSteps };
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // STEP 8: WEB SEARCH
     // ─────────────────────────────────────────────────────────────
     if (
@@ -1305,7 +1404,11 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       lower.includes('find documentation') ||
       lower.includes('latest react updates') ||
       lower.includes('compare') ||
-      lower.includes('what are the latest')
+      lower.includes('what are the latest') ||
+      lower.includes('who is') ||
+      lower.includes('what is the news') ||
+      lower.includes('live news') ||
+      lower.includes('google search')
     ) {
       toolSteps.push({
         toolName: 'WebSearchTool',
@@ -1330,10 +1433,11 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         reply += `*Source: ${s.source}*\n\n`;
         reply += `${s.snippet}\n\n`;
       }
-      reply += `---\n*Information retrieved live from authoritative technical documentation.*`;
+      reply += `---\n*Information retrieved live in real time from authoritative web sources.*`;
 
       return { reply, toolSteps };
     }
+
 
     // ─────────────────────────────────────────────────────────────
     // STEP 9: DEFAULT INTELLIGENT SYNTHESIS WITH RECALLED MEMORIES

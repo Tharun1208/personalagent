@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CheckSquare,
   Clock,
@@ -14,13 +14,54 @@ import {
   Plus,
   HandCoins,
   TrendingUp,
+  TrendingDown,
   Sun,
   Timer,
   Check,
+  Wallet,
+  Zap,
+  ArrowUpRight,
+  ArrowDownLeft,
+  PieChart,
+  ListTodo,
+  AlarmClock,
+  Trophy,
+  CreditCard,
+  Layers,
+  Activity,
+  ChevronRight,
+  CloudSun,
+  Globe,
+  DollarSign,
+  RefreshCw,
+  Wind,
+  Droplets,
+  Newspaper,
+  ExternalLink,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { Habit } from '@/types';
 import DailyBriefingModal from '@/components/briefing/DailyBriefingModal';
+import { LiveWeatherData, LiveMarketQuote, LiveNewsItem } from '@/lib/tools/realtimeData';
+
+
+// Storage key for daily spending to pull real-time financial KPI
+const SPENDING_STORAGE_KEY = 'assistance_daily_spending';
+
+interface SpendingEntry {
+  id: string;
+  amount: number;
+  currency: string;
+  category: string;
+  note: string;
+  date: string;
+  createdAt: string;
+}
+
+function loadSpending(): SpendingEntry[] {
+  if (typeof window === 'undefined') return [];
+  try { return JSON.parse(localStorage.getItem(SPENDING_STORAGE_KEY) || '[]'); } catch { return []; }
+}
 
 export default function DashboardView() {
   const {
@@ -29,27 +70,63 @@ export default function DashboardView() {
     reminders,
     goals,
     ledgerEntries,
+    conversations,
     setActiveTab,
     sendMessage,
     toggleTask,
     setFocusTimerOpen,
+    setLiveVoiceOpen,
   } = useApp();
 
   const [habits, setHabits] = useState<Habit[]>([]);
   const [timeStr, setTimeStr] = useState('');
   const [briefingOpen, setBriefingOpen] = useState(false);
+  const [spendingList, setSpendingList] = useState<SpendingEntry[]>([]);
+  const [liveWeather, setLiveWeather] = useState<LiveWeatherData | null>(null);
+  const [liveQuotes, setLiveQuotes] = useState<LiveMarketQuote[]>([]);
+  const [liveNews, setLiveNews] = useState<LiveNewsItem[]>([]);
+  const [weatherCity, setWeatherCity] = useState('Bangalore');
+  const [newsTopic, setNewsTopic] = useState('technology');
+  const [isCityEditing, setIsCityEditing] = useState(false);
+  const [cityInput, setCityInput] = useState('');
+  const [isRealtimeLoading, setIsRealtimeLoading] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
+  const fetchRealtimeData = async (city = weatherCity, topic = newsTopic) => {
+    try {
+      setIsRealtimeLoading(true);
+      const res = await fetch(`/api/realtime?location=${encodeURIComponent(city)}&news=${encodeURIComponent(topic)}`);
+      const data = await res.json();
+      if (data.success) {
+        if (data.weather) setLiveWeather(data.weather);
+        if (data.marketQuotes) setLiveQuotes(data.marketQuotes);
+        if (data.news) setLiveNews(data.news);
+      }
+    } catch (err) {
+      console.warn('Realtime fetch error:', err);
+    } finally {
+      setIsRealtimeLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRealtimeData(weatherCity, newsTopic);
+    const liveInterval = setInterval(() => fetchRealtimeData(weatherCity, newsTopic), 60000); // 1-minute live tick
+    return () => clearInterval(liveInterval);
+  }, [weatherCity, newsTopic]);
+
   useEffect(() => {
     const updateTime = () => {
-      setTimeStr(
-        new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      );
+      setTimeStr(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     };
     updateTime();
-    const interval = setInterval(updateTime, 1000);
+    const interval = setInterval(updateTime, 30000); // 30-sec tick instead of 1-sec to eliminate mobile lag
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    setSpendingList(loadSpending());
   }, []);
 
   useEffect(() => {
@@ -79,11 +156,84 @@ export default function DashboardView() {
     }
   };
 
-  const pendingTasks = tasks.filter((t) => t.status !== 'completed');
-  const completedTasks = tasks.filter((t) => t.status === 'completed');
-  const pendingReminders = reminders.filter((r) => r.status === 'pending');
+  // ── KPI Calculations (Memoized for zero-lag mobile performance) ──────────────
+  const { totalTasks, completedTasks, pendingTasks, taskCompletionRate, highPriorityTasks } = useMemo(() => {
+    const total = tasks.length;
+    const completed = tasks.filter((t) => t.status === 'completed');
+    const pending = tasks.filter((t) => t.status !== 'completed');
+    const rate = total > 0 ? Math.round((completed.length / total) * 100) : 0;
+    const high = pending.filter((t) => t.priority === 'high' || t.priority === 'urgent');
+    return { totalTasks: total, completedTasks: completed, pendingTasks: pending, taskCompletionRate: rate, highPriorityTasks: high };
+  }, [tasks]);
+
+  // 2. Alarms & Reminders KPIs
+  const { pendingReminders, nextReminder } = useMemo(() => {
+    const pending = reminders.filter((r) => r.status === 'pending');
+    const sorted = pending
+      .slice()
+      .sort((a, b) => new Date(a.dueDateTime).getTime() - new Date(b.dueDateTime).getTime());
+    return { pendingReminders: pending, nextReminder: sorted[0] };
+  }, [reminders]);
+
+
+  // 3. Financial & Spending KPIs
+  const todaySpendingTotal = useMemo(() => {
+    return spendingList.filter((e) => e.date === todayStr).reduce((s, e) => s + e.amount, 0);
+  }, [spendingList, todayStr]);
+
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const monthSpendingTotal = useMemo(() => {
+    return spendingList
+      .filter((e) => {
+        const [y, m] = e.date.split('-').map(Number);
+        return y === currentYear && m - 1 === currentMonth;
+      })
+      .reduce((s, e) => s + e.amount, 0);
+  }, [spendingList, currentYear, currentMonth]);
+
+  const duesStats = useMemo(() => {
+    const pending = (ledgerEntries || []).filter((e) => e.status === 'pending');
+    const give = pending.filter((e) => e.type === 'give').reduce((s, e) => s + e.amount, 0);
+    const receive = pending.filter((e) => e.type === 'receive').reduce((s, e) => s + e.amount, 0);
+    const net = receive - give;
+    return { give, receive, net, pendingCount: pending.length };
+  }, [ledgerEntries]);
+
+  // 4. Goals & Milestone KPIs
   const activeGoals = goals.filter((g) => g.status === 'active');
-  const pendingDues = (ledgerEntries || []).filter((l) => l.status === 'pending');
+  const goalsMilestonesCompleted = useMemo(() => {
+    let totalM = 0;
+    let compM = 0;
+    goals.forEach((g) => {
+      if (g.milestones) {
+        totalM += g.milestones.length;
+        compM += g.milestones.filter((m) => m.completed).length;
+      }
+    });
+    return { totalM, compM, pct: totalM > 0 ? Math.round((compM / totalM) * 100) : 0 };
+  }, [goals]);
+
+  // 5. Habits KPIs
+  const habitsCompletedToday = habits.filter((h) => h.lastCompletedDate === todayStr).length;
+  const habitCompletionRate = habits.length > 0 ? Math.round((habitsCompletedToday / habits.length) * 100) : 0;
+
+  // 6. 7-Day Spending Trend for Mini Chart
+  const past7Days = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().split('T')[0];
+    });
+  }, []);
+
+  const weeklySpendValues = useMemo(() => {
+    return past7Days.map((dateStr) => {
+      return spendingList.filter((e) => e.date === dateStr).reduce((s, e) => s + e.amount, 0);
+    });
+  }, [past7Days, spendingList]);
+
+  const maxWeeklySpend = Math.max(...weeklySpendValues, 1);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -100,17 +250,18 @@ export default function DashboardView() {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-(--bg-primary) text-(--text-primary)">
-      {/* Top Header Toolbar */}
-      <div className="h-14 px-4 sm:px-6 border-b border-(--border-subtle) flex items-center justify-between shrink-0 bg-(--bg-primary)/95 backdrop-blur-md">
+      
+      {/* ── Top Header Toolbar ── */}
+      <div className="h-16 px-4 sm:px-6 border-b border-(--border-subtle) flex items-center justify-between shrink-0 bg-(--bg-primary)/95 backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white flex items-center justify-center font-bold text-xs shadow-xs">
-            <Sun size={17} />
+          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white flex items-center justify-center font-bold text-xs shadow-xs">
+            <Sun size={18} />
           </div>
           <div>
-            <h1 className="font-semibold text-xs sm:text-sm text-(--text-primary)">
+            <h1 className="font-bold text-sm sm:text-base text-(--text-primary)">
               {getGreeting()}, {user?.name || 'User'}
             </h1>
-            <p className="text-[10px] sm:text-[11px] text-(--text-muted)">
+            <p className="text-[11px] text-(--text-muted)">
               {formattedDate} · {timeStr}
             </p>
           </div>
@@ -119,27 +270,28 @@ export default function DashboardView() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setBriefingOpen(true)}
-            className="px-3.5 py-1.5 rounded-full bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-semibold hover:opacity-95 shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+            className="px-3.5 py-1.5 sm:py-2 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-semibold hover:opacity-95 shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
           >
             <Volume2 size={14} />
-            <span>Audio Briefing</span>
+            <span className="hidden sm:inline">Audio Briefing</span>
           </button>
         </div>
       </div>
 
-      {/* Main Briefing Dashboard Canvas */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-6 custom-scrollbar">
-        {/* Executive Summary Card */}
+      {/* ── Main KPI Canvas ── */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 max-w-6xl mx-auto w-full space-y-6 custom-scrollbar">
+
+        {/* ── 1. Executive Intelligence Card ── */}
         <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-[#4E82EE]/10 via-(--bg-card) to-[#9B72CF]/10 border border-[#4E82EE]/25 shadow-xs space-y-4 relative overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold text-[#4E82EE] uppercase tracking-wider">
-              <Sparkles size={15} />
-              <span>Today's Executive Intelligence</span>
+              <Sparkles size={16} />
+              <span>Executive Briefing & Intelligence</span>
             </div>
             <button
               onClick={() => {
                 setActiveTab('chat');
-                sendMessage('Give me a quick 3-point action plan for today.');
+                sendMessage('Analyze my tasks, financial dues, and today\'s schedule. Give me a 3-point action plan.');
               }}
               className="text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
             >
@@ -149,78 +301,516 @@ export default function DashboardView() {
           </div>
 
           <p className="text-sm font-medium text-(--text-primary) leading-relaxed">
-            You currently have <strong>{pendingTasks.length} pending tasks</strong> and{' '}
-            <strong>{pendingReminders.length} scheduled alarms</strong> for today.
-            {pendingTasks[0] && (
-              <span> Top priority item is <span className="text-[#4E82EE] font-semibold">"{pendingTasks[0].title}"</span>.</span>
+            You have <strong className="text-[#4E82EE]">{pendingTasks.length} pending tasks</strong>,{' '}
+            <strong className="text-rose-500">{pendingReminders.length} alarms</strong>, and today&apos;s spending stands at{' '}
+            <strong className="text-emerald-500">₹{todaySpendingTotal.toLocaleString('en-IN')}</strong>.
+            {highPriorityTasks.length > 0 && (
+              <span> Focus on high priority: <strong className="text-(--text-primary)">&ldquo;{highPriorityTasks[0].title}&rdquo;</strong>.</span>
             )}
-            {pendingReminders[0] && (
-              <span> Next reminder is set for <strong>{new Date(pendingReminders[0].dueDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>.</span>
+            {nextReminder && (
+              <span> Next reminder is at <strong>{new Date(nextReminder.dueDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>.</span>
             )}
           </p>
 
-          {/* 4 Metric Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+          {/* 6 Quick Action Buttons */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-none">
+            <button
+              onClick={() => setActiveTab('tasks')}
+              className="px-3 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+            >
+              <Plus size={13} className="text-[#4E82EE]" />
+              <span>New Task</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('ledger')}
+              className="px-3 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-emerald-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+            >
+              <CreditCard size={13} className="text-emerald-500" />
+              <span>Log Expense</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('reminders')}
+              className="px-3 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-rose-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+            >
+              <AlarmClock size={13} className="text-rose-500" />
+              <span>Set Alarm</span>
+            </button>
+            <button
+              onClick={() => setFocusTimerOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+            >
+              <Flame size={13} className="text-amber-500" />
+              <span>Start Focus 25m</span>
+            </button>
+            <button
+              onClick={() => setLiveVoiceOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+            >
+              <Zap size={13} className="text-[#4E82EE]" />
+              <span>Live Voice</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ── 2. Master KPI Metrics Grid (6 Key Performance Indicators) ── */}
+        <div>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-(--text-muted) mb-3 px-1 flex items-center gap-1.5">
+            <Activity size={14} className="text-[#4E82EE]" />
+            Key Performance Indicators (KPIs)
+          </h2>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* KPI 1: Task Completion Rate */}
             <div
               onClick={() => setActiveTab('tasks')}
-              className="p-3 rounded-2xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/40 transition-all cursor-pointer shadow-2xs"
+              className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/40 transition-all cursor-pointer shadow-xs space-y-2 group"
             >
-              <div className="flex items-center justify-between text-[11px] text-(--text-muted) mb-1">
-                <span>Tasks Due</span>
-                <CheckSquare size={13} className="text-[#4E82EE]" />
+              <div className="flex items-center justify-between text-xs text-(--text-muted)">
+                <span className="font-semibold">Task Rate</span>
+                <ListTodo size={15} className="text-[#4E82EE]" />
               </div>
-              <div className="text-lg font-bold text-(--text-primary)">{pendingTasks.length}</div>
+              <div>
+                <p className="text-2xl font-black text-(--text-primary) font-mono">{taskCompletionRate}%</p>
+                <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-2 overflow-hidden">
+                  <div className="h-full rounded-full bg-[#4E82EE]" style={{ width: `${taskCompletionRate}%` }} />
+                </div>
+              </div>
+              <p className="text-[10px] text-(--text-muted)">{completedTasks.length}/{totalTasks} completed</p>
             </div>
 
+            {/* KPI 2: Today's Spending */}
+            <div
+              onClick={() => setActiveTab('ledger')}
+              className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-emerald-500/40 transition-all cursor-pointer shadow-xs space-y-2 group"
+            >
+              <div className="flex items-center justify-between text-xs text-(--text-muted)">
+                <span className="font-semibold">Today Spend</span>
+                <CreditCard size={15} className="text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-black text-emerald-500 font-mono">₹{todaySpendingTotal.toLocaleString('en-IN')}</p>
+              </div>
+              <p className="text-[10px] text-(--text-muted)">Month: ₹{monthSpendingTotal.toLocaleString('en-IN')}</p>
+            </div>
+
+            {/* KPI 3: Net Ledger Due Balance */}
+            <div
+              onClick={() => setActiveTab('ledger')}
+              className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-indigo-500/40 transition-all cursor-pointer shadow-xs space-y-2 group"
+            >
+              <div className="flex items-center justify-between text-xs text-(--text-muted)">
+                <span className="font-semibold">Net Balance</span>
+                <HandCoins size={15} className="text-indigo-500" />
+              </div>
+              <div>
+                <p className={`text-2xl font-black font-mono ${duesStats.net >= 0 ? 'text-[#4E82EE]' : 'text-rose-500'}`}>
+                  {duesStats.net >= 0 ? '+' : ''}₹{duesStats.net.toLocaleString('en-IN')}
+                </p>
+              </div>
+              <p className="text-[10px] text-(--text-muted)">{duesStats.pendingCount} active dues</p>
+            </div>
+
+            {/* KPI 4: Alarms & Alerts */}
             <div
               onClick={() => setActiveTab('reminders')}
-              className="p-3 rounded-2xl bg-(--bg-card) border border-(--border-subtle) hover:border-rose-500/40 transition-all cursor-pointer shadow-2xs"
+              className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-rose-500/40 transition-all cursor-pointer shadow-xs space-y-2 group"
             >
-              <div className="flex items-center justify-between text-[11px] text-(--text-muted) mb-1">
-                <span>Alarms</span>
-                <Clock size={13} className="text-rose-500" />
+              <div className="flex items-center justify-between text-xs text-(--text-muted)">
+                <span className="font-semibold">Alarms</span>
+                <AlarmClock size={15} className="text-rose-500" />
               </div>
-              <div className="text-lg font-bold text-(--text-primary)">{pendingReminders.length}</div>
+              <div>
+                <p className="text-2xl font-black text-(--text-primary) font-mono">{pendingReminders.length}</p>
+              </div>
+              <p className="text-[10px] text-(--text-muted) truncate">
+                {nextReminder ? new Date(nextReminder.dueDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No pending'}
+              </p>
             </div>
 
-            <div
-              onClick={() => setActiveTab('habits')}
-              className="p-3 rounded-2xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/40 transition-all cursor-pointer shadow-2xs"
-            >
-              <div className="flex items-center justify-between text-[11px] text-(--text-muted) mb-1">
-                <span>Habits</span>
-                <Flame size={13} className="text-amber-500" />
-              </div>
-              <div className="text-lg font-bold text-(--text-primary)">{habits.length}</div>
-            </div>
-
+            {/* KPI 5: Goal Milestones */}
             <div
               onClick={() => setActiveTab('goals')}
-              className="p-3 rounded-2xl bg-(--bg-card) border border-(--border-subtle) hover:border-purple-500/40 transition-all cursor-pointer shadow-2xs"
+              className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-purple-500/40 transition-all cursor-pointer shadow-xs space-y-2 group"
             >
-              <div className="flex items-center justify-between text-[11px] text-(--text-muted) mb-1">
-                <span>Active Goals</span>
-                <Target size={13} className="text-purple-500" />
+              <div className="flex items-center justify-between text-xs text-(--text-muted)">
+                <span className="font-semibold">Goals</span>
+                <Trophy size={15} className="text-purple-500" />
               </div>
-              <div className="text-lg font-bold text-(--text-primary)">{activeGoals.length}</div>
+              <div>
+                <p className="text-2xl font-black text-purple-500 font-mono">{activeGoals.length}</p>
+                <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-2 overflow-hidden">
+                  <div className="h-full rounded-full bg-purple-500" style={{ width: `${goalsMilestonesCompleted.pct}%` }} />
+                </div>
+              </div>
+              <p className="text-[10px] text-(--text-muted)">{goalsMilestonesCompleted.compM}/{goalsMilestonesCompleted.totalM || 1} milestones</p>
+            </div>
+
+            {/* KPI 6: Habits & Daily Streak */}
+            <div
+              onClick={() => setActiveTab('habits')}
+              className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/40 transition-all cursor-pointer shadow-xs space-y-2 group"
+            >
+              <div className="flex items-center justify-between text-xs text-(--text-muted)">
+                <span className="font-semibold">Habit Streak</span>
+                <Flame size={15} className="text-amber-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-black text-amber-500 font-mono">{habitCompletionRate}%</p>
+                <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-2 overflow-hidden">
+                  <div className="h-full rounded-full bg-amber-500" style={{ width: `${habitCompletionRate}%` }} />
+                </div>
+              </div>
+              <p className="text-[10px] text-(--text-muted)">{habitsCompletedToday}/{habits.length || 1} done today</p>
             </div>
           </div>
         </div>
 
-        {/* 2-Column Main Section: Today's Tasks & Upcoming Alarms */}
+        {/* ── 3. Visual Charts & Analytics Section (2-Column) ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          
+          {/* Spending Trend Mini Bar Histogram */}
+          <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-(--text-primary) flex items-center gap-1.5">
+                  <TrendingUp size={14} className="text-emerald-500" />
+                  7-Day Spending Velocity
+                </h3>
+                <p className="text-[11px] text-(--text-muted)">Daily spend trends for the past week</p>
+              </div>
+              <button
+                onClick={() => setActiveTab('ledger')}
+                className="text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>Full Ledger</span>
+                <ChevronRight size={13} />
+              </button>
+            </div>
+
+            {/* 7-Day Mini Histogram */}
+            <div className="flex items-end gap-2 h-28 pt-3">
+              {past7Days.map((d, i) => {
+                const val = weeklySpendValues[i];
+                const pct = (val / maxWeeklySpend) * 100;
+                const isToday = d === todayStr;
+
+                return (
+                  <div key={d} className="flex-1 flex flex-col items-center gap-1 group">
+                    <span className="text-[9px] text-(--text-muted) font-mono">
+                      {val > 0 ? `₹${val.toLocaleString('en-IN')}` : ''}
+                    </span>
+                    <div className="w-full rounded-t-lg relative flex items-end" style={{ height: '64px' }}>
+                      <div
+                        className={`w-full rounded-t-lg transition-all duration-300 ${
+                          isToday ? 'bg-[#4E82EE]' : 'bg-(--bg-elevated) group-hover:bg-[#4E82EE]/50'
+                        }`}
+                        style={{ height: `${Math.max(pct, 6)}%` }}
+                      />
+                    </div>
+                    <span className={`text-[10px] font-semibold ${isToday ? 'text-[#4E82EE]' : 'text-(--text-muted)'}`}>
+                      {isToday ? 'Today' : new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Financial Dues & Smart Settlement Summary */}
+          <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-(--text-primary) flex items-center gap-1.5">
+                  <Wallet size={14} className="text-[#4E82EE]" />
+                  Financial Health Overview
+                </h3>
+                <p className="text-[11px] text-(--text-muted)">Dues, receivables, and net cashflow</p>
+              </div>
+              <button
+                onClick={() => setActiveTab('ledger')}
+                className="text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>View Dues</span>
+                <ChevronRight size={13} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="p-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-1">
+                <div className="flex items-center justify-between text-xs text-(--text-muted)">
+                  <span>You Need to Give</span>
+                  <ArrowUpRight size={14} className="text-rose-500" />
+                </div>
+                <p className="text-xl font-bold text-rose-500 font-mono">₹{duesStats.give.toLocaleString('en-IN')}</p>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-1">
+                <div className="flex items-center justify-between text-xs text-(--text-muted)">
+                  <span>Owed to You</span>
+                  <ArrowDownLeft size={14} className="text-emerald-500" />
+                </div>
+                <p className="text-xl font-bold text-emerald-500 font-mono">₹{duesStats.receive.toLocaleString('en-IN')}</p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-[#4E82EE]/10 border border-[#4E82EE]/20 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-[#4E82EE] text-white flex items-center justify-center font-bold text-xs">⚡</div>
+                <span className="text-xs font-semibold text-(--text-primary)">Optimal Smart Settlements Active</span>
+              </div>
+              <span className="text-xs font-mono font-bold text-[#4E82EE]">DSA O(V log V)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Real-Time Live Intelligence (Weather & Market Tickers) ── */}
+        <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-4 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Globe size={17} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-(--text-primary)">Real-Time Live Intelligence</h3>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-semibold border border-emerald-500/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                    LIVE
+                  </span>
+                </div>
+                <p className="text-[11px] text-(--text-muted)">Live internet weather conditions & global market prices</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => fetchRealtimeData(weatherCity)}
+                disabled={isRealtimeLoading}
+                className="p-2 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-elevated)/80 border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 text-xs active:scale-95 disabled:opacity-50"
+                title="Refresh Live Data"
+              >
+                <RefreshCw size={13} className={isRealtimeLoading ? 'animate-spin text-[#4E82EE]' : ''} />
+                <span className="text-[11px] font-medium hidden sm:inline">Sync Live</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
+            {/* Weather Card (5 cols) */}
+            <div className="lg:col-span-5 p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CloudSun size={17} className="text-amber-500" />
+                  {isCityEditing ? (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (cityInput.trim()) {
+                          setWeatherCity(cityInput.trim());
+                          setIsCityEditing(false);
+                        }
+                      }}
+                      className="flex items-center gap-1"
+                    >
+                      <input
+                        type="text"
+                        value={cityInput}
+                        onChange={(e) => setCityInput(e.target.value)}
+                        placeholder="Enter City..."
+                        className="text-xs px-2 py-1 rounded-lg bg-(--bg-card) border border-[#4E82EE] text-(--text-primary) focus:outline-hidden w-28"
+                        autoFocus
+                      />
+                      <button
+                        type="submit"
+                        className="text-[10px] px-2 py-1 rounded-lg bg-[#4E82EE] text-white font-semibold cursor-pointer"
+                      >
+                        Set
+                      </button>
+                    </form>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setCityInput(weatherCity);
+                        setIsCityEditing(true);
+                      }}
+                      className="text-xs font-bold text-(--text-primary) hover:text-[#4E82EE] transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      {liveWeather ? `${liveWeather.location}, ${liveWeather.country}` : weatherCity}
+                      <span className="text-[10px] text-(--text-muted) font-normal">(Edit)</span>
+                    </button>
+                  )}
+                </div>
+                <span className="text-[10px] font-mono text-(--text-muted)">Open-Meteo Live</span>
+              </div>
+
+              {liveWeather ? (
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <div className="text-3xl font-black text-(--text-primary) font-mono">
+                      {liveWeather.temperature}°C
+                    </div>
+                    <div className="text-xs font-semibold text-(--text-secondary) mt-0.5">
+                      {liveWeather.condition}
+                    </div>
+                  </div>
+
+                  <div className="text-right space-y-1 text-xs text-(--text-muted)">
+                    <div className="flex items-center justify-end gap-1">
+                      <Droplets size={12} className="text-sky-500" />
+                      <span>{liveWeather.humidity}% humidity</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-1">
+                      <Wind size={12} className="text-emerald-500" />
+                      <span>{liveWeather.windSpeed} km/h wind</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-4 text-center text-xs text-(--text-muted)">Loading live weather...</div>
+              )}
+
+              {/* 3-Day Forecast mini-pills */}
+              {liveWeather?.forecast && liveWeather.forecast.length > 0 && (
+                <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-(--border-subtle)">
+                  {liveWeather.forecast.slice(0, 3).map((f, i) => (
+                    <div key={i} className="p-2 rounded-xl bg-(--bg-card) text-center space-y-0.5">
+                      <span className="text-[10px] text-(--text-muted) font-semibold block">{f.day}</span>
+                      <span className="text-[11px] font-bold text-(--text-primary) block font-mono">{f.tempMax}° / {f.tempMin}°</span>
+                      <span className="text-[9px] text-(--text-secondary) block truncate">{f.condition.split(' ')[0]}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Live Stocks & Crypto Market Tickers (7 cols) */}
+            <div className="lg:col-span-7 p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-(--text-primary) flex items-center gap-1.5">
+                  <TrendingUp size={15} className="text-emerald-500" />
+                  Live Market Tickers (Crypto & Equities)
+                </span>
+                <span className="text-[10px] font-mono text-(--text-muted)">Live CoinGecko/Nasdaq</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {liveQuotes.map((q) => {
+                  const isPositive = q.changePercent24h >= 0;
+                  return (
+                    <div
+                      key={q.symbol}
+                      className="p-2.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/40 transition-all flex flex-col justify-between"
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-bold text-xs text-(--text-primary) font-mono">{q.symbol}</span>
+                        <span
+                          className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded-md ${
+                            isPositive ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+                          }`}
+                        >
+                          {isPositive ? '+' : ''}{q.changePercent24h}%
+                        </span>
+                      </div>
+                      <div className="mt-1.5">
+                        <div className="text-sm font-black text-(--text-primary) font-mono">
+                          {q.currency}{q.price.toLocaleString('en-US')}
+                        </div>
+                        <div className="text-[9px] text-(--text-muted) truncate">{q.name}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Live Breaking News & Technology Feeds ── */}
+          <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Newspaper size={16} className="text-[#4E82EE]" />
+                <span className="text-xs font-bold text-(--text-primary)">Live Global & Tech Breaking News</span>
+              </div>
+
+              {/* News Topic Switcher Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                {[
+                  { key: 'technology', label: 'Tech & AI' },
+                  { key: 'business markets', label: 'Markets' },
+                  { key: 'world news', label: 'World' },
+                  { key: 'science', label: 'Science' },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => {
+                      setNewsTopic(tab.key);
+                      fetchRealtimeData(weatherCity, tab.key);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                      newsTopic === tab.key
+                        ? 'bg-[#4E82EE] text-white shadow-2xs'
+                        : 'bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) border border-(--border-subtle)'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* News Articles Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+              {liveNews.slice(0, 6).map((item) => (
+                <a
+                  key={item.id}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 transition-all flex flex-col justify-between group shadow-2xs"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2 text-[10px]">
+                      <span className="px-1.5 py-0.5 rounded-md bg-[#4E82EE]/10 text-[#4E82EE] font-semibold font-mono truncate">
+                        {item.source}
+                      </span>
+                      <span className="text-(--text-muted) shrink-0">{item.timeAgo}</span>
+                    </div>
+                    <h4 className="text-xs font-semibold text-(--text-primary) line-clamp-2 group-hover:text-[#4E82EE] transition-colors">
+                      {item.title}
+                    </h4>
+                    {item.snippet && (
+                      <p className="text-[11px] text-(--text-muted) line-clamp-2">
+                        {item.snippet}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-(--text-muted) pt-2 mt-2 border-t border-(--border-subtle)/60">
+                    <span className="font-medium text-(--text-secondary)">{item.category}</span>
+                    <ExternalLink size={11} className="text-(--text-muted) group-hover:text-[#4E82EE] transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── 4. Detailed Sections: Priority Tasks & Alarms ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Tasks Column */}
+
+          
+          {/* Priority Tasks Column */}
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
                 <CheckSquare size={15} className="text-[#4E82EE]" />
-                Today's Priority Tasks
+                Priority Tasks ({pendingTasks.length})
               </span>
               <button
                 onClick={() => setActiveTab('tasks')}
                 className="text-xs text-[#4E82EE] font-semibold hover:underline cursor-pointer"
               >
-                Open Tasks
+                View All
               </button>
             </div>
 
@@ -230,7 +820,7 @@ export default function DashboardView() {
                   All tasks completed for today!
                 </div>
               ) : (
-                pendingTasks.slice(0, 5).map((t) => (
+                pendingTasks.slice(0, 4).map((t) => (
                   <div
                     key={t.id}
                     onClick={() => toggleTask(t.id, t.status)}
@@ -253,18 +843,18 @@ export default function DashboardView() {
             </div>
           </div>
 
-          {/* Alarms & Reminders Column */}
+          {/* Upcoming Alarms Column */}
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
                 <Clock size={15} className="text-rose-500" />
-                Upcoming Alarms & Reminders
+                Upcoming Alarms ({pendingReminders.length})
               </span>
               <button
                 onClick={() => setActiveTab('reminders')}
                 className="text-xs text-rose-500 font-semibold hover:underline cursor-pointer"
               >
-                Open Alarms
+                View All
               </button>
             </div>
 
@@ -274,7 +864,7 @@ export default function DashboardView() {
                   No upcoming alarms scheduled
                 </div>
               ) : (
-                pendingReminders.slice(0, 5).map((r) => (
+                pendingReminders.slice(0, 4).map((r) => (
                   <div
                     key={r.id}
                     className="p-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center justify-between gap-2.5"
@@ -295,13 +885,13 @@ export default function DashboardView() {
           </div>
         </div>
 
-        {/* Habit Trackers Section */}
+        {/* ── 5. Habit Streaks Section ── */}
         {habits.length > 0 && (
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
                 <Flame size={15} className="text-amber-500" />
-                Today's Habit Check-in
+                Habit Streak & Daily Progress
               </span>
               <button
                 onClick={() => setActiveTab('habits')}
@@ -347,6 +937,7 @@ export default function DashboardView() {
             </div>
           </div>
         )}
+
       </div>
 
       {/* Audio Daily Briefing Modal */}

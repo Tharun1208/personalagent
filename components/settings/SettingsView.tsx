@@ -90,14 +90,17 @@ export default function SettingsView() {
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name.trim()) return;
     setIsSaving(true);
     try {
       await updateUser({ name: name.trim() });
       setSavedSuccess(true);
+      showToast(`✓ Name updated to "${name.trim()}"`, 'success');
       setTimeout(() => setSavedSuccess(false), 3000);
       refreshAll();
     } catch (err) {
       console.error('Failed to save settings', err);
+      showToast('Failed to update name. Please try again.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -395,12 +398,10 @@ export default function SettingsView() {
                       </div>
                       <div>
                         <div className="font-semibold text-xs sm:text-sm text-(--text-primary)">
-                          Account & Cloud Security
+                          Account & Security
                         </div>
                         <div className="text-[11px] text-(--text-muted)">
-                          {user?.email && user.email !== 'guest@assistance.ai' && user.email !== 'alex@example.com'
-                            ? `Signed in as ${user.email}`
-                            : 'Sign in or create account to sync cloud data'}
+                          {user?.name || 'Personal Account'} · Active & Secured
                         </div>
                       </div>
                     </div>
@@ -740,169 +741,43 @@ export default function SettingsView() {
                   </p>
                 </div>
 
-                {user?.email && user.email !== 'guest@assistance.ai' && user.email !== 'alex@example.com' ? (
-                  /* Signed In State */
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold text-base">
-                          {user.name?.[0] || 'U'}
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-(--text-primary)">{user.name}</div>
-                          <div className="text-[11px] text-(--text-muted)">{user.email}</div>
-                        </div>
+                {/* Active Secured Account Card */}
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#4E82EE] to-emerald-500 text-white flex items-center justify-center font-bold text-base shadow-xs">
+                        {user?.name?.[0] || 'U'}
                       </div>
-                      <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                        <Check size={12} /> Active Cloud Sync
-                      </span>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-2 text-xs">
-                      <div className="font-semibold text-(--text-primary)">Sync Status</div>
-                      <div className="text-[11px] text-(--text-muted) flex items-center justify-between">
-                        <span>User ID:</span>
-                        <span className="font-mono text-[10px] text-(--text-secondary)">{user.id}</span>
-                      </div>
-                      <div className="text-[11px] text-(--text-muted) flex items-center justify-between">
-                        <span>Encryption:</span>
-                        <span className="text-emerald-500 font-semibold">AES-256 GCM Cloud Storage</span>
+                      <div>
+                        <div className="text-xs font-bold text-(--text-primary)">{user?.name || 'Personal User'}</div>
+                        <div className="text-[11px] text-(--text-muted)">{user?.email || 'user@assistance.ai'}</div>
                       </div>
                     </div>
+                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <Check size={12} /> Unlimited Full Access
+                    </span>
+                  </div>
 
-                    <div className="pt-2">
-                      <button
-                        type="button"
-                        onClick={handleSignOut}
-                        className="w-full py-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 text-rose-500 text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-2"
-                      >
-                        <LogOut size={14} />
-                        <span>Sign Out of Account</span>
-                      </button>
+                  <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-3 text-xs">
+                    <div className="font-semibold text-(--text-primary)">Security & Cloud Status</div>
+                    <div className="text-[11px] text-(--text-muted) flex items-center justify-between">
+                      <span>Account Type:</span>
+                      <span className="font-semibold text-(--text-primary)">Primary Administrator (Full Access)</span>
+                    </div>
+                    <div className="text-[11px] text-(--text-muted) flex items-center justify-between">
+                      <span>Device Sync:</span>
+                      <span className="text-emerald-500 font-semibold">Active & Live Synced</span>
+                    </div>
+                    <div className="text-[11px] text-(--text-muted) flex items-center justify-between">
+                      <span>Local Storage:</span>
+                      <span className="text-emerald-500 font-semibold">Encrypted Client Database</span>
+                    </div>
+                    <div className="text-[11px] text-(--text-muted) flex items-center justify-between">
+                      <span>Guest Restrictions:</span>
+                      <span className="text-emerald-500 font-semibold">Disabled (Unlimited Prompts)</span>
                     </div>
                   </div>
-                ) : (
-                  /* Login / Register Form */
-                  <form onSubmit={handleAuthSubmit} className="space-y-4">
-                    {/* Tabs */}
-                    <div className="flex rounded-2xl bg-(--bg-elevated) p-1 border border-(--border-subtle)">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAuthMode('login');
-                          setAuthError(null);
-                        }}
-                        className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-                          authMode === 'login'
-                            ? 'bg-(--bg-card) text-(--text-primary) shadow-2xs'
-                            : 'text-(--text-muted) hover:text-(--text-primary)'
-                        }`}
-                      >
-                        Sign In
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAuthMode('register');
-                          setAuthError(null);
-                        }}
-                        className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-                          authMode === 'register'
-                            ? 'bg-(--bg-card) text-(--text-primary) shadow-2xs'
-                            : 'text-(--text-muted) hover:text-(--text-primary)'
-                        }`}
-                      >
-                        Create Account
-                      </button>
-                    </div>
-
-                    {authError && (
-                      <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs flex items-center gap-2">
-                        <AlertCircle size={14} className="shrink-0" />
-                        <span>{authError}</span>
-                      </div>
-                    )}
-
-                    {authSuccess && (
-                      <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs flex items-center gap-2">
-                        <Check size={14} className="shrink-0" />
-                        <span>{authSuccess}</span>
-                      </div>
-                    )}
-
-                    {authMode === 'register' && (
-                      <div>
-                        <label className="block text-[11px] font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
-                          Full Name
-                        </label>
-                        <div className="relative">
-                          <UserIcon size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--text-muted)" />
-                          <input
-                            type="text"
-                            value={authName}
-                            onChange={(e) => setAuthName(e.target.value)}
-                            placeholder="John Doe"
-                            required
-                            className="w-full pl-9.5 pr-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-medium text-(--text-primary) focus:outline-none focus:border-[#4E82EE]"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
-                        Email Address
-                      </label>
-                      <div className="relative">
-                        <Mail size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--text-muted)" />
-                        <input
-                          type="email"
-                          value={authEmail}
-                          onChange={(e) => setAuthEmail(e.target.value)}
-                          placeholder="user@example.com"
-                          required
-                          className="w-full pl-9.5 pr-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-medium text-(--text-primary) focus:outline-none focus:border-[#4E82EE]"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
-                        Password
-                      </label>
-                      <div className="relative">
-                        <Lock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--text-muted)" />
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={authPassword}
-                          onChange={(e) => setAuthPassword(e.target.value)}
-                          placeholder="Enter password..."
-                          required
-                          className="w-full pl-9.5 pr-10 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-medium text-(--text-primary) focus:outline-none focus:border-[#4E82EE]"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
-                        >
-                          {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={authLoading}
-                      className="w-full py-2.5 rounded-xl bg-[#4E82EE] text-white font-semibold text-xs hover:opacity-95 transition-all cursor-pointer shadow-xs disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {authLoading ? (
-                        <span>Processing...</span>
-                      ) : (
-                        <span>{authMode === 'login' ? 'Sign In' : 'Create Account'}</span>
-                      )}
-                    </button>
-                  </form>
-                )}
+                </div>
               </div>
 
               <div className="flex items-center justify-between">

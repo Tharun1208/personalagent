@@ -17,40 +17,60 @@ import { Capacitor } from '@capacitor/core';
 
 let permissionGranted: boolean | null = null;
 
-const isNative = () => Capacitor.isNativePlatform();
+const isNative = () => {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
+};
 
 export async function ensureNotificationPermission(): Promise<boolean> {
   if (permissionGranted !== null) return permissionGranted;
 
   try {
     if (isNative()) {
-      const status = await LocalNotifications.checkPermissions();
-      if (status.display !== 'granted') {
-        const req = await LocalNotifications.requestPermissions();
-        permissionGranted = req.display === 'granted';
-      } else {
-        permissionGranted = true;
+      try {
+        const status = await LocalNotifications.checkPermissions();
+        if (status.display !== 'granted') {
+          const req = await LocalNotifications.requestPermissions();
+          permissionGranted = req.display === 'granted';
+        } else {
+          permissionGranted = true;
+        }
+      } catch (permErr) {
+        console.warn('LocalNotifications permission check failed:', permErr);
+        permissionGranted = false;
       }
-      // Register the default channel once (Android 13+ shows a channel toggle)
-      await LocalNotifications.createChannel({
-        id: 'assistance-reminders',
-        name: 'Reminders & Alarms',
-        description: 'Scheduled reminders, alarms and task due dates',
-        importance: 10 as any, // IMPORTANCE_HIGH → heads-up display + sound
-        vibration: true,
-        sound: 'notify.wav',
-        visibility: 1, // PUBLIC — show on lock screen
-      }).catch(() => {});
+
+      // Register the default channel once with safe Android importance (5 = IMPORTANCE_HIGH)
+      try {
+        await LocalNotifications.createChannel({
+          id: 'assistance-reminders',
+          name: 'Reminders & Alarms',
+          description: 'Scheduled reminders, alarms and task due dates',
+          importance: 5, // Android IMPORTANCE_HIGH (valid 1-5)
+          vibration: true,
+          sound: 'notify.wav',
+          visibility: 1, // PUBLIC — show on lock screen
+        });
+      } catch (channelErr) {
+        console.warn('Channel creation error (ignored):', channelErr);
+      }
     } else if (typeof window !== 'undefined' && 'Notification' in window) {
-      const p = await Notification.requestPermission();
-      permissionGranted = p === 'granted';
+      try {
+        const p = await Notification.requestPermission();
+        permissionGranted = p === 'granted';
+      } catch {
+        permissionGranted = false;
+      }
     } else {
       permissionGranted = false;
     }
   } catch {
     permissionGranted = false;
   }
-  return permissionGranted;
+  return permissionGranted || false;
 }
 
 export interface ScheduledItem {
@@ -64,6 +84,7 @@ export interface ScheduledItem {
 
 /** Android int ids must fit in 31 bits — hash the string id deterministically */
 export function notificationIdFromString(str: string): number {
+  if (!str) return Math.floor(Math.random() * 1000000);
   let h = 0;
   for (let i = 0; i < str.length; i++) {
     h = (h * 31 + str.charCodeAt(i)) | 0;
@@ -76,42 +97,45 @@ export function notificationIdFromString(str: string): number {
  * Cancels nothing (ids are stable), re-schedules everything in the future.
  */
 export async function scheduleNotifications(items: ScheduledItem[]): Promise<void> {
-  const granted = await ensureNotificationPermission();
-  if (!granted) return;
-
-  const now = Date.now();
-  const upcoming = items
-    .filter((i) => new Date(i.fireAt).getTime() > now + 1000)
-    .slice(0, 40); // Android practical limit safety
-
-  if (upcoming.length === 0) return;
-
   try {
+    const granted = await ensureNotificationPermission();
+    if (!granted) return;
+
+    const now = Date.now();
+    const upcoming = (items || [])
+      .filter((i) => i && i.fireAt && !isNaN(new Date(i.fireAt).getTime()) && new Date(i.fireAt).getTime() > now + 1000)
+      .slice(0, 40); // Android practical limit safety
+
+    if (upcoming.length === 0) return;
+
     if (isNative()) {
-      await LocalNotifications.schedule({
-        notifications: upcoming.map((item) => ({
-          id: item.id,
-          title: item.title,
-          body: item.body,
-          schedule: { at: new Date(item.fireAt), allowWhileIdle: true },
-          channelId: 'assistance-reminders',
-          smallIcon: 'ic_launcher',
-          largeIcon: '/logo.svg',
-        })),
-      });
+      try {
+        await LocalNotifications.schedule({
+          notifications: upcoming.map((item) => ({
+            id: Number(item.id) || Math.floor(Math.random() * 1000000),
+            title: String(item.title || 'Scheduled Reminder').slice(0, 100),
+            body: String(item.body || 'Due now').slice(0, 200),
+            schedule: { at: new Date(item.fireAt), allowWhileIdle: true },
+            channelId: 'assistance-reminders',
+            smallIcon: 'ic_launcher',
+          })),
+        });
+      } catch (nativeErr) {
+        console.warn('Native LocalNotifications.schedule failed:', nativeErr);
+      }
     } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
       // Browser fallback: fire-and-forget timers for the near future only
       upcoming.slice(0, 10).forEach((item) => {
         const delay = new Date(item.fireAt).getTime() - now;
         setTimeout(() => {
           try {
-            new Notification(item.title, { body: item.body, icon: '/logo.svg' });
+            new Notification(item.title, { body: item.body });
           } catch {}
         }, Math.min(delay, 2 ** 31 - 1));
       });
     }
   } catch (err) {
-    console.warn('Notification scheduling failed:', err);
+    console.warn('Notification scheduling safe catch:', err);
   }
 }
 
@@ -121,5 +145,7 @@ export async function cancelNotification(id: number): Promise<void> {
     if (isNative()) {
       await LocalNotifications.cancel({ notifications: [{ id }] });
     }
-  } catch {}
+  } catch (err) {
+    console.warn('Notification cancellation error:', err);
+  }
 }

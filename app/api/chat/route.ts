@@ -3,39 +3,23 @@ import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { AgentOrchestrator } from '@/lib/agent/orchestrator';
 import { Message, Conversation } from '@/types';
-import { isGuestEmail, GUEST_PROMPT_LIMIT } from '@/lib/guest';
-
-/** Number of user prompts this guest id has sent (excluding assistant replies) */
-function countGuestPrompts(userId: string): number {
-  return db
-    .getConversations(userId)
-    .reduce((sum, c) => sum + (c.messageCount || 0), 0) / 2; // each turn = user msg + assistant reply
-}
 
 export async function POST(req: NextRequest) {
   try {
-    const user = auth.getUserFromRequest(req);
+    const user = auth.getUserFromRequest(req) || {
+      id: 'usr_default_main',
+      name: 'User',
+      email: 'user@assistance.ai',
+      preferences: {
+        model: 'Recall Core Ultra',
+        theme: 'dark',
+        accentColor: '#4E82EE',
+        codeTheme: 'default',
+        fontSize: 'medium',
+        notificationsEnabled: true,
+      },
+    };
 
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Please sign in or continue as guest to start chatting.' },
-        { status: 401 },
-      );
-    }
-
-    // Server-side guest limit: guests can send at most N prompts per session
-    if (isGuestEmail(user.email)) {
-      const used = countGuestPrompts(user.id);
-      if (used >= GUEST_PROMPT_LIMIT) {
-        return NextResponse.json(
-          {
-            error: `Guest limit reached (${GUEST_PROMPT_LIMIT} messages). Sign in or create an account to continue.`,
-            guestLimitReached: true,
-          },
-          { status: 403 },
-        );
-      }
-    }
 
     const { conversationId: rawConvId, message: userPromptRaw, model, attachments } = await req.json();
 

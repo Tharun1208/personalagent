@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { Reminder } from '@/types';
+import { renderTextWithIosEmojis } from '@/lib/utils/iosEmoji';
 
 export default function RemindersView() {
   const { reminders, createReminder, updateReminder, deleteReminder } = useApp();
@@ -149,11 +150,11 @@ export default function RemindersView() {
                       </span>
                       <div className="min-w-0">
                         <span className="text-xs font-semibold text-(--text-primary) block truncate">
-                          {rem.title}
+                          {renderTextWithIosEmojis(rem.title)}
                         </span>
                         {rem.notes && (
                           <p className="text-[11px] text-(--text-secondary) mt-0.5 line-clamp-2">
-                            {rem.notes}
+                            {renderTextWithIosEmojis(rem.notes)}
                           </p>
                         )}
                       </div>
