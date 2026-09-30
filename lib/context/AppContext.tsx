@@ -647,8 +647,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const data = await safeJson(res);
       if (data?.success) {
         if (!activeConversationId || activeConversationId !== data.conversationId) {
-
           setActiveConversationId(data.conversationId);
+          const newConv: Conversation = {
+            id: data.conversationId,
+            userId: user?.id || 'usr_default_main',
+            title: effectiveContent.slice(0, 36) + (effectiveContent.length > 36 ? '...' : ''),
+            pinned: false,
+            model: user?.preferences?.model || 'Recall Core Ultra',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          setConversations((prev) => [newConv, ...prev.filter((c) => c.id !== data.conversationId)]);
         }
 
         // Replace temp message with server message and append assistant reply

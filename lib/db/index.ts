@@ -511,8 +511,9 @@ export const db = {
   // --- CONVERSATIONS ---
   getConversations(userId: string): Conversation[] {
     const data = ensureDbFile();
+    const isGuest = !userId || userId === 'usr_default_main' || userId.includes('guest');
     return data.conversations
-      .filter((c) => c.userId === userId)
+      .filter((c) => c.userId === userId || (isGuest && (!c.userId || c.userId === 'usr_default_main' || c.userId.includes('guest'))))
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .map((c) => {
         const msgs = data.messages.filter((m) => m.conversationId === c.id);

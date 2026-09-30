@@ -7,16 +7,27 @@ import { Conversation } from '@/types';
 
 export async function GET(req: NextRequest) {
   await ensureDbReady();
-  const user = auth.getUserFromRequest(req);
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const user = auth.getUserFromRequest(req) || { id: 'usr_default_main', email: 'guest@assistance.ai' };
+  const isGuest = !user || user.id === 'usr_default_main' || user.id.includes('guest') || user.email?.includes('guest');
 
   let conversations = db.getConversations(user.id);
 
   if (isMongoConfigured()) {
     try {
-      const mongoDocs = await ConversationModel.find({
-        $or: [{ userId: user.id }, { userId: { $exists: false } }],
-      })
+      const filter = isGuest
+        ? {
+            $or: [
+              { userId: user.id },
+              { userId: 'usr_default_main' },
+              { userId: { $regex: /guest/i } },
+              { userId: { $exists: false } },
+            ],
+          }
+        : {
+            $or: [{ userId: user.id }, { userId: { $exists: false } }],
+          };
+
+      const mongoDocs = await ConversationModel.find(filter)
         .sort({ updatedAt: -1 })
         .lean();
 
