@@ -102,16 +102,20 @@ export async function routeLLMRequest({
     }
   }
 
-  // 2. Groq High-Speed LPU (Ultra-fast 300ms inference for text)
+  // 2. Groq High-Speed LPU (Ultra-fast ~200-400ms inference for text)
   if (groqKey) {
     try {
+      const targetGroqModel = (configuredModel && (configuredModel.startsWith('llama') || configuredModel.startsWith('mixtral') || configuredModel.startsWith('gemma')))
+        ? configuredModel
+        : 'llama-3.3-70b-versatile';
+
       const res = await callGroqAI({
         apiKey: groqKey,
-        model: configuredModel?.startsWith('qwen') || configuredModel?.startsWith('openai') ? configuredModel : 'qwen/qwen3.8-27b',
+        model: targetGroqModel,
         messages: systemInstruction ? [{ role: 'system', content: systemInstruction }, ...augmentedMessages] : augmentedMessages,
       });
       if (res.success && res.content) {
-        return { success: true, content: res.content, provider: 'Groq High-Speed LPU', model: configuredModel || 'qwen/qwen3.8-27b' };
+        return { success: true, content: res.content, provider: 'Groq High-Speed LPU', model: targetGroqModel };
       }
     } catch (e) {
       console.warn('Groq provider error, trying fallback:', e);
@@ -123,29 +127,29 @@ export async function routeLLMRequest({
     try {
       const res = await callGeminiAI({
         apiKey: geminiKey,
-        model: configuredModel?.startsWith('gemini') ? configuredModel : 'gemini-flash-latest',
+        model: configuredModel?.startsWith('gemini') ? configuredModel : 'gemini-2.5-flash',
         systemInstruction,
         messages: augmentedMessages,
         inlineAttachments: geminiInlineAttachments,
       });
       if (res.success && res.content) {
-        return { success: true, content: res.content, provider: 'Google Gemini Flash', model: configuredModel || 'gemini-flash-latest' };
+        return { success: true, content: res.content, provider: 'Google Gemini Flash', model: configuredModel || 'gemini-2.5-flash' };
       }
     } catch (e) {
       console.warn('Gemini provider error, trying fallback:', e);
     }
   }
 
-  // 4. Groq Fallback
+  // 4. Groq Fallback (Instant 8B)
   if (groqKey) {
     try {
       const res = await callGroqAI({
         apiKey: groqKey,
-        model: 'openai/gpt-oss-120b',
+        model: 'llama-3.1-8b-instant',
         messages: systemInstruction ? [{ role: 'system', content: systemInstruction }, ...augmentedMessages] : augmentedMessages,
       });
       if (res.success && res.content) {
-        return { success: true, content: res.content, provider: 'Groq High-Speed LPU', model: 'openai/gpt-oss-120b' };
+        return { success: true, content: res.content, provider: 'Groq High-Speed LPU', model: 'llama-3.1-8b-instant' };
       }
     } catch (e) {
       console.warn('Groq fallback error:', e);

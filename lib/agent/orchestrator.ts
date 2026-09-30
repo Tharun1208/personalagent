@@ -12,6 +12,7 @@ export interface AgentRunParams {
   userPrompt: string;
   model?: string;
   attachments?: any[];
+  timezone?: string;
 }
 
 export interface AgentRunResult {
@@ -440,6 +441,7 @@ export class AgentOrchestrator {
     userPrompt,
     model = 'Recall Core Ultra',
     attachments = [],
+    timezone = 'Asia/Kolkata',
   }: AgentRunParams): Promise<AgentRunResult> {
     const trimmed = userPrompt.trim();
     const lower = trimmed.toLowerCase();
@@ -1446,17 +1448,18 @@ Explain what you see clearly, extract any key text/details, and answer the user'
     // ─────────────────────────────────────────────────────────────
     // STEP 9: DEFAULT INTELLIGENT SYNTHESIS WITH RECALLED MEMORIES
     // ─────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────
     // STEP 9: REAL LLM SYNTHESIS VIA GROQ / CLOUD PROVIDER
     // ─────────────────────────────────────────────────────────────
     const userObj = db.getUserById(userId);
-    const groqKey = userObj?.preferences?.apiKey || process.env.GROQ_API_KEY;
+    const tz = timezone || (userObj?.preferences as any)?.timezone || 'Asia/Kolkata';
 
     const now = new Date();
-    const dayOfWeek = now.toLocaleDateString('en-US', { weekday: 'long' });
-    const fullDate = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const fullTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const dayOfWeek = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: tz }).format(now);
+    const fullDate = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: tz }).format(now);
+    const fullTime = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz }).format(now);
 
-    // Direct personal information and real-time date/day handlers
+    // Direct personal information and real-time date/day/time handlers
     const userName = userObj?.name || 'User';
 
     const isNameQuery =
@@ -1480,6 +1483,19 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       };
     }
 
+    const isTimeQuery =
+      /\b(?:what (?:is|'s)? (?:the )?(?:current )?time|what time is it|current time|time now|see the time|tell me the time|time for now|check the time|what time)\b/i.test(lower) ||
+      lower === 'time' ||
+      lower === 'time now' ||
+      lower === 'what is time';
+
+    if (isTimeQuery) {
+      return {
+        reply: `It is currently **${fullTime}** on **${dayOfWeek}**, **${fullDate}** (*${tz}*).`,
+        toolSteps,
+      };
+    }
+
     if (
       lower === 'what is date today' ||
       lower === 'what is the date' ||
@@ -1497,7 +1513,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       lower.includes('current time and date')
     ) {
       return {
-        reply: `Today is **${dayOfWeek}**, **${fullDate}** *(Local Time: ${fullTime})*.`,
+        reply: `Today is **${dayOfWeek}**, **${fullDate}** *(Local Time: ${fullTime} - ${tz})*.`,
         toolSteps,
       };
     }
@@ -1514,9 +1530,10 @@ You know the user (${userName}) well and have live access to their persistent me
 
 CURRENT REAL-WORLD CONTEXT:
 - User Name: ${userName}
+- User Timezone: ${tz}
 - Day of the Week: ${dayOfWeek}
 - Full Date: ${fullDate}
-- Local Time: ${fullTime}
+- Local Time: ${fullTime} (${tz})
 
 USER'S STORED MEMORIES & PREFERENCES:
 ${allMemories.length ? allMemories.map((m) => `- [${m.type.toUpperCase()} / ${m.category || 'General'}]: ${m.content}`).join('\n') : 'No stored memories yet.'}
@@ -1535,7 +1552,7 @@ ${allReminders.length ? allReminders.map((r) => `- ${r.title} (Due: ${r.dueDateT
 
 CORE GUIDELINES:
 1. Act as a high-agency, deeply capable personal intelligence assistant.
-2. The current day of the week is strictly ${dayOfWeek} (${fullDate}) and current time is ${fullTime}.
+2. The current day of the week is strictly ${dayOfWeek} (${fullDate}) and current local time is ${fullTime} (${tz}).
 3. When the user asks about personal preferences, schedule, dues, or goals, use their context accurately.
 4. Format output with clean Markdown, tables, and highlighted sections.`;
 

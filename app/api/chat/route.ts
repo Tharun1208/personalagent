@@ -22,7 +22,10 @@ export async function POST(req: NextRequest) {
     };
 
 
-    const { conversationId: rawConvId, message: userPromptRaw, model, attachments } = await req.json();
+    const { conversationId: rawConvId, message: userPromptRaw, model, attachments, timezone: clientTimezone } = await req.json();
+
+    const headerTimezone = req.headers.get('x-vercel-ip-timezone');
+    const timezone = clientTimezone || headerTimezone || 'Asia/Kolkata';
 
     const userPrompt = userPromptRaw?.trim() || (attachments && attachments.length > 0 ? (attachments.length === 1 ? `Please analyze this attached file: ${attachments[0].name}` : 'Please analyze these attached files.') : '');
 
@@ -69,6 +72,7 @@ export async function POST(req: NextRequest) {
       userPrompt: userPrompt.trim(),
       model: model || conv.model,
       attachments,
+      timezone,
     });
 
     // 4. Save Assistant Message with Tool Steps and Memory Badges

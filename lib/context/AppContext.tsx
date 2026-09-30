@@ -632,6 +632,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIsSending(true);
 
     try {
+      const clientTimezone = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
       const res = await apiFetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -639,6 +640,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           conversationId: activeConversationId,
           message: effectiveContent,
           attachments,
+          timezone: clientTimezone,
         }),
       });
 

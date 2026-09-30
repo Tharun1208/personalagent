@@ -6,7 +6,7 @@ export interface GroqMessage {
 export async function callGroqAI({
   apiKey,
   messages,
-  model = 'qwen/qwen3.8-27b',
+  model = 'llama-3.3-70b-versatile',
   temperature = 0.6,
   maxTokens = 2048,
 }: {
@@ -26,12 +26,13 @@ export async function callGroqAI({
     };
   }
 
-  // Active verified ultra-fast models on Groq instance (~300ms latency)
+  // Active verified ultra-fast models on Groq LPUs (~200-400ms latency)
   const modelsToTry = [
     model,
-    'qwen/qwen3.8-27b',
-    'openai/gpt-oss-120b',
-    'openai/gpt-oss-20b',
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant',
+    'mixtral-8x7b-32768',
+    'gemma2-9b-it',
   ].filter(Boolean);
 
   const uniqueModels = Array.from(new Set(modelsToTry));
