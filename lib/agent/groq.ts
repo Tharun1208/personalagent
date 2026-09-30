@@ -26,14 +26,21 @@ export async function callGroqAI({
     };
   }
 
-  // Active verified ultra-fast models on Groq LPUs (~200-400ms latency)
-  const modelsToTry = [
-    model,
+  // Verified ultra-fast Groq LPU models (200-400ms inference)
+  const KNOWN_GROQ_MODELS = [
     'llama-3.3-70b-versatile',
     'llama-3.1-8b-instant',
+    'llama-3.1-70b-versatile',
     'mixtral-8x7b-32768',
     'gemma2-9b-it',
-  ].filter(Boolean);
+  ];
+
+  const preferredModel = (model && KNOWN_GROQ_MODELS.includes(model)) ? model : 'llama-3.3-70b-versatile';
+  const modelsToTry = [
+    preferredModel,
+    'llama-3.1-8b-instant',
+    'llama-3.3-70b-versatile',
+  ];
 
   const uniqueModels = Array.from(new Set(modelsToTry));
 
@@ -48,6 +55,9 @@ export async function callGroqAI({
         return m;
       });
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -60,7 +70,10 @@ export async function callGroqAI({
           temperature,
           max_tokens: maxTokens,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         continue;

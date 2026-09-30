@@ -18,14 +18,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       if (doc) {
         conv = JSON.parse(JSON.stringify(doc));
         if (conv) {
-          conv.userId = user.id;
           db.createConversation(conv);
         }
       }
     } catch {}
   }
-
-  if (!conv) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
 
   let messages = db.getMessages(id);
   if ((!messages || messages.length === 0) && isMongoConfigured()) {
@@ -35,6 +32,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         messages = msgDocs.map((m: any) => JSON.parse(JSON.stringify(m)));
       }
     } catch {}
+  }
+
+  // Resilient auto-recovery: if conversation document is missing, self-heal rather than 404ing
+  if (!conv) {
+    conv = {
+      id,
+      userId: user.id,
+      title: messages && messages.length > 0 ? (messages[0].content?.slice(0, 40) || 'Conversation') : 'New Conversation',
+      createdAt: (messages && messages[0]?.createdAt) || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      model: user.preferences?.model || 'Recall Core Ultra',
+      pinned: false,
+    };
+    db.createConversation(conv);
+    await flushDb();
   }
 
   return NextResponse.json({ conversation: conv, messages: messages || [] });
