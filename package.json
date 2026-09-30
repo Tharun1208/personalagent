@@ -8,6 +8,8 @@
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "db:view": "node scripts/view-db.js",
+    "db:backup": "node scripts/backup-data.js",
+    "db:restore": "node scripts/migrate.js",
     "cap:sync": "npx cap sync",
     "cap:sync:local": "node scripts/sync-local-ip.js && npx cap sync",
     "cap:sync:tunnel": "node scripts/sync-tunnel-url.js && npx cap sync",

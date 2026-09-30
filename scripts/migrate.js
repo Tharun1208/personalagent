@@ -28,6 +28,7 @@ async function migrate() {
     { name: 'knowledgedocs', data: raw.knowledgeDocs },
     { name: 'agentactions', data: raw.agentActions },
     { name: 'notifications', data: raw.notifications },
+    { name: 'userCredentials', data: raw.userCredentials },
   ];
 
   for (const c of collections) {
