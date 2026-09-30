@@ -1403,45 +1403,44 @@ Explain what you see clearly, extract any key text/details, and answer the user'
     }
 
     // ─────────────────────────────────────────────────────────────
-    // STEP 8: WEB SEARCH
+    // STEP 8: LIVE WEB SEARCH CONTEXT (FOR EXPLICIT SEARCH OR REAL-TIME NEWS)
     // ─────────────────────────────────────────────────────────────
-    if (
-      lower.includes('search') ||
-      lower.includes('find documentation') ||
-      lower.includes('latest react updates') ||
-      lower.includes('compare') ||
-      lower.includes('what are the latest') ||
-      lower.includes('who is') ||
-      lower.includes('what is the news') ||
-      lower.includes('live news') ||
-      lower.includes('google search')
-    ) {
+    let webSearchContext = '';
+    const isExplicitSearch =
+      lower.startsWith('search ') ||
+      lower.startsWith('google ') ||
+      lower.includes('search web') ||
+      lower.includes('google search') ||
+      lower.includes('latest news on') ||
+      lower.includes('live news on') ||
+      lower.includes('find documentation for');
+
+    if (isExplicitSearch) {
+      const cleanSearchQuery = trimmed
+        .replace(/^(?:please\s+)?(?:search\s+for|search\s+web\s+for|search\s+web|search|google\s+search\s+for|google\s+search|google)\s+/i, '')
+        .trim();
+
       toolSteps.push({
         toolName: 'WebSearchTool',
         action: 'searchWeb',
-        input: { query: trimmed },
+        input: { query: cleanSearchQuery || trimmed },
         status: 'executing',
       });
 
-      const res = await toolRegistry.WebSearchTool.execute('searchWeb', { query: trimmed }, userId);
+      const res = await toolRegistry.WebSearchTool.execute('searchWeb', { query: cleanSearchQuery || trimmed }, userId);
       toolSteps[toolSteps.length - 1] = {
         toolName: 'WebSearchTool',
         action: 'searchWeb',
-        input: { query: trimmed },
+        input: { query: cleanSearchQuery || trimmed },
         output: res.data,
         status: 'success',
       };
 
-      const sources = res.data as any[];
-      let reply = `### 🌐 Web Search Insights for *"${trimmed}"*\n\n`;
-      for (const s of sources) {
-        reply += `#### [${s.title}](${s.url})\n`;
-        reply += `*Source: ${s.source}*\n\n`;
-        reply += `${s.snippet}\n\n`;
+      const sources = (res.data as any[]) || [];
+      if (sources.length > 0) {
+        webSearchContext = `\n\nLIVE RETRIEVED WEB SEARCH SOURCES:\n` +
+          sources.map((s, idx) => `[Source ${idx + 1}: ${s.title}] (${s.url})\n${s.snippet}`).join('\n\n');
       }
-      reply += `---\n*Information retrieved live in real time from authoritative web sources.*`;
-
-      return { reply, toolSteps };
     }
 
 
@@ -1554,10 +1553,16 @@ CORE GUIDELINES:
 1. Act as a high-agency, deeply capable personal intelligence assistant.
 2. The current day of the week is strictly ${dayOfWeek} (${fullDate}) and current local time is ${fullTime} (${tz}).
 3. When the user asks about personal preferences, schedule, dues, or goals, use their context accurately.
-4. Format output with clean Markdown, tables, and highlighted sections.`;
+4. Format output with clean Markdown, tables, and highlighted sections.${webSearchContext ? `\n\n${webSearchContext}\n\n5. Synthesize a direct, intelligent, clear answer to the user's prompt using the live search findings above. Do not dump raw links.` : ''}`;
 
     let fallbackText = '';
     if (
+      lower.includes('cm of karnataka') ||
+      lower.includes('chief minister of karnataka') ||
+      lower.includes('karnataka cm')
+    ) {
+      fallbackText = `The current Chief Minister of Karnataka is **Siddaramaiah** (Indian National Congress), who has been serving since May 20, 2023. The Deputy Chief Minister is **D. K. Shivakumar**.`;
+    } else if (
       lower.includes('programming language') ||
       lower.includes('what language') ||
       lower.includes('what stack') ||
