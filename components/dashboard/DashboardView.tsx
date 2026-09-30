@@ -255,8 +255,8 @@ export default function DashboardView() {
       {/* ── Top Header Toolbar (Mobile Optimized) ── */}
       <div className="px-4 py-3 sm:px-6 sm:h-16 border-b border-(--border-subtle) flex items-center justify-between shrink-0 bg-(--bg-primary)/95 backdrop-blur-md">
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
-            <Sun size={16} />
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-xs shrink-0 select-none">
+            ☀️
           </div>
           <div className="min-w-0">
             <h1 className="font-extrabold text-xs sm:text-base text-(--text-primary) truncate">
@@ -273,7 +273,7 @@ export default function DashboardView() {
             onClick={() => setBriefingOpen(true)}
             className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-[11px] sm:text-xs font-semibold hover:opacity-95 shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shrink-0"
           >
-            <Volume2 size={13} />
+            <span className="text-xs">🎙️</span>
             <span>Briefing</span>
           </button>
         </div>
@@ -286,7 +286,7 @@ export default function DashboardView() {
         <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#4E82EE]/10 via-(--bg-card) to-[#9B72CF]/10 border border-[#4E82EE]/25 shadow-xs space-y-3 sm:space-y-4 relative overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-bold text-[#4E82EE] uppercase tracking-wider">
-              <Sparkles size={14} className="shrink-0" />
+              <span className="text-sm">✨</span>
               <span>Executive Daily Briefing</span>
             </div>
             <button
@@ -297,7 +297,7 @@ export default function DashboardView() {
               className="text-[11px] sm:text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
             >
               <span>AI Plan</span>
-              <ArrowRight size={12} />
+              <span>🚀</span>
             </button>
           </div>
 
@@ -319,28 +319,28 @@ export default function DashboardView() {
               onClick={() => setActiveTab('tasks')}
               className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
             >
-              <Plus size={13} className="text-[#4E82EE]" />
+              <span>📝</span>
               <span>New Task</span>
             </button>
             <button
               onClick={() => setActiveTab('ledger')}
               className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-emerald-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
             >
-              <CreditCard size={13} className="text-emerald-500" />
+              <span>💳</span>
               <span>Log Expense</span>
             </button>
             <button
               onClick={() => setActiveTab('reminders')}
               className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-rose-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
             >
-              <AlarmClock size={13} className="text-rose-500" />
+              <span>⏰</span>
               <span>Set Alarm</span>
             </button>
             <button
               onClick={() => setFocusTimerOpen(true)}
               className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
             >
-              <Flame size={13} className="text-amber-500" />
+              <span>🔥</span>
               <span>Focus 25m</span>
             </button>
           </div>
@@ -349,7 +349,7 @@ export default function DashboardView() {
         {/* ── 2. Master KPI Metrics Grid (Mobile 2-Column / Desktop 6-Column) ── */}
         <div>
           <h2 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-(--text-muted) mb-2.5 px-1 flex items-center gap-1.5">
-            <Activity size={13} className="text-[#4E82EE]" />
+            <span>📊</span>
             Key Performance Indicators (KPIs)
           </h2>
 
@@ -361,7 +361,7 @@ export default function DashboardView() {
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
                 <span className="font-semibold text-[11px] sm:text-xs truncate">Tasks</span>
-                <ListTodo size={14} className="text-[#4E82EE] shrink-0" />
+                <span className="text-sm">📋</span>
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-black text-(--text-primary) font-mono">{taskCompletionRate}%</p>
@@ -379,7 +379,7 @@ export default function DashboardView() {
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
                 <span className="font-semibold text-[11px] sm:text-xs truncate">Today Spend</span>
-                <CreditCard size={14} className="text-emerald-500 shrink-0" />
+                <span className="text-sm">💰</span>
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-black text-emerald-500 font-mono truncate">₹{todaySpendingTotal.toLocaleString('en-IN')}</p>
@@ -394,7 +394,7 @@ export default function DashboardView() {
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
                 <span className="font-semibold text-[11px] sm:text-xs truncate">Net Dues</span>
-                <HandCoins size={14} className="text-indigo-500 shrink-0" />
+                <span className="text-sm">🤝</span>
               </div>
               <div>
                 <p className={`text-xl sm:text-2xl font-black font-mono truncate ${duesStats.net >= 0 ? 'text-[#4E82EE]' : 'text-rose-500'}`}>
@@ -411,7 +411,7 @@ export default function DashboardView() {
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
                 <span className="font-semibold text-[11px] sm:text-xs truncate">Alarms</span>
-                <AlarmClock size={14} className="text-rose-500 shrink-0" />
+                <span className="text-sm">⏰</span>
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-black text-(--text-primary) font-mono">{pendingReminders.length}</p>
@@ -428,7 +428,7 @@ export default function DashboardView() {
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
                 <span className="font-semibold text-[11px] sm:text-xs truncate">Goals</span>
-                <Trophy size={14} className="text-purple-500 shrink-0" />
+                <span className="text-sm">🎯</span>
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-black text-purple-500 font-mono">{activeGoals.length}</p>
@@ -442,19 +442,19 @@ export default function DashboardView() {
             {/* KPI 6: Habits & Daily Streak */}
             <div
               onClick={() => setActiveTab('habits')}
-              className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/40 transition-all cursor-pointer shadow-xs space-y-2 group"
+              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-semibold">Habit Streak</span>
-                <Flame size={15} className="text-amber-500" />
+                <span className="font-semibold text-[11px] sm:text-xs truncate">Habit Streak</span>
+                <span className="text-sm">🔥</span>
               </div>
               <div>
-                <p className="text-2xl font-black text-amber-500 font-mono">{habitCompletionRate}%</p>
-                <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-2 overflow-hidden">
+                <p className="text-xl sm:text-2xl font-black text-amber-500 font-mono">{habitCompletionRate}%</p>
+                <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-1.5 overflow-hidden">
                   <div className="h-full rounded-full bg-amber-500" style={{ width: `${habitCompletionRate}%` }} />
                 </div>
               </div>
-              <p className="text-[10px] text-(--text-muted)">{habitsCompletedToday}/{habits.length || 1} done today</p>
+              <p className="text-[10px] text-(--text-muted) truncate">{habitsCompletedToday}/{habits.length || 1} done today</p>
             </div>
           </div>
         </div>
@@ -467,7 +467,7 @@ export default function DashboardView() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-(--text-primary) flex items-center gap-1.5">
-                  <TrendingUp size={14} className="text-emerald-500" />
+                  <span className="text-sm">📈</span>
                   7-Day Spending Velocity
                 </h3>
                 <p className="text-[11px] text-(--text-muted)">Daily spend trends for the past week</p>
@@ -477,7 +477,7 @@ export default function DashboardView() {
                 className="text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>Full Ledger</span>
-                <ChevronRight size={13} />
+                <span>👉</span>
               </button>
             </div>
 
@@ -515,7 +515,7 @@ export default function DashboardView() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-(--text-primary) flex items-center gap-1.5">
-                  <Wallet size={14} className="text-[#4E82EE]" />
+                  <span className="text-sm">🏦</span>
                   Financial Health Overview
                 </h3>
                 <p className="text-[11px] text-(--text-muted)">Dues, receivables, and net cashflow</p>
@@ -525,7 +525,7 @@ export default function DashboardView() {
                 className="text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>View Dues</span>
-                <ChevronRight size={13} />
+                <span>👉</span>
               </button>
             </div>
 
@@ -533,7 +533,7 @@ export default function DashboardView() {
               <div className="p-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-1">
                 <div className="flex items-center justify-between text-xs text-(--text-muted)">
                   <span>You Need to Give</span>
-                  <ArrowUpRight size={14} className="text-rose-500" />
+                  <span className="text-xs">💸</span>
                 </div>
                 <p className="text-xl font-bold text-rose-500 font-mono">₹{duesStats.give.toLocaleString('en-IN')}</p>
               </div>
@@ -541,7 +541,7 @@ export default function DashboardView() {
               <div className="p-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-1">
                 <div className="flex items-center justify-between text-xs text-(--text-muted)">
                   <span>Owed to You</span>
-                  <ArrowDownLeft size={14} className="text-emerald-500" />
+                  <span className="text-xs">💵</span>
                 </div>
                 <p className="text-xl font-bold text-emerald-500 font-mono">₹{duesStats.receive.toLocaleString('en-IN')}</p>
               </div>
@@ -549,7 +549,7 @@ export default function DashboardView() {
 
             <div className="p-3 rounded-2xl bg-[#4E82EE]/10 border border-[#4E82EE]/20 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-[#4E82EE] text-white flex items-center justify-center font-bold text-xs">⚡</div>
+                <div className="w-6 h-6 rounded-lg bg-[#4E82EE] text-white flex items-center justify-center font-bold text-xs select-none">⚡</div>
                 <span className="text-xs font-semibold text-(--text-primary)">Optimal Smart Settlements Active</span>
               </div>
               <span className="text-xs font-mono font-bold text-[#4E82EE]">DSA O(V log V)</span>
@@ -561,8 +561,8 @@ export default function DashboardView() {
         <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-4 shadow-2xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Globe size={17} />
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-500 text-white flex items-center justify-center shrink-0 shadow-xs text-base select-none">
+                🌐
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -583,7 +583,7 @@ export default function DashboardView() {
                 className="p-2 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-elevated)/80 border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 text-xs active:scale-95 disabled:opacity-50"
                 title="Refresh Live Data"
               >
-                <RefreshCw size={13} className={isRealtimeLoading ? 'animate-spin text-[#4E82EE]' : ''} />
+                <span className={`text-xs ${isRealtimeLoading ? 'animate-spin' : ''}`}>🔄</span>
                 <span className="text-[11px] font-medium hidden sm:inline">Sync Live</span>
               </button>
             </div>
@@ -594,7 +594,7 @@ export default function DashboardView() {
             <div className="lg:col-span-5 p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <CloudSun size={17} className="text-amber-500" />
+                  <span className="text-base select-none">🌤️</span>
                   {isCityEditing ? (
                     <form
                       onSubmit={(e) => {
@@ -650,11 +650,11 @@ export default function DashboardView() {
 
                   <div className="text-right space-y-1 text-xs text-(--text-muted)">
                     <div className="flex items-center justify-end gap-1">
-                      <Droplets size={12} className="text-sky-500" />
+                      <span>💧</span>
                       <span>{liveWeather.humidity}% humidity</span>
                     </div>
                     <div className="flex items-center justify-end gap-1">
-                      <Wind size={12} className="text-emerald-500" />
+                      <span>💨</span>
                       <span>{liveWeather.windSpeed} km/h wind</span>
                     </div>
                   </div>
@@ -681,7 +681,7 @@ export default function DashboardView() {
             <div className="lg:col-span-7 p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-(--text-primary) flex items-center gap-1.5">
-                  <TrendingUp size={15} className="text-emerald-500" />
+                  <span className="text-sm">💹</span>
                   Live Market Tickers (Crypto & Equities)
                 </span>
                 <span className="text-[10px] font-mono text-(--text-muted)">Live CoinGecko/Nasdaq</span>
@@ -722,7 +722,7 @@ export default function DashboardView() {
           <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Newspaper size={16} className="text-[#4E82EE]" />
+                <span className="text-base select-none">📰</span>
                 <span className="text-xs font-bold text-(--text-primary)">Live Global & Tech Breaking News</span>
               </div>
 
@@ -781,7 +781,7 @@ export default function DashboardView() {
 
                   <div className="flex items-center justify-between text-[10px] text-(--text-muted) pt-2 mt-2 border-t border-(--border-subtle)/60">
                     <span className="font-medium text-(--text-secondary)">{item.category}</span>
-                    <ExternalLink size={11} className="text-(--text-muted) group-hover:text-[#4E82EE] transition-transform group-hover:translate-x-0.5" />
+                    <span className="text-xs group-hover:translate-x-0.5 transition-transform">🔗</span>
                   </div>
                 </a>
               ))}
@@ -797,7 +797,7 @@ export default function DashboardView() {
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
-                <CheckSquare size={15} className="text-[#4E82EE]" />
+                <span className="text-sm select-none">✅</span>
                 Priority Tasks ({pendingTasks.length})
               </span>
               <button
@@ -822,7 +822,7 @@ export default function DashboardView() {
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-5 h-5 rounded-lg border border-(--border-subtle) flex items-center justify-center shrink-0">
-                        {t.status === 'completed' && <Check size={12} className="text-emerald-500" />}
+                        {t.status === 'completed' && <span className="text-xs text-emerald-500">✓</span>}
                       </div>
                       <span className="text-xs font-medium text-(--text-primary) truncate">
                         {t.title}
@@ -841,7 +841,7 @@ export default function DashboardView() {
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
-                <Clock size={15} className="text-rose-500" />
+                <span className="text-sm select-none">🔔</span>
                 Upcoming Alarms ({pendingReminders.length})
               </span>
               <button
@@ -884,7 +884,7 @@ export default function DashboardView() {
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
-                <Flame size={15} className="text-amber-500" />
+                <span className="text-sm select-none">🏆</span>
                 Habit Streak & Daily Progress
               </span>
               <button
@@ -923,7 +923,7 @@ export default function DashboardView() {
                           : 'bg-(--bg-card) border border-(--border-subtle) text-transparent'
                       }`}
                     >
-                      <Check size={13} />
+                      <span className="text-xs font-bold">✓</span>
                     </div>
                   </div>
                 );
