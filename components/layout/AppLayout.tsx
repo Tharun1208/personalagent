@@ -2,6 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import {
+  Compass,
+  Sparkles,
+  ListTodo,
+  Wallet,
+  AlarmClock,
+} from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import Sidebar from '@/components/sidebar/Sidebar';
 import TopNavbar from '@/components/layout/TopNavbar';
@@ -27,6 +34,7 @@ import SplashScreen from '@/components/common/SplashScreen';
 export default function AppLayout() {
   const {
     activeTab,
+    setActiveTab,
     liveVoiceOpen,
     setLiveVoiceOpen,
     focusTimerOpen,
@@ -151,13 +159,47 @@ export default function AppLayout() {
         </main>
       </div>
 
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-(--bg-primary)/95 backdrop-blur-xl border-t border-(--border-subtle)/60 px-2 py-1.5 flex items-center justify-around shadow-lg">
+        {[
+          { id: 'dashboard', label: 'Dashboard', icon: Compass },
+          { id: 'chat', label: 'Chat', icon: Sparkles },
+          { id: 'tasks', label: 'Tasks', icon: ListTodo },
+          { id: 'ledger', label: 'Dues & Spend', icon: Wallet },
+          { id: 'reminders', label: 'Alarms', icon: AlarmClock },
+        ].map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id as any)}
+              className={`flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer relative ${
+                isActive
+                  ? 'text-[#4E82EE] font-bold'
+                  : 'text-(--text-muted) hover:text-(--text-primary)'
+              }`}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="mobileNavActivePill"
+                  className="absolute inset-0 bg-[#4E82EE]/10 rounded-xl"
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
+              )}
+              <Icon size={18} className={`relative z-10 transition-transform ${isActive ? 'scale-110' : ''}`} />
+              <span className="text-[10px] mt-0.5 relative z-10 tracking-tight">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
       {/* Global Modals / Drawers / Widgets */}
       <CommandPalette />
       <NotificationDrawer />
       <NotificationAlertToast />
 
       <LiveVoiceModal isOpen={liveVoiceOpen} onClose={() => setLiveVoiceOpen(false)} />
-
 
       {/* Global in-app confirm dialog */}
       <CustomConfirmModal dialog={confirmDialog} onClose={dismissConfirm} />
@@ -166,7 +208,7 @@ export default function AppLayout() {
       <CustomToastAlert toasts={toasts} onDismiss={dismissToast} />
 
       {focusTimerOpen && (
-        <div className="fixed bottom-6 right-4 md:right-6 z-40 shadow-2xl animate-in slide-in-from-bottom-5 duration-200">
+        <div className="fixed bottom-16 md:bottom-6 right-4 md:right-6 z-40 shadow-2xl animate-in slide-in-from-bottom-5 duration-200">
           <TimerWidget onClose={() => setFocusTimerOpen(false)} />
         </div>
       )}

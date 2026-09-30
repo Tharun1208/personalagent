@@ -252,56 +252,56 @@ export default function DashboardView() {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-(--bg-primary) text-(--text-primary)">
       
-      {/* ── Top Header Toolbar ── */}
-      <div className="h-16 px-4 sm:px-6 border-b border-(--border-subtle) flex items-center justify-between shrink-0 bg-(--bg-primary)/95 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white flex items-center justify-center font-bold text-xs shadow-xs">
-            <Sun size={18} />
+      {/* ── Top Header Toolbar (Mobile Optimized) ── */}
+      <div className="px-4 py-3 sm:px-6 sm:h-16 border-b border-(--border-subtle) flex items-center justify-between shrink-0 bg-(--bg-primary)/95 backdrop-blur-md">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white flex items-center justify-center font-bold text-xs shadow-xs shrink-0">
+            <Sun size={16} />
           </div>
-          <div>
-            <h1 className="font-bold text-sm sm:text-base text-(--text-primary)">
+          <div className="min-w-0">
+            <h1 className="font-extrabold text-xs sm:text-base text-(--text-primary) truncate">
               {getGreeting()}, {user?.name || 'User'}
             </h1>
-            <p className="text-[11px] text-(--text-muted)">
-              {formattedDate} · {timeStr}
+            <p className="text-[10px] sm:text-[11px] text-(--text-muted) truncate">
+              {formattedDate} · <span className="font-mono font-semibold">{timeStr}</span>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={() => setBriefingOpen(true)}
-            className="px-3.5 py-1.5 sm:py-2 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-semibold hover:opacity-95 shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+            className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-[11px] sm:text-xs font-semibold hover:opacity-95 shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shrink-0"
           >
-            <Volume2 size={14} />
-            <span className="hidden sm:inline">Audio Briefing</span>
+            <Volume2 size={13} />
+            <span>Briefing</span>
           </button>
         </div>
       </div>
 
-      {/* ── Main KPI Canvas ── */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 max-w-6xl mx-auto w-full space-y-6 custom-scrollbar">
+      {/* ── Main KPI Canvas (Mobile-First Scrollable View) ── */}
+      <div className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-6 max-w-6xl mx-auto w-full space-y-4 sm:space-y-6 custom-scrollbar pb-24 md:pb-8">
 
-        {/* ── 1. Executive Intelligence Card ── */}
-        <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-[#4E82EE]/10 via-(--bg-card) to-[#9B72CF]/10 border border-[#4E82EE]/25 shadow-xs space-y-4 relative overflow-hidden">
+        {/* ── 1. Executive Intelligence Card (Mobile Streamlined) ── */}
+        <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#4E82EE]/10 via-(--bg-card) to-[#9B72CF]/10 border border-[#4E82EE]/25 shadow-xs space-y-3 sm:space-y-4 relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-bold text-[#4E82EE] uppercase tracking-wider">
-              <Sparkles size={16} />
-              <span>Executive Briefing & Intelligence</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-bold text-[#4E82EE] uppercase tracking-wider">
+              <Sparkles size={14} className="shrink-0" />
+              <span>Executive Daily Briefing</span>
             </div>
             <button
               onClick={() => {
                 setActiveTab('chat');
                 sendMessage('Analyze my tasks, financial dues, and today\'s schedule. Give me a 3-point action plan.');
               }}
-              className="text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
+              className="text-[11px] sm:text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
             >
-              <span>AI Action Plan</span>
-              <ArrowRight size={13} />
+              <span>AI Plan</span>
+              <ArrowRight size={12} />
             </button>
           </div>
 
-          <p className="text-sm font-medium text-(--text-primary) leading-relaxed">
+          <p className="text-xs sm:text-sm font-medium text-(--text-primary) leading-relaxed">
             You have <strong className="text-[#4E82EE]">{pendingTasks.length} pending tasks</strong>,{' '}
             <strong className="text-rose-500">{pendingReminders.length} alarms</strong>, and today&apos;s spending stands at{' '}
             <strong className="text-emerald-500">₹{todaySpendingTotal.toLocaleString('en-IN')}</strong>.
@@ -313,137 +313,130 @@ export default function DashboardView() {
             )}
           </p>
 
-          {/* 6 Quick Action Buttons */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-none">
+          {/* Quick Action Buttons Grid (Mobile 2-Row / Desktop Row) */}
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-1">
             <button
               onClick={() => setActiveTab('tasks')}
-              className="px-3 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+              className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
             >
               <Plus size={13} className="text-[#4E82EE]" />
               <span>New Task</span>
             </button>
             <button
               onClick={() => setActiveTab('ledger')}
-              className="px-3 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-emerald-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+              className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-emerald-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
             >
               <CreditCard size={13} className="text-emerald-500" />
               <span>Log Expense</span>
             </button>
             <button
               onClick={() => setActiveTab('reminders')}
-              className="px-3 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-rose-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+              className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-rose-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
             >
               <AlarmClock size={13} className="text-rose-500" />
               <span>Set Alarm</span>
             </button>
             <button
               onClick={() => setFocusTimerOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+              className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
             >
               <Flame size={13} className="text-amber-500" />
-              <span>Start Focus 25m</span>
-            </button>
-            <button
-              onClick={() => setLiveVoiceOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
-            >
-              <Zap size={13} className="text-[#4E82EE]" />
-              <span>Live Voice</span>
+              <span>Focus 25m</span>
             </button>
           </div>
         </div>
 
-        {/* ── 2. Master KPI Metrics Grid (6 Key Performance Indicators) ── */}
+        {/* ── 2. Master KPI Metrics Grid (Mobile 2-Column / Desktop 6-Column) ── */}
         <div>
-          <h2 className="text-xs font-bold uppercase tracking-wider text-(--text-muted) mb-3 px-1 flex items-center gap-1.5">
-            <Activity size={14} className="text-[#4E82EE]" />
+          <h2 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-(--text-muted) mb-2.5 px-1 flex items-center gap-1.5">
+            <Activity size={13} className="text-[#4E82EE]" />
             Key Performance Indicators (KPIs)
           </h2>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">
             {/* KPI 1: Task Completion Rate */}
             <div
               onClick={() => setActiveTab('tasks')}
-              className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/40 transition-all cursor-pointer shadow-xs space-y-2 group"
+              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-semibold">Task Rate</span>
-                <ListTodo size={15} className="text-[#4E82EE]" />
+                <span className="font-semibold text-[11px] sm:text-xs truncate">Tasks</span>
+                <ListTodo size={14} className="text-[#4E82EE] shrink-0" />
               </div>
               <div>
-                <p className="text-2xl font-black text-(--text-primary) font-mono">{taskCompletionRate}%</p>
-                <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-2 overflow-hidden">
+                <p className="text-xl sm:text-2xl font-black text-(--text-primary) font-mono">{taskCompletionRate}%</p>
+                <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-1.5 overflow-hidden">
                   <div className="h-full rounded-full bg-[#4E82EE]" style={{ width: `${taskCompletionRate}%` }} />
                 </div>
               </div>
-              <p className="text-[10px] text-(--text-muted)">{completedTasks.length}/{totalTasks} completed</p>
+              <p className="text-[10px] text-(--text-muted) truncate">{completedTasks.length}/{totalTasks} done</p>
             </div>
 
             {/* KPI 2: Today's Spending */}
             <div
               onClick={() => setActiveTab('ledger')}
-              className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-emerald-500/40 transition-all cursor-pointer shadow-xs space-y-2 group"
+              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-emerald-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-semibold">Today Spend</span>
-                <CreditCard size={15} className="text-emerald-500" />
+                <span className="font-semibold text-[11px] sm:text-xs truncate">Today Spend</span>
+                <CreditCard size={14} className="text-emerald-500 shrink-0" />
               </div>
               <div>
-                <p className="text-2xl font-black text-emerald-500 font-mono">₹{todaySpendingTotal.toLocaleString('en-IN')}</p>
+                <p className="text-xl sm:text-2xl font-black text-emerald-500 font-mono truncate">₹{todaySpendingTotal.toLocaleString('en-IN')}</p>
               </div>
-              <p className="text-[10px] text-(--text-muted)">Month: ₹{monthSpendingTotal.toLocaleString('en-IN')}</p>
+              <p className="text-[10px] text-(--text-muted) truncate">Month: ₹{monthSpendingTotal.toLocaleString('en-IN')}</p>
             </div>
 
             {/* KPI 3: Net Ledger Due Balance */}
             <div
               onClick={() => setActiveTab('ledger')}
-              className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-indigo-500/40 transition-all cursor-pointer shadow-xs space-y-2 group"
+              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-indigo-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-semibold">Net Balance</span>
-                <HandCoins size={15} className="text-indigo-500" />
+                <span className="font-semibold text-[11px] sm:text-xs truncate">Net Dues</span>
+                <HandCoins size={14} className="text-indigo-500 shrink-0" />
               </div>
               <div>
-                <p className={`text-2xl font-black font-mono ${duesStats.net >= 0 ? 'text-[#4E82EE]' : 'text-rose-500'}`}>
+                <p className={`text-xl sm:text-2xl font-black font-mono truncate ${duesStats.net >= 0 ? 'text-[#4E82EE]' : 'text-rose-500'}`}>
                   {duesStats.net >= 0 ? '+' : ''}₹{duesStats.net.toLocaleString('en-IN')}
                 </p>
               </div>
-              <p className="text-[10px] text-(--text-muted)">{duesStats.pendingCount} active dues</p>
+              <p className="text-[10px] text-(--text-muted) truncate">{duesStats.pendingCount} active dues</p>
             </div>
 
             {/* KPI 4: Alarms & Alerts */}
             <div
               onClick={() => setActiveTab('reminders')}
-              className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-rose-500/40 transition-all cursor-pointer shadow-xs space-y-2 group"
+              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-rose-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-semibold">Alarms</span>
-                <AlarmClock size={15} className="text-rose-500" />
+                <span className="font-semibold text-[11px] sm:text-xs truncate">Alarms</span>
+                <AlarmClock size={14} className="text-rose-500 shrink-0" />
               </div>
               <div>
-                <p className="text-2xl font-black text-(--text-primary) font-mono">{pendingReminders.length}</p>
+                <p className="text-xl sm:text-2xl font-black text-(--text-primary) font-mono">{pendingReminders.length}</p>
               </div>
               <p className="text-[10px] text-(--text-muted) truncate">
-                {nextReminder ? new Date(nextReminder.dueDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No pending'}
+                {nextReminder ? new Date(nextReminder.dueDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'None active'}
               </p>
             </div>
 
             {/* KPI 5: Goal Milestones */}
             <div
               onClick={() => setActiveTab('goals')}
-              className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-purple-500/40 transition-all cursor-pointer shadow-xs space-y-2 group"
+              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-purple-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-semibold">Goals</span>
-                <Trophy size={15} className="text-purple-500" />
+                <span className="font-semibold text-[11px] sm:text-xs truncate">Goals</span>
+                <Trophy size={14} className="text-purple-500 shrink-0" />
               </div>
               <div>
-                <p className="text-2xl font-black text-purple-500 font-mono">{activeGoals.length}</p>
-                <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-2 overflow-hidden">
+                <p className="text-xl sm:text-2xl font-black text-purple-500 font-mono">{activeGoals.length}</p>
+                <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-1.5 overflow-hidden">
                   <div className="h-full rounded-full bg-purple-500" style={{ width: `${goalsMilestonesCompleted.pct}%` }} />
                 </div>
               </div>
-              <p className="text-[10px] text-(--text-muted)">{goalsMilestonesCompleted.compM}/{goalsMilestonesCompleted.totalM || 1} milestones</p>
+              <p className="text-[10px] text-(--text-muted) truncate">{goalsMilestonesCompleted.compM}/{goalsMilestonesCompleted.totalM || 1} milestones</p>
             </div>
 
             {/* KPI 6: Habits & Daily Streak */}

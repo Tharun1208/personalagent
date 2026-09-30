@@ -135,15 +135,25 @@ export default function Sidebar({ onClose }: SidebarProps) {
       {/* ── Brand Header ── */}
       <div className="shrink-0 p-4 pb-3 border-b border-(--border-subtle)/50">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] p-0.5 shadow-md shadow-blue-500/20">
-              <div className="w-full h-full bg-(--bg-card) rounded-[14px] flex items-center justify-center">
-                <Zap size={20} className="text-[#4E82EE] fill-[#4E82EE]/20" />
+          <div
+            onClick={() => {
+              setActiveTab('dashboard');
+              if (onClose) onClose();
+            }}
+            className="flex items-center gap-3 cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] p-0.5 shadow-md shadow-blue-500/20 shrink-0 group-hover:scale-105 transition-transform">
+              <div className="w-full h-full bg-(--bg-card) rounded-[14px] flex items-center justify-center overflow-hidden p-1">
+                <img
+                  src="/logo.png"
+                  alt="Assistance Logo"
+                  className="w-full h-full object-contain rounded-[10px]"
+                />
               </div>
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-[15px] tracking-tight text-(--text-primary)">
+                <span className="font-extrabold text-[15px] tracking-tight text-(--text-primary) group-hover:text-[#4E82EE] transition-colors">
                   Assistance
                 </span>
                 <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-[#4E82EE]/15 text-[#4E82EE]">

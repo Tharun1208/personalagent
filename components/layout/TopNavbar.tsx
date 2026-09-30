@@ -97,8 +97,13 @@ export default function TopNavbar({
               startNewChat();
             }
           }}
-          className="flex items-center cursor-pointer group"
+          className="flex items-center gap-2 cursor-pointer group"
         >
+          <img
+            src="/logo.png"
+            alt="Assistance Logo"
+            className="w-6 h-6 rounded-lg object-contain shrink-0"
+          />
           <span className="font-bold text-base sm:text-lg tracking-tight text-(--text-primary) font-sans">
             Assistance
           </span>
