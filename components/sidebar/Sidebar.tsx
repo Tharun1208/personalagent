@@ -10,6 +10,15 @@ import {
   CheckCircle2,
   ChevronRight,
   ShieldCheck,
+  LayoutDashboard,
+  Sparkles,
+  CheckSquare,
+  Bell,
+  Target,
+  Wallet,
+  Boxes,
+  Calendar,
+  type LucideIcon,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 
@@ -19,13 +28,22 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
 }
 
-// ── Decorative Nav Items with Dedicated Theme Gradients & Emojis ─────────────
-const NAV_ITEMS = [
+interface NavItem {
+  key: string;
+  title: string;
+  subtitle: string;
+  icon: LucideIcon;
+  gradient: string;
+  glow: string;
+}
+
+// ── Nav Items with Lucide Icons & Theme Gradients ─────────────
+const NAV_ITEMS: NavItem[] = [
   {
     key: 'dashboard',
     title: 'Executive KPI',
     subtitle: 'Daily overview & metrics',
-    emoji: '📊',
+    icon: LayoutDashboard,
     gradient: 'from-blue-600 to-cyan-500',
     glow: 'shadow-blue-500/25',
   },
@@ -33,7 +51,7 @@ const NAV_ITEMS = [
     key: 'chat',
     title: 'AI Intelligence',
     subtitle: 'Assistant & voice brain',
-    emoji: '✨',
+    icon: Sparkles,
     gradient: 'from-purple-600 via-indigo-600 to-pink-500',
     glow: 'shadow-purple-500/25',
   },
@@ -41,7 +59,7 @@ const NAV_ITEMS = [
     key: 'tasks',
     title: 'Tasks & Todos',
     subtitle: 'Action items & priorities',
-    emoji: '📋',
+    icon: CheckSquare,
     gradient: 'from-emerald-500 to-teal-500',
     glow: 'shadow-emerald-500/25',
   },
@@ -49,7 +67,7 @@ const NAV_ITEMS = [
     key: 'reminders',
     title: 'Alarms & Alerts',
     subtitle: 'Real-time notifications',
-    emoji: '⏰',
+    icon: Bell,
     gradient: 'from-amber-500 to-orange-500',
     glow: 'shadow-amber-500/25',
   },
@@ -57,7 +75,7 @@ const NAV_ITEMS = [
     key: 'habits',
     title: 'Habits & Streaks',
     subtitle: 'Daily routine tracker',
-    emoji: '🔥',
+    icon: Flame,
     gradient: 'from-rose-500 to-pink-600',
     glow: 'shadow-rose-500/25',
   },
@@ -65,7 +83,7 @@ const NAV_ITEMS = [
     key: 'goals',
     title: 'Goals & OKRs',
     subtitle: 'Strategic milestones',
-    emoji: '🎯',
+    icon: Target,
     gradient: 'from-cyan-500 to-blue-600',
     glow: 'shadow-cyan-500/25',
   },
@@ -73,7 +91,7 @@ const NAV_ITEMS = [
     key: 'ledger',
     title: 'Ledger & Dues',
     subtitle: 'Debts & receivables',
-    emoji: '💰',
+    icon: Wallet,
     gradient: 'from-emerald-600 to-teal-600',
     glow: 'shadow-teal-500/25',
   },
@@ -81,7 +99,7 @@ const NAV_ITEMS = [
     key: 'apps',
     title: 'Dynamic Apps',
     subtitle: 'Interactive tools & AI sandbox',
-    emoji: '⚡',
+    icon: Boxes,
     gradient: 'from-violet-600 to-indigo-600',
     glow: 'shadow-violet-500/25',
   },
@@ -89,11 +107,11 @@ const NAV_ITEMS = [
     key: 'calendar',
     title: 'Calendar & Schedule',
     subtitle: 'Events & timeline',
-    emoji: '📅',
+    icon: Calendar,
     gradient: 'from-indigo-600 to-blue-600',
     glow: 'shadow-indigo-500/25',
   },
-] as const;
+];
 
 export default function Sidebar({ onClose }: SidebarProps) {
   const {
@@ -178,6 +196,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
         {NAV_ITEMS.map((item) => {
           const isActive = activeTab === item.key;
           const badge = getBadge(item.key);
+          const Icon = item.icon;
 
           return (
             <button
@@ -192,15 +211,16 @@ export default function Sidebar({ onClose }: SidebarProps) {
                   : 'text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
               }`}
             >
-              {/* Enhanced Icon Badge */}
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110 shadow-xs ${
-                  isActive
-                    ? 'bg-white/25 text-white backdrop-blur-xs ring-1 ring-white/40'
-                    : `bg-gradient-to-tr ${item.gradient} text-white`
-                }`}
-              >
-                <span className="text-base select-none leading-none">{item.emoji}</span>
+              {/* Clean Lucide Icon without background box */}
+              <div className="w-6 h-6 flex items-center justify-center shrink-0">
+                <Icon
+                  size={20}
+                  className={`transition-transform duration-200 group-hover:scale-110 ${
+                    isActive
+                      ? 'text-white'
+                      : 'text-(--text-secondary) group-hover:text-(--text-primary)'
+                  }`}
+                />
               </div>
 
               {/* Title & Subtitle */}
