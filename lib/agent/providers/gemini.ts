@@ -18,6 +18,7 @@ export async function callGeminiAI({
   systemInstruction,
   messages,
   inlineAttachments = [],
+  tools = [],
 }: CallGeminiParams): Promise<{ success: boolean; content?: string; error?: string; toolCalls?: any[] }> {
   try {
     const contents: any[] = [];
@@ -62,6 +63,10 @@ export async function callGeminiAI({
       payload.systemInstruction = {
         parts: [{ text: systemInstruction }],
       };
+    }
+
+    if (tools && tools.length > 0) {
+      payload.tools = tools;
     }
 
     const candidateModels = Array.from(

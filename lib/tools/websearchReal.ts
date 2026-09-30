@@ -9,10 +9,70 @@ export async function executeWebSearch(query: string): Promise<WebSearchResult[]
   const results: WebSearchResult[] = [];
   const cleanQuery = query.trim();
 
-  // 1. Wikipedia Summary / Live Knowledge API
+  // 1. Google Custom Search JSON API / Google Programmable Search
+  const googleKey = process.env.GOOGLE_SEARCH_API_KEY || process.env.GOOGLE_API_KEY;
+  const googleCx = process.env.GOOGLE_SEARCH_ENGINE_ID || process.env.GOOGLE_CSE_ID;
+
+  if (googleKey && googleCx) {
+    try {
+      const googleUrl = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(googleKey)}&cx=${encodeURIComponent(googleCx)}&q=${encodeURIComponent(cleanQuery)}`;
+      const googleRes = await fetch(googleUrl, { signal: AbortSignal.timeout(5000) });
+      if (googleRes.ok) {
+        const googleData = await googleRes.json();
+        const items = googleData.items || [];
+        for (const item of items.slice(0, 4)) {
+          results.push({
+            title: item.title,
+            url: item.link,
+            snippet: item.snippet || item.title,
+            source: 'Google Search',
+          });
+        }
+        if (results.length > 0) {
+          return results;
+        }
+      }
+    } catch (err) {
+      console.warn('Google Custom Search API error:', err);
+    }
+  }
+
+  // 2. Serper Google Search API
+  const serperKey = process.env.SERPER_API_KEY;
+  if (serperKey) {
+    try {
+      const serperRes = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': serperKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ q: cleanQuery, num: 4 }),
+        signal: AbortSignal.timeout(4000),
+      });
+      if (serperRes.ok) {
+        const data = await serperRes.json();
+        if (data.organic && Array.isArray(data.organic)) {
+          for (const item of data.organic.slice(0, 4)) {
+            results.push({
+              title: item.title,
+              url: item.link,
+              snippet: item.snippet || item.title,
+              source: 'Google Search (Live)',
+            });
+          }
+          if (results.length > 0) return results;
+        }
+      }
+    } catch (err) {
+      console.warn('Serper Google Search error:', err);
+    }
+  }
+
+  // 3. Wikipedia Summary / Live Knowledge API
   try {
     const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanQuery)}&format=json&origin=*`;
-    const wikiRes = await fetch(wikiUrl, { next: { revalidate: 300 } });
+    const wikiRes = await fetch(wikiUrl, { next: { revalidate: 300 }, signal: AbortSignal.timeout(4000) });
     if (wikiRes.ok) {
       const wikiData = await wikiRes.json();
       const hits = wikiData.query?.search || [];
