@@ -2,23 +2,14 @@
 
 import React from 'react';
 import {
-  Compass,
-  Sparkles,
-  ListTodo,
-  AlarmClock,
-  Flame,
-  Trophy,
-  CreditCard,
-  Calendar,
   AudioLines,
-  Timer,
+  Flame,
   Settings,
   X,
   Database,
   CheckCircle2,
   ChevronRight,
   ShieldCheck,
-  Zap,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 
@@ -28,88 +19,79 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
 }
 
-// ── Decorative Nav Items with Dedicated Theme Gradients ───────────────────────
+// ── Decorative Nav Items with Dedicated Theme Gradients & Emojis ─────────────
 const NAV_ITEMS = [
   {
     key: 'dashboard',
     title: 'Executive KPI',
     subtitle: 'Daily overview & metrics',
-    icon: Compass,
-    color: 'text-blue-500 dark:text-blue-400',
-    bg: 'bg-blue-500/10 dark:bg-blue-500/15',
-    activeBg: 'bg-blue-600 text-white shadow-md shadow-blue-500/25',
+    emoji: '📊',
+    gradient: 'from-blue-600 to-cyan-500',
+    glow: 'shadow-blue-500/25',
   },
   {
     key: 'chat',
     title: 'AI Intelligence',
     subtitle: 'Assistant & voice brain',
-    icon: Sparkles,
-    color: 'text-purple-500 dark:text-purple-400',
-    bg: 'bg-purple-500/10 dark:bg-purple-500/15',
-    activeBg: 'bg-purple-600 text-white shadow-md shadow-purple-500/25',
+    emoji: '✨',
+    gradient: 'from-purple-600 via-indigo-600 to-pink-500',
+    glow: 'shadow-purple-500/25',
   },
   {
     key: 'tasks',
     title: 'Tasks & Todos',
     subtitle: 'Action items & priorities',
-    icon: ListTodo,
-    color: 'text-emerald-500 dark:text-emerald-400',
-    bg: 'bg-emerald-500/10 dark:bg-emerald-500/15',
-    activeBg: 'bg-emerald-600 text-white shadow-md shadow-emerald-500/25',
+    emoji: '📋',
+    gradient: 'from-emerald-500 to-teal-500',
+    glow: 'shadow-emerald-500/25',
   },
   {
     key: 'reminders',
     title: 'Alarms & Alerts',
     subtitle: 'Real-time notifications',
-    icon: AlarmClock,
-    color: 'text-amber-500 dark:text-amber-400',
-    bg: 'bg-amber-500/10 dark:bg-amber-500/15',
-    activeBg: 'bg-amber-600 text-white shadow-md shadow-amber-500/25',
+    emoji: '⏰',
+    gradient: 'from-amber-500 to-orange-500',
+    glow: 'shadow-amber-500/25',
   },
   {
     key: 'habits',
     title: 'Habits & Streaks',
     subtitle: 'Daily routine tracker',
-    icon: Flame,
-    color: 'text-rose-500 dark:text-rose-400',
-    bg: 'bg-rose-500/10 dark:bg-rose-500/15',
-    activeBg: 'bg-rose-600 text-white shadow-md shadow-rose-500/25',
+    emoji: '🔥',
+    gradient: 'from-rose-500 to-pink-600',
+    glow: 'shadow-rose-500/25',
   },
   {
     key: 'goals',
     title: 'Goals & OKRs',
     subtitle: 'Strategic milestones',
-    icon: Trophy,
-    color: 'text-cyan-500 dark:text-cyan-400',
-    bg: 'bg-cyan-500/10 dark:bg-cyan-500/15',
-    activeBg: 'bg-cyan-600 text-white shadow-md shadow-cyan-500/25',
+    emoji: '🎯',
+    gradient: 'from-cyan-500 to-blue-600',
+    glow: 'shadow-cyan-500/25',
   },
   {
     key: 'ledger',
     title: 'Ledger & Dues',
     subtitle: 'Debts & receivables',
-    icon: CreditCard,
-    color: 'text-teal-500 dark:text-teal-400',
-    bg: 'bg-teal-500/10 dark:bg-teal-500/15',
-    activeBg: 'bg-teal-600 text-white shadow-md shadow-teal-500/25',
+    emoji: '💰',
+    gradient: 'from-emerald-600 to-teal-600',
+    glow: 'shadow-teal-500/25',
   },
   {
     key: 'apps',
     title: 'Dynamic Apps',
     subtitle: 'Interactive tools & AI sandbox',
-    icon: Zap,
-    color: 'text-violet-500 dark:text-violet-400',
-    bg: 'bg-violet-500/10 dark:bg-violet-500/15',
-    activeBg: 'bg-violet-600 text-white shadow-md shadow-violet-500/25',
+    emoji: '⚡',
+    gradient: 'from-violet-600 to-indigo-600',
+    glow: 'shadow-violet-500/25',
   },
   {
     key: 'calendar',
     title: 'Calendar & Schedule',
     subtitle: 'Events & timeline',
-    icon: Calendar,
-    color: 'text-indigo-500 dark:text-indigo-400',
-    bg: 'bg-indigo-500/10 dark:bg-indigo-500/15',
-    activeBg: 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25',
+    emoji: '📅',
+    gradient: 'from-indigo-600 to-blue-600',
+    glow: 'shadow-indigo-500/25',
   },
 ] as const;
 
@@ -188,15 +170,14 @@ export default function Sidebar({ onClose }: SidebarProps) {
       </div>
 
       {/* ── Main Navigation List ── */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 custom-scrollbar">
-        <div className="px-3 pt-1 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-(--text-muted)">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5 custom-scrollbar">
+        <div className="px-3 pt-1 pb-1 text-[10px] font-bold uppercase tracking-wider text-(--text-muted)">
           Workspace Modules
         </div>
 
         {NAV_ITEMS.map((item) => {
           const isActive = activeTab === item.key;
           const badge = getBadge(item.key);
-          const Icon = item.icon;
 
           return (
             <button
@@ -207,31 +188,33 @@ export default function Sidebar({ onClose }: SidebarProps) {
               }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left transition-all duration-200 cursor-pointer group relative ${
                 isActive
-                  ? item.activeBg
+                  ? `bg-gradient-to-r ${item.gradient} text-white shadow-lg ${item.glow}`
                   : 'text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
               }`}
             >
-              {/* Icon with Glowing Badge */}
+              {/* Enhanced Icon Badge */}
               <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 ${
-                  isActive ? 'bg-white/20 text-white' : `${item.bg} ${item.color}`
+                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110 shadow-xs ${
+                  isActive
+                    ? 'bg-white/25 text-white backdrop-blur-xs ring-1 ring-white/40'
+                    : `bg-gradient-to-tr ${item.gradient} text-white`
                 }`}
               >
-                <Icon size={18} strokeWidth={2.2} />
+                <span className="text-base select-none leading-none">{item.emoji}</span>
               </div>
 
               {/* Title & Subtitle */}
               <div className="flex-1 min-w-0">
                 <div
-                  className={`text-[13.5px] font-semibold tracking-tight truncate ${
+                  className={`text-[13.5px] font-bold tracking-tight truncate ${
                     isActive ? 'text-white' : 'text-(--text-primary)'
                   }`}
                 >
                   {item.title}
                 </div>
                 <div
-                  className={`text-[11px] truncate font-normal ${
-                    isActive ? 'text-white/80' : 'text-(--text-muted)'
+                  className={`text-[11px] truncate font-medium ${
+                    isActive ? 'text-white/85' : 'text-(--text-muted)'
                   }`}
                 >
                   {item.subtitle}
@@ -241,10 +224,10 @@ export default function Sidebar({ onClose }: SidebarProps) {
               {/* Counter Badge */}
               {badge > 0 && (
                 <span
-                  className={`text-[11px] font-mono px-2 py-0.5 rounded-full font-bold shrink-0 shadow-2xs ${
+                  className={`text-[11px] font-mono px-2 py-0.5 rounded-full font-extrabold shrink-0 shadow-xs ${
                     isActive
                       ? 'bg-white text-slate-900'
-                      : 'bg-(--bg-elevated) text-[#4E82EE] border border-[#4E82EE]/20'
+                      : 'bg-(--bg-elevated) text-[#4E82EE] border border-[#4E82EE]/30'
                   }`}
                 >
                   {badge}
@@ -252,7 +235,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
               )}
 
               {isActive && (
-                <ChevronRight size={14} className="text-white/60 shrink-0" />
+                <ChevronRight size={15} className="text-white/80 shrink-0" />
               )}
             </button>
           );
