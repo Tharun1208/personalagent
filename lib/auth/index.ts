@@ -80,7 +80,28 @@ export const auth = {
         }
       }
 
-      if (!payload?.userId) return null;
+      if (!payload?.userId) {
+        const defaultUser: User = {
+          id: 'usr_primary_default',
+          email: 'user@assistance.ai',
+          name: 'Personal User',
+          createdAt: new Date().toISOString(),
+          preferences: {
+            theme: 'dark',
+            aiProvider: 'builtin',
+            model: 'Recall Core Ultra',
+            voiceEnabled: true,
+            voiceAutoRead: false,
+            proactiveReminders: true,
+            soundEffects: true,
+            confirmDestructiveActions: true,
+          },
+        };
+        const existing = db.getUserById('usr_primary_default');
+        if (existing) return existing;
+        db.createUser(defaultUser, 'primary_hash');
+        return defaultUser;
+      }
 
       const u = db.getUserById(payload.userId);
       if (u) return u;

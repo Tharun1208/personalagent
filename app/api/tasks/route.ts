@@ -17,13 +17,13 @@ export async function POST(req: NextRequest) {
   const user = auth.getUserFromRequest(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { title, description, priority, dueDate, projectId, tags } = await req.json();
+  const { id, title, description, priority, dueDate, projectId, tags } = await req.json();
   if (!title || !title.trim()) {
     return NextResponse.json({ error: 'Task title cannot be empty' }, { status: 400 });
   }
 
   const newTask: Task = {
-    id: `task_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    id: id || `task_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     userId: user.id,
     title: title.trim(),
     description,

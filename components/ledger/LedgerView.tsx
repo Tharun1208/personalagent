@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   HandCoins,
   ArrowUpRight,
@@ -98,10 +98,18 @@ function DailySpendingPanel({ currency }: { currency: string }) {
   const [showForm, setShowForm] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayStr());
 
+  // Guarantee instant load on client mount / hard refresh
+  useEffect(() => {
+    const loaded = loadSpending();
+    if (loaded && loaded.length > 0) {
+      setEntries(loaded);
+    }
+  }, []);
+
   // Month Report Selector State
-  const now = new Date();
-  const [reportYear, setReportYear] = useState(now.getFullYear());
-  const [reportMonth, setReportMonth] = useState(now.getMonth()); // 0-11
+  const now = useMemo(() => new Date(), []);
+  const [reportYear, setReportYear] = useState(() => new Date().getFullYear());
+  const [reportMonth, setReportMonth] = useState(() => new Date().getMonth()); // 0-11
   const [monthlyFilterCat, setMonthlyFilterCat] = useState<string>('all');
 
   // Form state
@@ -111,7 +119,7 @@ function DailySpendingPanel({ currency }: { currency: string }) {
   const [formDate, setFormDate] = useState(todayStr());
   const [editId, setEditId]   = useState<string | null>(null);
 
-  const days = last7Days();
+  const days = useMemo(() => last7Days(), []);
 
   // 7-day totals
   const dailyTotals = useMemo(() => {

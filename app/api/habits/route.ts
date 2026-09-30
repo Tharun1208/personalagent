@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
   }
 
   const newHabit: Habit = {
-    id: `habit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    id: body.id || `habit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     userId: user.id,
     title: title.trim(),
     frequency,

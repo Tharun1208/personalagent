@@ -203,6 +203,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [focusTimerOpen, setFocusTimerOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [guestPromptsUsed, setGuestPromptsUsed] = useState(0);
+  const [isHydrated, setIsHydrated] = useState(false);
   const initialLoadedRef = React.useRef(false);
 
   const isGuest = !user || isGuestEmail(user?.email);
@@ -240,49 +241,111 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Instant User load from localStorage cache on hard refresh
+  // Instant Client Hydration from localStorage on mount (prevents SSR blank wipes)
   useEffect(() => {
+    try {
+      const storedTasks = localStorage.getItem('recall_tasks');
+      if (storedTasks) {
+        const parsed = JSON.parse(storedTasks);
+        if (Array.isArray(parsed) && parsed.length > 0) setTasks(parsed);
+      }
+    } catch {}
+
+    try {
+      const storedRem = localStorage.getItem('recall_reminders');
+      if (storedRem) {
+        const parsed = JSON.parse(storedRem);
+        if (Array.isArray(parsed) && parsed.length > 0) setReminders(parsed);
+      }
+    } catch {}
+
+    try {
+      const storedLedger = localStorage.getItem('recall_ledger');
+      if (storedLedger) {
+        const parsed = JSON.parse(storedLedger);
+        if (Array.isArray(parsed) && parsed.length > 0) setLedgerEntries(parsed);
+      }
+    } catch {}
+
+    try {
+      const storedMem = localStorage.getItem('recall_memories');
+      if (storedMem) {
+        const parsed = JSON.parse(storedMem);
+        if (Array.isArray(parsed) && parsed.length > 0) setMemories(parsed);
+      }
+    } catch {}
+
+    try {
+      const storedGoals = localStorage.getItem('recall_goals');
+      if (storedGoals) {
+        const parsed = JSON.parse(storedGoals);
+        if (Array.isArray(parsed) && parsed.length > 0) setGoals(parsed);
+      }
+    } catch {}
+
+    try {
+      const storedConvs = localStorage.getItem('recall_conversations');
+      if (storedConvs) {
+        const parsed = JSON.parse(storedConvs);
+        if (Array.isArray(parsed) && parsed.length > 0) setConversations(parsed);
+      }
+    } catch {}
+
+    try {
+      const storedNotifs = localStorage.getItem('recall_notifications');
+      if (storedNotifs) {
+        const parsed = JSON.parse(storedNotifs);
+        if (Array.isArray(parsed) && parsed.length > 0) setNotifications(parsed);
+      }
+    } catch {}
+
     try {
       const cachedUser = localStorage.getItem('recall_user');
       if (cachedUser) {
         const parsed = JSON.parse(cachedUser);
-        if (parsed?.name) {
-          setUser(parsed);
-        }
+        if (parsed?.name) setUser(parsed);
       }
     } catch {}
-    // Restore guest prompt counter
+
     setGuestPromptsUsed(readGuestPromptCount());
+    setIsHydrated(true);
   }, []);
 
-  // ── Auto-persist all collections to localStorage immediately on change ─────
+  // ── Auto-persist all collections to localStorage ONLY when hydrated ─────
   useEffect(() => {
+    if (!isHydrated) return;
     try { localStorage.setItem('recall_tasks', JSON.stringify(tasks)); } catch {}
-  }, [tasks]);
+  }, [tasks, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     try { localStorage.setItem('recall_reminders', JSON.stringify(reminders)); } catch {}
-  }, [reminders]);
+  }, [reminders, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     try { localStorage.setItem('recall_memories', JSON.stringify(memories)); } catch {}
-  }, [memories]);
+  }, [memories, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     try { localStorage.setItem('recall_goals', JSON.stringify(goals)); } catch {}
-  }, [goals]);
+  }, [goals, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     try { localStorage.setItem('recall_ledger', JSON.stringify(ledgerEntries)); } catch {}
-  }, [ledgerEntries]);
+  }, [ledgerEntries, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     try { localStorage.setItem('recall_conversations', JSON.stringify(conversations)); } catch {}
-  }, [conversations]);
+  }, [conversations, isHydrated]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     try { localStorage.setItem('recall_notifications', JSON.stringify(notifications)); } catch {}
-  }, [notifications]);
+  }, [notifications, isHydrated]);
 
   // Theme switch helper
   const setTheme = useCallback((t: 'light' | 'dark') => {
@@ -548,10 +611,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (goalResult.status === 'fulfilled' && Array.isArray(goalResult.value?.goals)) {
         const serverGoals: Goal[] = goalResult.value.goals;
         setGoals((prev) => {
-          if (serverGoals.length === 0 && prev.length > 0) return prev;
+          if (serverGoals.length === 0 && prev.length > 0) {
+            prev.forEach((g) => {
+              apiFetch('/api/goals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(g),
+              }).catch(() => {});
+            });
+            return prev;
+          }
           const map = new Map<string, Goal>();
           serverGoals.forEach((g) => map.set(g.id, g));
-          prev.forEach((g) => { if (!map.has(g.id)) map.set(g.id, g); });
+          prev.forEach((g) => {
+            if (!map.has(g.id)) {
+              map.set(g.id, g);
+              apiFetch('/api/goals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(g),
+              }).catch(() => {});
+            }
+          });
           return Array.from(map.values());
         });
       }
@@ -574,10 +655,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (ledgerResult.status === 'fulfilled' && Array.isArray(ledgerResult.value?.ledger)) {
         const serverLedger: LedgerEntry[] = ledgerResult.value.ledger;
         setLedgerEntries((prev) => {
-          if (serverLedger.length === 0 && prev.length > 0) return prev;
+          if (serverLedger.length === 0 && prev.length > 0) {
+            prev.forEach((l) => {
+              apiFetch('/api/ledger', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(l),
+              }).catch(() => {});
+            });
+            return prev;
+          }
           const map = new Map<string, LedgerEntry>();
           serverLedger.forEach((l) => map.set(l.id, l));
-          prev.forEach((l) => { if (!map.has(l.id)) map.set(l.id, l); });
+          prev.forEach((l) => {
+            if (!map.has(l.id)) {
+              map.set(l.id, l);
+              apiFetch('/api/ledger', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(l),
+              }).catch(() => {});
+            }
+          });
           return Array.from(map.values());
         });
       }
@@ -929,34 +1028,71 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Memory Actions
-  const createMemory = async (content: string, category?: string, tags?: string[]) => {
-    const res = await apiFetch('/api/memories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, category, tags }),
+  // Memory Actions (Local-first & instant)
+  const createMemory = async (content: string, category = 'general', tags: string[] = []) => {
+    const tempId = `mem_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newMemory: Memory = {
+      id: tempId,
+      userId: user?.id || 'usr_primary_default',
+      content: content.trim(),
+      type: 'personal',
+      category: (category as any) || 'general',
+      tags: tags || [],
+      confidence: 1.0,
+      pinned: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setMemories((prev) => {
+      const updated = [newMemory, ...prev];
+      try { localStorage.setItem('recall_memories', JSON.stringify(updated)); } catch {}
+      return updated;
     });
-    const data = await res.json();
-    if (data.memory) {
-      setMemories((prev) => [data.memory, ...prev]);
+
+    try {
+      const res = await apiFetch('/api/memories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: tempId, content, category, tags }),
+      });
+      const data = await safeJson(res);
+      if (data?.memory) {
+        setMemories((prev) => prev.map((m) => (m.id === tempId ? data.memory : m)));
+      }
+    } catch (err) {
+      console.warn('Memory background sync notice:', err);
     }
   };
 
   const deleteMemory = async (id: string) => {
-    await apiFetch(`/api/memories/${id}`, { method: 'DELETE' });
-    setMemories((prev) => prev.filter((m) => m.id !== id));
+    setMemories((prev) => {
+      const updated = prev.filter((m) => m.id !== id);
+      try { localStorage.setItem('recall_memories', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+    try {
+      await apiFetch(`/api/memories/${id}`, { method: 'DELETE' });
+    } catch {}
   };
 
   const updateMemory = async (id: string, patch: Partial<Memory>) => {
-      const res = await apiFetch(`/api/memories/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
+    setMemories((prev) => {
+      const updated = prev.map((m) => (m.id === id ? { ...m, ...patch, updatedAt: new Date().toISOString() } : m));
+      try { localStorage.setItem('recall_memories', JSON.stringify(updated)); } catch {}
+      return updated;
     });
-    const data = await res.json();
-    if (data.memory) {
-      setMemories((prev) => prev.map((m) => (m.id === id ? data.memory : m)));
-    }
+    try {
+      const res = await apiFetch(`/api/memories/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const data = await safeJson(res);
+      if (data?.memory) {
+        setMemories((prev) => prev.map((m) => (m.id === id ? data.memory : m)));
+      }
+    } catch {}
   };
 
   // Task Actions
@@ -1087,7 +1223,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     cancelNotification(notificationIdFromString(id));
   };
 
-  // Goal Actions
+  // Goal Actions (Local-first & instant)
   const createGoal = async (
     title: string,
     description?: string,
@@ -1101,50 +1237,112 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       completed: false,
     }));
 
-    const res = await apiFetch('/api/goals', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        description,
-        category,
-        targetDate,
-        milestones: formattedMilestones,
-      }),
+    const newGoalId = `goal_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newGoal: Goal = {
+      id: newGoalId,
+      userId: user?.id || 'usr_primary_default',
+      title: title.trim(),
+      description: description?.trim() || undefined,
+      category,
+      targetDate: targetDate || undefined,
+      milestones: formattedMilestones,
+      progress: 0,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setGoals((prev) => {
+      const updated = [newGoal, ...prev];
+      try { localStorage.setItem('recall_goals', JSON.stringify(updated)); } catch {}
+      return updated;
     });
-    const data = await res.json();
-    if (data.goal) {
-      setGoals((prev) => [data.goal, ...prev]);
+
+    try {
+      const res = await apiFetch('/api/goals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: newGoalId,
+          title,
+          description,
+          category,
+          targetDate,
+          milestones: formattedMilestones,
+        }),
+      });
+      const data = await safeJson(res);
+      if (data?.goal) {
+        setGoals((prev) => prev.map((g) => (g.id === newGoalId ? data.goal : g)));
+      }
+    } catch (err) {
+      console.warn('Goal background sync notice:', err);
     }
   };
 
   const updateGoal = async (id: string, patch: Partial<Goal>) => {
-    const res = await apiFetch('/api/goals', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, ...patch }),
+    setGoals((prev) => {
+      const updated = prev.map((g) => (g.id === id ? { ...g, ...patch, updatedAt: new Date().toISOString() } : g));
+      try { localStorage.setItem('recall_goals', JSON.stringify(updated)); } catch {}
+      return updated;
     });
-    const data = await res.json();
-    if (data.goal) {
-      setGoals((prev) => prev.map((g) => (g.id === id ? data.goal : g)));
+
+    try {
+      const res = await apiFetch('/api/goals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...patch }),
+      });
+      const data = await safeJson(res);
+      if (data?.goal) {
+        setGoals((prev) => prev.map((g) => (g.id === id ? data.goal : g)));
+      }
+    } catch (err) {
+      console.warn('Goal update background sync notice:', err);
     }
   };
 
   const toggleGoalMilestone = async (goalId: string, milestoneId: string) => {
-    const res = await apiFetch('/api/goals', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: goalId, milestoneId, toggleMilestone: true }),
+    setGoals((prev) => {
+      const updated = prev.map((g) => {
+        if (g.id !== goalId) return g;
+        const updatedMilestones = (g.milestones || []).map((m) =>
+          m.id === milestoneId ? { ...m, completed: !m.completed } : m
+        );
+        const completedCount = updatedMilestones.filter((m) => m.completed).length;
+        const progress = updatedMilestones.length > 0
+          ? Math.round((completedCount / updatedMilestones.length) * 100)
+          : g.progress;
+        return { ...g, milestones: updatedMilestones, progress, updatedAt: new Date().toISOString() };
+      });
+      try { localStorage.setItem('recall_goals', JSON.stringify(updated)); } catch {}
+      return updated;
     });
-    const data = await res.json();
-    if (data.goal) {
-      setGoals((prev) => prev.map((g) => (g.id === goalId ? data.goal : g)));
+
+    try {
+      const res = await apiFetch('/api/goals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: goalId, milestoneId, toggleMilestone: true }),
+      });
+      const data = await safeJson(res);
+      if (data?.goal) {
+        setGoals((prev) => prev.map((g) => (g.id === goalId ? data.goal : g)));
+      }
+    } catch (err) {
+      console.warn('Goal milestone background sync notice:', err);
     }
   };
 
   const deleteGoal = async (id: string) => {
-    await apiFetch(`/api/goals?id=${id}`, { method: 'DELETE' });
-    setGoals((prev) => prev.filter((g) => g.id !== id));
+    setGoals((prev) => {
+      const updated = prev.filter((g) => g.id !== id);
+      try { localStorage.setItem('recall_goals', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+    try {
+      await apiFetch(`/api/goals?id=${id}`, { method: 'DELETE' });
+    } catch {}
   };
 
   // Confirmation Tool Action
@@ -1169,59 +1367,114 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Ledger Actions (Who I Owe / Who Owes Me)
+  // Ledger Actions (Local-first & instant)
   const createLedgerEntry = async (
     personName: string,
     amount: number,
     type: 'give' | 'receive',
     options?: { description?: string; dueDate?: string; category?: string; currency?: string }
   ) => {
-    const res = await apiFetch('/api/ledger', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        personName,
-        amount,
-        type,
-        currency: options?.currency || '₹',
-        description: options?.description,
-        dueDate: options?.dueDate,
-        category: options?.category,
-      }),
+    const tempId = `ledg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newEntry: LedgerEntry = {
+      id: tempId,
+      userId: user?.id || 'usr_primary_default',
+      personName: personName.trim(),
+      amount,
+      currency: options?.currency || '₹',
+      type: type === 'give' ? 'give' : 'receive',
+      status: 'pending',
+      description: options?.description?.trim() || undefined,
+      dueDate: options?.dueDate || undefined,
+      category: options?.category || 'personal',
+      createdAt: new Date().toISOString(),
+    };
+
+    setLedgerEntries((prev) => {
+      const updated = [newEntry, ...prev];
+      try { localStorage.setItem('recall_ledger', JSON.stringify(updated)); } catch {}
+      return updated;
     });
-    const data = await res.json();
-    if (data.entry) {
-      setLedgerEntries((prev) => [data.entry, ...prev]);
+
+    try {
+      const res = await apiFetch('/api/ledger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: tempId,
+          personName,
+          amount,
+          type,
+          currency: options?.currency || '₹',
+          description: options?.description,
+          dueDate: options?.dueDate,
+          category: options?.category,
+        }),
+      });
+      const data = await safeJson(res);
+      if (data?.entry) {
+        setLedgerEntries((prev) => prev.map((l) => (l.id === tempId ? data.entry : l)));
+      }
+    } catch (err) {
+      console.warn('Ledger background sync notice:', err);
     }
   };
 
   const updateLedgerEntry = async (id: string, patch: Partial<LedgerEntry>) => {
-    const res = await apiFetch('/api/ledger', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, ...patch }),
+    setLedgerEntries((prev) => {
+      const updated = prev.map((l) => (l.id === id ? { ...l, ...patch } : l));
+      try { localStorage.setItem('recall_ledger', JSON.stringify(updated)); } catch {}
+      return updated;
     });
-    const data = await res.json();
-    if (data.entry) {
-      setLedgerEntries((prev) => prev.map((l) => (l.id === id ? data.entry : l)));
+
+    try {
+      const res = await apiFetch('/api/ledger', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...patch }),
+      });
+      const data = await safeJson(res);
+      if (data?.entry) {
+        setLedgerEntries((prev) => prev.map((l) => (l.id === id ? data.entry : l)));
+      }
+    } catch (err) {
+      console.warn('Ledger update background sync notice:', err);
     }
   };
 
   const settleLedgerEntry = async (id: string) => {
-    const res = await apiFetch('/api/ledger', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, action: 'settle' }),
+    setLedgerEntries((prev) => {
+      const updated = prev.map((l) => (l.id === id ? { ...l, status: 'settled' as const } : l));
+      try { localStorage.setItem('recall_ledger', JSON.stringify(updated)); } catch {}
+      return updated;
     });
-    const data = await res.json();
-    if (data.entry) {
-      setLedgerEntries((prev) => prev.map((l) => (l.id === id ? data.entry : l)));
+
+    try {
+      const res = await apiFetch('/api/ledger', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'settle' }),
+      });
+      const data = await safeJson(res);
+      if (data?.entry) {
+        setLedgerEntries((prev) => prev.map((l) => (l.id === id ? data.entry : l)));
+      }
+    } catch (err) {
+      console.warn('Ledger settle background sync notice:', err);
     }
   };
 
   const deleteLedgerEntry = async (id: string) => {
-    await apiFetch(`/api/ledger?id=${id}`, { method: 'DELETE' });
-    setLedgerEntries((prev) => prev.filter((l) => l.id !== id));
+    setLedgerEntries((prev) => {
+      const updated = prev.filter((l) => l.id !== id);
+      try { localStorage.setItem('recall_ledger', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    try {
+      await apiFetch(`/api/ledger?id=${id}`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('Ledger delete background sync notice:', err);
+    }
   };
 
   // Notifications

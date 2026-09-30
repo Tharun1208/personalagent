@@ -39,7 +39,6 @@ export async function callGroqAI({
   const modelsToTry = [
     preferredModel,
     'llama-3.1-8b-instant',
-    'llama-3.3-70b-versatile',
   ];
 
   const uniqueModels = Array.from(new Set(modelsToTry));
@@ -56,7 +55,7 @@ export async function callGroqAI({
       });
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
 
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',

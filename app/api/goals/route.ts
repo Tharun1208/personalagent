@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const { title, description, category, targetDate, milestones } = await req.json();
+    const { id, title, description, category, targetDate, milestones } = await req.json();
     if (!title || !title.trim()) {
       return NextResponse.json({ error: 'Goal title cannot be empty' }, { status: 400 });
     }
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const progress = goalMilestones.length > 0 ? Math.round((completedMilestones / goalMilestones.length) * 100) : 0;
 
     const newGoal: Goal = {
-      id: `goal_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: id || `goal_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       userId: user.id,
       title: title.trim(),
       description: description || '',

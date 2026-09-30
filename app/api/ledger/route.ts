@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     }
 
     const newEntry: LedgerEntry = {
-      id: `ledg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: body.id || `ledg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       userId: user.id,
       personName: personName.trim(),
       amount: numAmount,

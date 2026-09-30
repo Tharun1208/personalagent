@@ -11,21 +11,78 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { Habit } from '@/types';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, safeJson } from '@/lib/api';
+
+const HABITS_STORAGE_KEY = 'recall_habits';
+
+function loadLocalHabits(): Habit[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(HABITS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function HabitsView() {
-  const [habits, setHabits] = useState<Habit[]>([]);
+  const [habits, setHabits] = useState<Habit[]>(loadLocalHabits);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Client hydration from localStorage
+  useEffect(() => {
+    const local = loadLocalHabits();
+    if (local && local.length > 0) {
+      setHabits(local);
+    }
+    setIsHydrated(true);
+  }, []);
+
+  // Auto-persist to localStorage
+  useEffect(() => {
+    if (!isHydrated) return;
+    try {
+      localStorage.setItem(HABITS_STORAGE_KEY, JSON.stringify(habits));
+    } catch {}
+  }, [habits, isHydrated]);
 
   const fetchHabits = async () => {
     try {
       const res = await apiFetch('/api/habits');
-      const data = await res.json();
-      if (data.habits) setHabits(data.habits);
+      const data = await safeJson(res);
+      if (data?.habits && Array.isArray(data.habits)) {
+        setHabits((prev) => {
+          if (data.habits.length === 0 && prev.length > 0) {
+            // Push local habits to server
+            prev.forEach((h) => {
+              apiFetch('/api/habits', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(h),
+              }).catch(() => {});
+            });
+            return prev;
+          }
+          const map = new Map<string, Habit>();
+          data.habits.forEach((h: Habit) => map.set(h.id, h));
+          prev.forEach((h) => {
+            if (!map.has(h.id)) {
+              map.set(h.id, h);
+              apiFetch('/api/habits', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(h),
+              }).catch(() => {});
+            }
+          });
+          return Array.from(map.values());
+        });
+      }
     } catch (err) {
-      console.error('Failed to load habits', err);
+      console.warn('Failed to load habits from server', err);
     } finally {
       setIsLoading(false);
     }
@@ -39,45 +96,71 @@ export default function HabitsView() {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
+    const tempId = `habit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newHabit: Habit = {
+      id: tempId,
+      userId: 'usr_primary_default',
+      title: newTitle.trim(),
+      frequency: 'daily',
+      streak: 0,
+      history: [],
+      createdAt: new Date().toISOString(),
+    };
+
+    setHabits((prev) => [newHabit, ...prev]);
+    setNewTitle('');
+    setIsAddOpen(false);
+
     try {
       const res = await apiFetch('/api/habits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTitle.trim(), frequency: 'daily' }),
+        body: JSON.stringify({ id: tempId, title: newHabit.title, frequency: 'daily' }),
       });
-      const data = await res.json();
-      if (data.habit) {
-        setHabits((prev) => [...prev, data.habit]);
-        setNewTitle('');
-        setIsAddOpen(false);
+      const data = await safeJson(res);
+      if (data?.habit) {
+        setHabits((prev) => prev.map((h) => (h.id === tempId ? data.habit : h)));
       }
     } catch (err) {
-      console.error('Failed to create habit', err);
+      console.warn('Habit creation sync notice:', err);
     }
   };
 
   const handleToggle = async (id: string) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    setHabits((prev) =>
+      prev.map((h) => {
+        if (h.id !== id) return h;
+        const isDone = h.lastCompletedDate === todayStr;
+        return {
+          ...h,
+          lastCompletedDate: isDone ? undefined : todayStr,
+          streak: isDone ? Math.max(0, h.streak - 1) : h.streak + 1,
+        };
+      })
+    );
+
     try {
       const res = await apiFetch('/api/habits', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
-      const data = await res.json();
-      if (data.habit) {
+      const data = await safeJson(res);
+      if (data?.habit) {
         setHabits((prev) => prev.map((h) => (h.id === id ? data.habit : h)));
       }
     } catch (err) {
-      console.error('Failed to toggle habit', err);
+      console.warn('Habit toggle sync notice:', err);
     }
   };
 
   const handleDelete = async (id: string) => {
+    setHabits((prev) => prev.filter((h) => h.id !== id));
     try {
       await apiFetch(`/api/habits?id=${id}`, { method: 'DELETE' });
-      setHabits((prev) => prev.filter((h) => h.id !== id));
     } catch (err) {
-      console.error('Failed to delete habit', err);
+      console.warn('Habit delete sync notice:', err);
     }
   };
 

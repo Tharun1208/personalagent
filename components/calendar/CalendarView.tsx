@@ -41,6 +41,14 @@ const MONTH_NAMES = [
 
 const SHORT_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// Local date YYYY-MM-DD formatter (avoids UTC toISOString timezone off-by-one day bugs)
+export function toLocalDateString(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function CalendarView() {
   const { tasks, reminders, createTask, createReminder, toggleTask, deleteTask, deleteReminder } = useApp();
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -70,7 +78,7 @@ export default function CalendarView() {
   // Event Scheduling Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
-  const [modalDate, setModalDate] = useState(new Date().toISOString().split('T')[0]);
+  const [modalDate, setModalDate] = useState(() => toLocalDateString(new Date()));
   const [modalTime, setModalTime] = useState('10:00');
   const [modalDuration, setModalDuration] = useState('60'); // minutes
   const [modalType, setModalType] = useState<'event' | 'task' | 'alarm'>('event');
@@ -174,7 +182,7 @@ export default function CalendarView() {
 
   const openScheduleModal = (date?: Date, hour?: number) => {
     const targetDate = date || selectedDate;
-    setModalDate(targetDate.toISOString().split('T')[0]);
+    setModalDate(toLocalDateString(targetDate));
     if (hour !== undefined) {
       setModalTime(`${hour.toString().padStart(2, '0')}:00`);
     } else {

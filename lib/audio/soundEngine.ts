@@ -160,9 +160,14 @@ class SoundEngine {
 
   constructor() {
     if (typeof window !== 'undefined') {
+      const unlockEvents = ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'] as const;
       const unlockListener = () => {
+        if (this.isUnlockedState) return;
         this.isUnlockedState = true;
         this.notifyState();
+        unlockEvents.forEach((evt) => {
+          window.removeEventListener(evt, unlockListener, { capture: true });
+        });
         if (this.pendingLoopConfig && this.isLooping) {
           const { tone, volume, customUrl } = this.pendingLoopConfig;
           this.pendingLoopConfig = null;
@@ -171,7 +176,7 @@ class SoundEngine {
       };
 
       // Listen on any real user gesture to unlock HTML5 audio playback immediately
-      ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'].forEach((evt) => {
+      unlockEvents.forEach((evt) => {
         window.addEventListener(evt, unlockListener, { capture: true, passive: true });
       });
     }

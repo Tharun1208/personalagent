@@ -13,24 +13,26 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     await ensureDbReady();
-    const primaryUser: User = {
-      id: `usr_primary_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      email: 'user@assistance.ai',
-      name: 'Personal User',
-      createdAt: new Date().toISOString(),
-      preferences: {
-        theme: 'dark',
-        aiProvider: 'builtin',
-        model: 'Recall Core Ultra',
-        voiceEnabled: true,
-        voiceAutoRead: false,
-        proactiveReminders: true,
-        soundEffects: true,
-        confirmDestructiveActions: true,
-      },
-    };
-
-    db.createUser(primaryUser, auth.hashPassword(Math.random().toString(36) + Date.now()));
+    let primaryUser = db.getUserById('usr_primary_default');
+    if (!primaryUser) {
+      primaryUser = {
+        id: 'usr_primary_default',
+        email: 'user@assistance.ai',
+        name: 'Personal User',
+        createdAt: new Date().toISOString(),
+        preferences: {
+          theme: 'dark',
+          aiProvider: 'builtin',
+          model: 'Recall Core Ultra',
+          voiceEnabled: true,
+          voiceAutoRead: false,
+          proactiveReminders: true,
+          soundEffects: true,
+          confirmDestructiveActions: true,
+        },
+      };
+      db.createUser(primaryUser, auth.hashPassword('primary_fixed_secret'));
+    }
     const token = auth.signToken({ userId: primaryUser.id, email: primaryUser.email });
 
     const res = NextResponse.json({ success: true, user: primaryUser, token }, { status: 201 });
