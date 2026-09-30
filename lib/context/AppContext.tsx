@@ -88,7 +88,7 @@ interface AppContextType {
   toggleTask: (id: string, currentStatus: string) => Promise<void>;
   updateTaskStatus: (id: string, status: Task['status']) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
-  createReminder: (title: string, dueDateTime: string, recurrence?: string) => Promise<void>;
+  createReminder: (title: string, dueDateTime: string, recurrence?: string, notes?: string) => Promise<void>;
   updateReminder: (id: string, patch: Partial<Reminder>) => Promise<void>;
   deleteReminder: (id: string) => Promise<void>;
   createGoal: (title: string, description?: string, category?: Goal['category'], targetDate?: string, milestones?: string[]) => Promise<void>;
@@ -255,6 +255,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setGuestPromptsUsed(readGuestPromptCount());
   }, []);
 
+  // ── Auto-persist all collections to localStorage immediately on change ─────
+  useEffect(() => {
+    try { localStorage.setItem('recall_tasks', JSON.stringify(tasks)); } catch {}
+  }, [tasks]);
+
+  useEffect(() => {
+    try { localStorage.setItem('recall_reminders', JSON.stringify(reminders)); } catch {}
+  }, [reminders]);
+
+  useEffect(() => {
+    try { localStorage.setItem('recall_memories', JSON.stringify(memories)); } catch {}
+  }, [memories]);
+
+  useEffect(() => {
+    try { localStorage.setItem('recall_goals', JSON.stringify(goals)); } catch {}
+  }, [goals]);
+
+  useEffect(() => {
+    try { localStorage.setItem('recall_ledger', JSON.stringify(ledgerEntries)); } catch {}
+  }, [ledgerEntries]);
+
+  useEffect(() => {
+    try { localStorage.setItem('recall_conversations', JSON.stringify(conversations)); } catch {}
+  }, [conversations]);
+
+  useEffect(() => {
+    try { localStorage.setItem('recall_notifications', JSON.stringify(notifications)); } catch {}
+  }, [notifications]);
+
   // Theme switch helper
   const setTheme = useCallback((t: 'light' | 'dark') => {
     setThemeState(t);
@@ -412,35 +441,119 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         apiFetch('/api/ledger').then(safeJson),
       ]);
 
-      if (convResult.status === 'fulfilled' && convResult.value?.conversations) {
-        setConversations(convResult.value.conversations);
-        try { localStorage.setItem('recall_conversations', JSON.stringify(convResult.value.conversations)); } catch {}
+      // Smart non-destructive merge: preserve local data if server returns empty list (e.g. cold start)
+      if (convResult.status === 'fulfilled' && Array.isArray(convResult.value?.conversations)) {
+        const serverConvs: Conversation[] = convResult.value.conversations;
+        setConversations((prev) => {
+          if (serverConvs.length === 0 && prev.length > 0) return prev;
+          const map = new Map<string, Conversation>();
+          serverConvs.forEach((c) => map.set(c.id, c));
+          prev.forEach((c) => { if (!map.has(c.id)) map.set(c.id, c); });
+          return Array.from(map.values());
+        });
         if (!initialLoadedRef.current) {
           initialLoadedRef.current = true;
-          // Start with a fresh new chat session on launch / reload as requested
           setActiveConversationId(null);
           setMessages([]);
         }
       }
 
-      if (memResult.status === 'fulfilled' && memResult.value?.memories) {
-        setMemories(memResult.value.memories);
-        try { localStorage.setItem('recall_memories', JSON.stringify(memResult.value.memories)); } catch {}
+      if (memResult.status === 'fulfilled' && Array.isArray(memResult.value?.memories)) {
+        const serverMems: Memory[] = memResult.value.memories;
+        setMemories((prev) => {
+          if (serverMems.length === 0 && prev.length > 0) {
+            prev.forEach((m) => {
+              apiFetch('/api/memories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(m),
+              }).catch(() => {});
+            });
+            return prev;
+          }
+          const map = new Map<string, Memory>();
+          serverMems.forEach((m) => map.set(m.id, m));
+          prev.forEach((m) => {
+            if (!map.has(m.id)) {
+              map.set(m.id, m);
+              apiFetch('/api/memories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(m),
+              }).catch(() => {});
+            }
+          });
+          return Array.from(map.values());
+        });
       }
 
-      if (taskResult.status === 'fulfilled' && taskResult.value?.tasks) {
-        setTasks(taskResult.value.tasks);
-        try { localStorage.setItem('recall_tasks', JSON.stringify(taskResult.value.tasks)); } catch {}
+      if (taskResult.status === 'fulfilled' && Array.isArray(taskResult.value?.tasks)) {
+        const serverTasks: Task[] = taskResult.value.tasks;
+        setTasks((prev) => {
+          if (serverTasks.length === 0 && prev.length > 0) {
+            prev.forEach((t) => {
+              apiFetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(t),
+              }).catch(() => {});
+            });
+            return prev;
+          }
+          const map = new Map<string, Task>();
+          serverTasks.forEach((t) => map.set(t.id, t));
+          prev.forEach((t) => {
+            if (!map.has(t.id)) {
+              map.set(t.id, t);
+              apiFetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(t),
+              }).catch(() => {});
+            }
+          });
+          return Array.from(map.values());
+        });
       }
 
-      if (remResult.status === 'fulfilled' && remResult.value?.reminders) {
-        setReminders(remResult.value.reminders);
-        try { localStorage.setItem('recall_reminders', JSON.stringify(remResult.value.reminders)); } catch {}
+      if (remResult.status === 'fulfilled' && Array.isArray(remResult.value?.reminders)) {
+        const serverRems: Reminder[] = remResult.value.reminders;
+        setReminders((prev) => {
+          if (serverRems.length === 0 && prev.length > 0) {
+            prev.forEach((r) => {
+              apiFetch('/api/reminders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(r),
+              }).catch(() => {});
+            });
+            return prev;
+          }
+          const map = new Map<string, Reminder>();
+          serverRems.forEach((r) => map.set(r.id, r));
+          prev.forEach((r) => {
+            if (!map.has(r.id)) {
+              map.set(r.id, r);
+              apiFetch('/api/reminders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(r),
+              }).catch(() => {});
+            }
+          });
+          return Array.from(map.values());
+        });
       }
 
-      if (goalResult.status === 'fulfilled' && goalResult.value?.goals) {
-        setGoals(goalResult.value.goals);
-        try { localStorage.setItem('recall_goals', JSON.stringify(goalResult.value.goals)); } catch {}
+      if (goalResult.status === 'fulfilled' && Array.isArray(goalResult.value?.goals)) {
+        const serverGoals: Goal[] = goalResult.value.goals;
+        setGoals((prev) => {
+          if (serverGoals.length === 0 && prev.length > 0) return prev;
+          const map = new Map<string, Goal>();
+          serverGoals.forEach((g) => map.set(g.id, g));
+          prev.forEach((g) => { if (!map.has(g.id)) map.set(g.id, g); });
+          return Array.from(map.values());
+        });
       }
 
       if (actResult.status === 'fulfilled' && actResult.value?.actions) {
@@ -448,13 +561,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (notifResult.status === 'fulfilled' && notifResult.value?.notifications) {
-        setNotifications(notifResult.value.notifications);
-        try { localStorage.setItem('recall_notifications', JSON.stringify(notifResult.value.notifications)); } catch {}
+        setNotifications((prev) => {
+          const serverN = notifResult.value.notifications;
+          if (serverN.length === 0 && prev.length > 0) return prev;
+          const map = new Map<string, AppNotification>();
+          serverN.forEach((n: AppNotification) => map.set(n.id, n));
+          prev.forEach((n) => { if (!map.has(n.id)) map.set(n.id, n); });
+          return Array.from(map.values());
+        });
       }
 
-      if (ledgerResult.status === 'fulfilled' && ledgerResult.value?.ledger) {
-        setLedgerEntries(ledgerResult.value.ledger);
-        try { localStorage.setItem('recall_ledger', JSON.stringify(ledgerResult.value.ledger)); } catch {}
+      if (ledgerResult.status === 'fulfilled' && Array.isArray(ledgerResult.value?.ledger)) {
+        const serverLedger: LedgerEntry[] = ledgerResult.value.ledger;
+        setLedgerEntries((prev) => {
+          if (serverLedger.length === 0 && prev.length > 0) return prev;
+          const map = new Map<string, LedgerEntry>();
+          serverLedger.forEach((l) => map.set(l.id, l));
+          prev.forEach((l) => { if (!map.has(l.id)) map.set(l.id, l); });
+          return Array.from(map.values());
+        });
       }
     } catch (err) {
       console.error('Failed to load initial application state', err);
@@ -609,10 +734,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const due = new Date(r.dueDateTime).getTime();
         if (!isNaN(due) && due <= now) {
           triggeredAny = true;
+
+          // Request screen wake lock so phone/desktop display doesn't dim or turn off while ringing
+          if (typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
+            try { (navigator as any).wakeLock.request('screen').catch(() => {}); } catch {}
+          }
+
+          let nextDueDateTime = r.dueDateTime;
+          let nextStatus: Reminder['status'] = 'triggered';
+
+          // Mobile Alarm auto-repeat logic (iOS/Android clock behavior)
+          if (r.recurrence === 'daily') {
+            nextDueDateTime = new Date(due + 24 * 60 * 60 * 1000).toISOString();
+            nextStatus = 'pending'; // Stays active for the next day
+          } else if (r.recurrence === 'weekly') {
+            nextDueDateTime = new Date(due + 7 * 24 * 60 * 60 * 1000).toISOString();
+            nextStatus = 'pending';
+          }
+
           // Optimistically update reminder status locally
           setReminders((prev) =>
-            prev.map((item) => (item.id === r.id ? { ...item, status: 'triggered' } : item))
+            prev.map((item) =>
+              item.id === r.id
+                ? {
+                    ...item,
+                    status: nextStatus,
+                    dueDateTime: nextDueDateTime,
+                    lastTriggeredAt: new Date().toISOString(),
+                  }
+                : item
+            )
           );
+
           // Create instant alarm notification
           const newNotif: AppNotification = {
             id: `notif_alarm_${r.id}_${Date.now()}`,
@@ -625,10 +778,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             createdAt: new Date().toISOString(),
           };
           setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)]);
+
           apiFetch(`/api/reminders/${r.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'triggered' }),
+            body: JSON.stringify({
+              status: nextStatus,
+              dueDateTime: nextDueDateTime,
+              lastTriggeredAt: new Date().toISOString(),
+            }),
           }).catch(() => {});
         }
       }
@@ -874,15 +1032,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Reminder Actions
-  const createReminder = async (title: string, dueDateTime: string, recurrence = 'none') => {
-    const res = await apiFetch('/api/reminders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, dueDateTime, recurrence }),
-    });
-    const data = await res.json();
-    if (data.reminder) {
-      setReminders((prev) => [...prev, data.reminder]);
+  const createReminder = async (title: string, dueDateTime: string, recurrence = 'none', notes?: string) => {
+    const tempId = `rem_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const tempReminder: Reminder = {
+      id: tempId,
+      userId: user?.id || 'usr_default',
+      title: title.trim(),
+      dueDateTime: dueDateTime || new Date(Date.now() + 3600000).toISOString(),
+      recurrence: (recurrence as any) || 'none',
+      priority: 'medium',
+      status: 'pending',
+      notes,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Instant optimistic update
+    setReminders((prev) => [tempReminder, ...prev]);
+
+    try {
+      const res = await apiFetch('/api/reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, dueDateTime, recurrence, notes }),
+      });
+      const data = await safeJson(res);
+      if (data?.reminder) {
+        setReminders((prev) => prev.map((r) => (r.id === tempId ? data.reminder : r)));
+      }
+    } catch (err) {
+      console.warn('Reminder sync notice:', err);
     }
   };
 
