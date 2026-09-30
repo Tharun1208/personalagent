@@ -1479,31 +1479,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Notifications
   const markNotificationRead = async (id: string) => {
-    await apiFetch('/api/notifications', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
+    setNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
+      try { localStorage.setItem('recall_notifications', JSON.stringify(updated)); } catch {}
+      return updated;
     });
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+
+    try {
+      await apiFetch('/api/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+    } catch (err) {
+      console.warn('markNotificationRead background sync notice:', err);
+    }
   };
 
   const markAllNotificationsRead = async () => {
-    await apiFetch('/api/notifications', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ markAll: true }),
+    setNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, read: true }));
+      try { localStorage.setItem('recall_notifications', JSON.stringify(updated)); } catch {}
+      return updated;
     });
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+
+    try {
+      await apiFetch('/api/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ markAll: true }),
+      });
+    } catch (err) {
+      console.warn('markAllNotificationsRead background sync notice:', err);
+    }
   };
 
   const deleteNotification = async (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-    await apiFetch(`/api/notifications?id=${id}`, { method: 'DELETE' });
+    setNotifications((prev) => {
+      const updated = prev.filter((n) => n.id !== id);
+      try { localStorage.setItem('recall_notifications', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    try {
+      await apiFetch(`/api/notifications?id=${id}`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('deleteNotification background sync notice:', err);
+    }
   };
 
   const clearAllNotifications = async () => {
     setNotifications([]);
-    await apiFetch('/api/notifications', { method: 'DELETE' });
+    try { localStorage.setItem('recall_notifications', JSON.stringify([])); } catch {}
+
+    try {
+      await apiFetch('/api/notifications', { method: 'DELETE' });
+    } catch (err) {
+      console.warn('clearAllNotifications background sync notice:', err);
+    }
   };
 
   return (
