@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, ensureDbReady } from '@/lib/db';
 import { AgentOrchestrator } from '@/lib/agent/orchestrator';
 import { Message, Conversation } from '@/types';
 
 export async function POST(req: NextRequest) {
   try {
+    await ensureDbReady();
     const user = auth.getUserFromRequest(req) || {
       id: 'usr_default_main',
       name: 'User',
