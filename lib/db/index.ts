@@ -1111,10 +1111,11 @@ export const db = {
     return data.ledger.length < initialLen;
   },
 
-  // --- DATA OWNERSHIP / EXPORT / WIPE ---
+  // --- DATA OWNERSHIP / EXPORT / IMPORT / WIPE ---
   exportUserData(userId: string): Record<string, any> {
     const data = ensureDbFile();
     return {
+      version: '1.0.0',
       exportedAt: new Date().toISOString(),
       user: data.users.find((u) => u.id === userId),
       conversations: data.conversations.filter((c) => c.userId === userId),
@@ -1123,9 +1124,64 @@ export const db = {
       tasks: data.tasks.filter((t) => t.userId === userId),
       reminders: data.reminders.filter((r) => r.userId === userId),
       goals: (data.goals || []).filter((g) => g.userId === userId),
+      habits: (data.habits || []).filter((h) => h.userId === userId),
       ledger: (data.ledger || []).filter((l) => l.userId === userId),
       agentActions: data.agentActions.filter((a) => a.userId === userId),
     };
+  },
+
+  importUserData(userId: string, backupData: any): { imported: Record<string, number> } {
+    const data = ensureDbFile();
+    const imported: Record<string, number> = {
+      conversations: 0,
+      messages: 0,
+      memories: 0,
+      tasks: 0,
+      reminders: 0,
+      goals: 0,
+      habits: 0,
+      ledger: 0,
+    };
+
+    if (!backupData || typeof backupData !== 'object') {
+      return { imported };
+    }
+
+    const mergeCollection = (collectionKey: keyof Schema, storeName: CollectionName) => {
+      const items = Array.isArray(backupData[collectionKey]) ? backupData[collectionKey] : [];
+      const currentList = (data[collectionKey] as any[]) || [];
+      const addedOrUpdated: any[] = [];
+
+      items.forEach((item: any) => {
+        if (!item || !item.id) return;
+        const normalized = { ...item, userId };
+        const idx = currentList.findIndex((existing: any) => existing.id === normalized.id);
+        if (idx >= 0) {
+          currentList[idx] = normalized;
+        } else {
+          currentList.push(normalized);
+        }
+        addedOrUpdated.push(normalized);
+      });
+
+      (data as any)[collectionKey] = currentList;
+      imported[collectionKey as string] = addedOrUpdated.length;
+      if (addedOrUpdated.length > 0) {
+        persistDocs(storeName, addedOrUpdated);
+      }
+    };
+
+    mergeCollection('conversations', 'conversations');
+    mergeCollection('messages', 'messages');
+    mergeCollection('memories', 'memories');
+    mergeCollection('tasks', 'tasks');
+    mergeCollection('reminders', 'reminders');
+    mergeCollection('goals', 'goals');
+    mergeCollection('habits', 'habits');
+    mergeCollection('ledger', 'ledger');
+
+    persistDb();
+    return { imported };
   },
 
   wipeUserData(userId: string): boolean {
@@ -1136,6 +1192,7 @@ export const db = {
     const tsks = data.tasks.filter((t) => t.userId === userId);
     const rems = data.reminders.filter((r) => r.userId === userId);
     const gls = (data.goals || []).filter((g) => g.userId === userId);
+    const hbts = (data.habits || []).filter((h) => h.userId === userId);
     const ldg = (data.ledger || []).filter((l) => l.userId === userId);
     const acts = data.agentActions.filter((a) => a.userId === userId);
     const nots = data.notifications.filter((n) => n.userId === userId);
@@ -1145,6 +1202,7 @@ export const db = {
     data.tasks = data.tasks.filter((t) => t.userId !== userId);
     data.reminders = data.reminders.filter((r) => r.userId !== userId);
     data.goals = (data.goals || []).filter((g) => g.userId !== userId);
+    data.habits = (data.habits || []).filter((h) => h.userId !== userId);
     data.ledger = (data.ledger || []).filter((l) => l.userId !== userId);
     data.agentActions = data.agentActions.filter((a) => a.userId !== userId);
     data.notifications = data.notifications.filter((n) => n.userId !== userId);
@@ -1155,6 +1213,7 @@ export const db = {
     tsks.forEach((d) => deleteFromStore('tasks', d.id));
     rems.forEach((d) => deleteFromStore('reminders', d.id));
     gls.forEach((d) => deleteFromStore('goals', d.id));
+    hbts.forEach((d) => deleteFromStore('habits', d.id));
     ldg.forEach((d) => deleteFromStore('ledger', d.id));
     acts.forEach((d) => deleteFromStore('agentActions', d.id));
     nots.forEach((d) => deleteFromStore('notifications', d.id));

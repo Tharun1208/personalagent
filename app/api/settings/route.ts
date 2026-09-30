@@ -76,11 +76,17 @@ export async function POST(req: NextRequest) {
   await ensureDbReady();
   const user = getOrCreateUser(req);
 
-  const { action } = await req.json();
+  const body = await req.json();
+  const { action, backupData } = body;
 
   if (action === 'export') {
     const data = db.exportUserData(user.id);
     return NextResponse.json({ export: data });
+  }
+
+  if (action === 'restore') {
+    const result = db.importUserData(user.id, backupData);
+    return NextResponse.json({ success: true, result });
   }
 
   if (action === 'wipe') {
