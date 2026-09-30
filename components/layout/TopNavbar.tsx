@@ -55,6 +55,8 @@ export default function TopNavbar({
         return 'Ledger';
       case 'dashboard':
         return 'Dashboard';
+      case 'apps':
+        return 'Dynamic Apps';
       case 'actions':
         return 'Audit Log';
       case 'settings':

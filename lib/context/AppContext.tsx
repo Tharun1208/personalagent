@@ -39,6 +39,7 @@ export type AppTab =
   | 'ledger'
   | 'actions'
   | 'dashboard'
+  | 'apps'
   | 'settings';
 
 interface AppContextType {

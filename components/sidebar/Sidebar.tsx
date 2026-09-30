@@ -94,6 +94,15 @@ const NAV_ITEMS = [
     activeBg: 'bg-teal-600 text-white shadow-md shadow-teal-500/25',
   },
   {
+    key: 'apps',
+    title: 'Dynamic Apps',
+    subtitle: 'Interactive tools & AI sandbox',
+    icon: Zap,
+    color: 'text-violet-500 dark:text-violet-400',
+    bg: 'bg-violet-500/10 dark:bg-violet-500/15',
+    activeBg: 'bg-violet-600 text-white shadow-md shadow-violet-500/25',
+  },
+  {
     key: 'calendar',
     title: 'Calendar & Schedule',
     subtitle: 'Events & timeline',

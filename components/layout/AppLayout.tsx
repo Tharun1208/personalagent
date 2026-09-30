@@ -20,6 +20,7 @@ import RemindersView from '@/components/reminders/RemindersView';
 import GoalsView from '@/components/goals/GoalsView';
 import ActivityLogView from '@/components/activity/ActivityLogView';
 import DashboardView from '@/components/dashboard/DashboardView';
+import DynamicAppsView from '@/components/apps/DynamicAppsView';
 import SettingsView from '@/components/settings/SettingsView';
 import LedgerView from '@/components/ledger/LedgerView';
 import CommandPalette from '@/components/common/CommandPalette';
@@ -79,6 +80,7 @@ export default function AppLayout() {
       case 'ledger':    return <LedgerView />;
       case 'actions':   return <ActivityLogView />;
       case 'dashboard': return <DashboardView />;
+      case 'apps':      return <DynamicAppsView />;
       case 'settings':  return <SettingsView />;
       default:          return <ChatView />;
     }
