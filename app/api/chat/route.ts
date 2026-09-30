@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady } from '@/lib/db';
+import { db, ensureDbReady, flushDb } from '@/lib/db';
 import { AgentOrchestrator } from '@/lib/agent/orchestrator';
 import { Message, Conversation } from '@/types';
 
@@ -83,6 +83,8 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     };
     db.createMessage(assistantMsg);
+
+    await flushDb();
 
     const res = NextResponse.json({
       success: true,

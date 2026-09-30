@@ -566,9 +566,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const loadMessages = async () => {
       try {
         const res = await apiFetch(`/api/conversations/${activeConversationId}`);
-        if (res.status === 404) {
-          setConversations((prev) => prev.filter((c) => c.id !== activeConversationId));
-          setMessages([]);
+        if (!res.ok) {
+          console.warn(`Conversation fetch returned status ${res.status}`);
           return;
         }
         const data = await safeJson(res);

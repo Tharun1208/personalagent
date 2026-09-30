@@ -156,12 +156,14 @@ export function getMirror(): DbSchema {
   return mirror;
 }
 
+let pendingWrites: Promise<any>[] = [];
+
 /**
- * Persist one document (upsert by its natural key). Fire-and-forget by
- * design — callers mutate the mirror synchronously and never wait.
+ * Persist one document (upsert by its natural key).
+ * Returns the write promise and tracks it in pendingWrites for flushDb().
  */
-export function persistDoc(collection: CollectionName, doc: any): void {
-  if (!isMongoConfigured()) return;
+export function persistDoc(collection: CollectionName, doc: any): Promise<any> {
+  if (!isMongoConfigured()) return Promise.resolve();
 
   const keyField = getKeyField(collection);
   const model: any = COLLECTION_MAP[collection];
@@ -171,37 +173,56 @@ export function persistDoc(collection: CollectionName, doc: any): void {
   delete payload._id;
   delete payload.__v;
 
-  connectToDatabase()
-    .then((conn) => {
+  const writePromise = (async () => {
+    try {
+      const conn = await connectToDatabase();
       if (!conn) return;
-      return model
-        .findOneAndUpdate({ [keyField]: payload[keyField] }, payload, {
-          upsert: true,
-          new: true,
-          setDefaultsOnInsert: true,
-        })
-        .catch((err: any) =>
-          console.error(`⚠️ persist ${collection} failed:`, err?.message || err),
-        );
-    })
-    .catch((err) => console.error(`⚠️ mongo conn failed:`, err?.message || err));
+      return await model.findOneAndUpdate({ [keyField]: payload[keyField] }, payload, {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      });
+    } catch (err: any) {
+      console.error(`⚠️ persist ${collection} failed:`, err?.message || err);
+    }
+  })();
+
+  pendingWrites.push(writePromise);
+  writePromise.finally(() => {
+    pendingWrites = pendingWrites.filter((p) => p !== writePromise);
+  });
+
+  return writePromise;
 }
 
-/** Delete one document by natural key (fire-and-forget) */
-export function deleteDoc(collection: CollectionName, key: string | number): void {
-  if (!isMongoConfigured()) return;
+/** Delete one document by natural key */
+export function deleteDoc(collection: CollectionName, key: string | number): Promise<any> {
+  if (!isMongoConfigured()) return Promise.resolve();
   const keyField = getKeyField(collection);
 
-  connectToDatabase()
-    .then((conn) => {
+  const deletePromise = (async () => {
+    try {
+      const conn = await connectToDatabase();
       if (!conn) return;
-      return (COLLECTION_MAP[collection] as any)
-        .deleteOne({ [keyField]: key })
-        .catch((err: any) =>
-          console.error(`⚠️ delete ${collection} failed:`, err?.message || err),
-        );
-    })
-    .catch((err) => console.error(`⚠️ mongo conn failed:`, err?.message || err));
+      return await (COLLECTION_MAP[collection] as any).deleteOne({ [keyField]: key });
+    } catch (err: any) {
+      console.error(`⚠️ delete ${collection} failed:`, err?.message || err);
+    }
+  })();
+
+  pendingWrites.push(deletePromise);
+  deletePromise.finally(() => {
+    pendingWrites = pendingWrites.filter((p) => p !== deletePromise);
+  });
+
+  return deletePromise;
+}
+
+/** Await all in-flight writes to MongoDB before serverless response finishes */
+export async function flushDb(): Promise<void> {
+  if (pendingWrites.length > 0) {
+    await Promise.allSettled([...pendingWrites]);
+  }
 }
 
 /** Natural key per collection (matches the JSON-file id semantics) */

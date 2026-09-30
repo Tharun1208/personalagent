@@ -23,8 +23,11 @@ import {
   getMirror,
   persistDoc,
   deleteDoc,
+  flushDb,
   CollectionName,
 } from './mongoStore';
+
+export { flushDb };
 
 interface Schema {
   users: User[];
