@@ -4,7 +4,7 @@ import { getLiveWeather, getLiveMarketQuotes, getLiveNews } from '@/lib/tools/re
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const location = searchParams.get('location') || 'Bangalore';
+    const location = searchParams.get('location') || 'Bengaluru';
     const symbols = searchParams.get('symbols')?.split(',') || ['BTC', 'ETH', 'SOL', 'AAPL', 'NVDA', 'TSLA'];
     const newsTopic = searchParams.get('news') || 'all';
 

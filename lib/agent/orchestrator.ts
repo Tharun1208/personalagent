@@ -1308,10 +1308,14 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       lower.includes('climate in');
 
     if (isWeatherQuery) {
-      let location = 'Bangalore';
-      const cityMatch = trimmed.match(/(?:in|at|for)\s+([A-Za-z\s]+)/i);
+      let location = 'Bengaluru';
+      const cityMatch = trimmed.match(/(?:in|at|for|around|of)\s+([A-Za-z\s]+)/i);
       if (cityMatch && cityMatch[1]) {
-        location = cityMatch[1].replace(/[?.,!]/g, '').trim();
+        const potentialCity = cityMatch[1].replace(/[?.,!]/g, '').trim();
+        const ignoreWords = ['today', 'tomorrow', 'now', 'here', 'the weekend', 'this week', 'next week', 'me', 'us', 'my area', 'my location', 'current location'];
+        if (!ignoreWords.includes(potentialCity.toLowerCase())) {
+          location = potentialCity;
+        }
       }
 
       toolSteps.push({

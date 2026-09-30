@@ -819,7 +819,7 @@ export const toolRegistry: Record<string, ToolModule> = {
     },
     async execute(action, args) {
       const { getLiveWeather } = await import('./realtimeData');
-      const data = await getLiveWeather(args.location || 'Bangalore');
+      const data = await getLiveWeather(args.location || 'Bengaluru');
       return {
         success: true,
         data,

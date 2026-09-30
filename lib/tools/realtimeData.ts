@@ -30,17 +30,70 @@ export interface LiveMarketQuote {
 }
 
 // ── 1. LIVE WEATHER SERVICE ──────────────────────────────────────────
-export async function getLiveWeather(locationQuery: string = 'Bangalore'): Promise<LiveWeatherData> {
+const CITY_ALIASES: Record<string, string> = {
+  bangalore: 'Bengaluru',
+  bengaluru: 'Bengaluru',
+  bombay: 'Mumbai',
+  mumbai: 'Mumbai',
+  calcutta: 'Kolkata',
+  kolkata: 'Kolkata',
+  madras: 'Chennai',
+  chennai: 'Chennai',
+  gurgaon: 'Gurugram',
+  gurugram: 'Gurugram',
+  trivandrum: 'Thiruvananthapuram',
+  thiruvananthapuram: 'Thiruvananthapuram',
+  cochin: 'Kochi',
+  kochi: 'Kochi',
+  baroda: 'Vadodara',
+  vadodara: 'Vadodara',
+  pondicherry: 'Puducherry',
+  puducherry: 'Puducherry',
+  mysore: 'Mysuru',
+  mysuru: 'Mysuru',
+  mangalore: 'Mangaluru',
+  mangaluru: 'Mangaluru',
+  calicut: 'Kozhikode',
+  kozhikode: 'Kozhikode',
+  banaras: 'Varanasi',
+  benares: 'Varanasi',
+  kashi: 'Varanasi',
+  poona: 'Pune',
+  pune: 'Pune',
+  delhi: 'New Delhi',
+  'new delhi': 'New Delhi',
+  hyd: 'Hyderabad',
+  hyderabad: 'Hyderabad',
+  today: 'Bengaluru',
+  tomorrow: 'Bengaluru',
+  now: 'Bengaluru',
+  here: 'Bengaluru',
+  me: 'Bengaluru',
+  'my area': 'Bengaluru',
+  'my location': 'Bengaluru',
+  'current location': 'Bengaluru',
+};
+
+export async function getLiveWeather(locationQuery: string = 'Bengaluru'): Promise<LiveWeatherData> {
   try {
-    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationQuery)}&count=1&language=en&format=json`;
+    let cleanQuery = (locationQuery || 'Bengaluru').trim();
+    const normalizedKey = cleanQuery.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    
+    if (CITY_ALIASES[normalizedKey]) {
+      cleanQuery = CITY_ALIASES[normalizedKey];
+    }
+
+    const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cleanQuery)}&count=10&language=en&format=json`;
     const geoRes = await fetch(geoUrl, { next: { revalidate: 300 } });
     const geoData = await geoRes.json();
 
     if (!geoData.results || geoData.results.length === 0) {
-      throw new Error(`Location "${locationQuery}" not found`);
+      throw new Error(`Location "${cleanQuery}" not found`);
     }
 
-    const loc = geoData.results[0];
+    // Rank results by population so major cities are always selected over minor neighborhoods
+    const sorted = [...geoData.results].sort((a, b) => (b.population || 0) - (a.population || 0));
+    const loc = sorted[0];
     const { latitude, longitude, name, country } = loc;
 
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
@@ -85,16 +138,16 @@ export async function getLiveWeather(locationQuery: string = 'Bangalore'): Promi
   } catch (err: any) {
     console.warn('Weather API fetch failed, using fallback:', err);
     return {
-      location: locationQuery,
-      country: 'Global',
-      temperature: 24,
+      location: locationQuery || 'Bengaluru',
+      country: 'India',
+      temperature: 26,
       condition: 'Partly Cloudy ⛅',
       humidity: 62,
       windSpeed: 14,
       forecast: [
-        { day: 'Today', tempMax: 26, tempMin: 18, condition: 'Partly Cloudy ⛅' },
-        { day: 'Tomorrow', tempMax: 27, tempMin: 19, condition: 'Sunny ☀️' },
-        { day: 'Thu', tempMax: 25, tempMin: 18, condition: 'Light Rain 🌧️' },
+        { day: 'Today', tempMax: 28, tempMin: 20, condition: 'Partly Cloudy ⛅' },
+        { day: 'Tomorrow', tempMax: 29, tempMin: 20, condition: 'Sunny ☀️' },
+        { day: 'Thu', tempMax: 27, tempMin: 19, condition: 'Light Rain 🌧️' },
       ],
     };
   }

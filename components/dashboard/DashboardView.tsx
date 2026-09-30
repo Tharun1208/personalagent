@@ -85,7 +85,7 @@ export default function DashboardView() {
   const [liveWeather, setLiveWeather] = useState<LiveWeatherData | null>(null);
   const [liveQuotes, setLiveQuotes] = useState<LiveMarketQuote[]>([]);
   const [liveNews, setLiveNews] = useState<LiveNewsItem[]>([]);
-  const [weatherCity, setWeatherCity] = useState('Bangalore');
+  const [weatherCity, setWeatherCity] = useState('Bengaluru');
   const [newsTopic, setNewsTopic] = useState('technology');
   const [isCityEditing, setIsCityEditing] = useState(false);
   const [cityInput, setCityInput] = useState('');
