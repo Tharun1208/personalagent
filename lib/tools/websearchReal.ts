@@ -69,7 +69,34 @@ export async function executeWebSearch(query: string): Promise<WebSearchResult[]
     }
   }
 
-  // 3. Wikipedia Summary / Live Knowledge API
+  // 3. Google News Live Search (100% Free & Unlimited, No API key needed)
+  try {
+    const googleNewsUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(cleanQuery)}&hl=en-IN&gl=IN&ceid=IN:en`;
+    const gnRes = await fetch(googleNewsUrl, { signal: AbortSignal.timeout(4000), next: { revalidate: 120 } });
+    if (gnRes.ok) {
+      const xmlText = await gnRes.text();
+      const itemRegex = /<item>[\s\S]*?<title>(.*?)<\/title>[\s\S]*?<link>(.*?)<\/link>[\s\S]*?<\/item>/gi;
+      let match;
+      let count = 0;
+      while ((match = itemRegex.exec(xmlText)) !== null && count < 3) {
+        const title = match[1]?.replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').replace(/&amp;/g, '&').trim();
+        const link = match[2]?.trim();
+        if (title && link) {
+          results.push({
+            title,
+            url: link,
+            snippet: title,
+            source: 'Google News (Live)',
+          });
+          count++;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Google News search fetch error:', err);
+  }
+
+  // 4. Wikipedia Summary / Live Knowledge API (100% Free & Unlimited)
   try {
     const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanQuery)}&format=json&origin=*`;
     const wikiRes = await fetch(wikiUrl, { next: { revalidate: 300 }, signal: AbortSignal.timeout(4000) });
@@ -90,10 +117,10 @@ export async function executeWebSearch(query: string): Promise<WebSearchResult[]
     console.warn('Wikipedia search fetch error:', err);
   }
 
-  // 2. DuckDuckGo Instant Answer / Live Web API
+  // 5. DuckDuckGo Instant Answer / Live Web API (100% Free & Unlimited)
   try {
     const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(cleanQuery)}&format=json&no_html=1&skip_disambig=1`;
-    const ddgRes = await fetch(ddgUrl, { next: { revalidate: 300 } });
+    const ddgRes = await fetch(ddgUrl, { next: { revalidate: 300 }, signal: AbortSignal.timeout(4000) });
     if (ddgRes.ok) {
       const data = await ddgRes.json();
       if (data.AbstractText && data.AbstractURL) {
@@ -121,7 +148,7 @@ export async function executeWebSearch(query: string): Promise<WebSearchResult[]
     console.warn('DuckDuckGo Instant API warning:', err);
   }
 
-  // 3. DuckDuckGo HTML Lite Fallback
+  // 6. DuckDuckGo HTML Lite Fallback
   if (results.length < 2) {
     try {
       const encoded = encodeURIComponent(cleanQuery);
@@ -129,6 +156,7 @@ export async function executeWebSearch(query: string): Promise<WebSearchResult[]
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
+        signal: AbortSignal.timeout(4000),
       });
 
       if (response.ok) {
