@@ -287,32 +287,32 @@ export default function SettingsView() {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-(--bg-primary) text-(--text-primary)">
       {/* Top Header Bar */}
       <div className="h-14 px-4 sm:px-6 border-b border-(--border-subtle) flex items-center justify-between shrink-0 bg-(--bg-primary)/95 backdrop-blur-md">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           {currentView !== 'main' && (
             <button
               onClick={() => setCurrentView('main')}
-              className="p-1.5 rounded-xl hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer mr-1 flex items-center gap-1 text-xs font-semibold"
+              className="p-1.5 rounded-xl hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer mr-0.5 flex items-center gap-1 text-xs font-semibold shrink-0"
               title="Back to Settings"
             >
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Settings</span>
             </button>
           )}
-          <div className="w-8 h-8 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) flex items-center justify-center shadow-2xs">
+          <div className="w-8 h-8 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) flex items-center justify-center shadow-2xs shrink-0">
             <Settings size={16} />
           </div>
-          <div>
-            <h1 className="app-page-title">
+          <div className="min-w-0">
+            <h1 className="app-page-title text-sm sm:text-base font-bold truncate">
               {currentView === 'main' && 'System Settings'}
               {currentView === 'profile' && 'Profile & Appearance'}
               {currentView === 'data' && 'Data & Privacy'}
               {currentView === 'backup' && 'Chat & Vault Backup'}
             </h1>
-            <p className="app-page-subtitle">
+            <p className="app-page-subtitle text-[11px] text-(--text-muted) truncate">
               {currentView === 'main' && 'Personal preferences, themes, sync, and storage'}
               {currentView === 'profile' && 'Manage your personal identity, display name, and color theme'}
               {currentView === 'data' && 'Manage local data backups and privacy storage'}
-              {currentView === 'backup' && 'WhatsApp-style Google Drive backup, restore & encryption'}
+              {currentView === 'backup' && 'Encrypted device vault & cloud backup sync'}
             </p>
           </div>
         </div>
@@ -571,17 +571,19 @@ export default function SettingsView() {
           {currentView === 'backup' && (
             <div className="space-y-6 animate-in fade-in duration-200">
               {/* Informative Header Banner */}
-              <div className="p-4 sm:p-5 rounded-3xl bg-teal-500/10 border border-teal-500/20 text-teal-800 dark:text-teal-200 text-xs space-y-2">
-                <div className="font-bold text-sm flex items-center gap-2 text-teal-900 dark:text-teal-100">
-                  <Cloud size={18} className="text-teal-500 shrink-0" />
+              <div className="p-4 sm:p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) text-xs space-y-2.5 shadow-2xs">
+                <div className="font-bold text-sm flex items-center gap-2.5 text-(--text-primary)">
+                  <div className="w-7 h-7 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-500/20">
+                    <Cloud size={16} />
+                  </div>
                   <span>How Backup & Recovery Works</span>
                 </div>
-                <ul className="list-disc pl-5 space-y-1 text-[11px] leading-relaxed opacity-90">
+                <ul className="list-disc pl-5 space-y-2 text-xs leading-relaxed text-(--text-secondary)">
                   <li>
-                    <strong className="text-(--text-primary)">Local Device Vault (Default & 100% Free):</strong> Your data is stored right here on your device storage. You do <span className="underline font-semibold">not</span> need any Google API key. You can also download or restore portable <code>.json</code> backup files anytime.
+                    <strong className="text-(--text-primary) font-semibold">Local Device Vault (Default & 100% Free):</strong> Your data is stored securely right here on your device storage without requiring any external API key. You can download or restore portable <code className="px-1.5 py-0.5 rounded-md bg-(--bg-elevated) font-mono text-[11px] text-(--text-primary) border border-(--border-subtle)">.json</code> backup files anytime.
                   </li>
                   <li>
-                    <strong className="text-(--text-primary)">Google Drive Cloud Sync (Optional):</strong> If you want to automatically sync backups to your personal Google Drive, you can provide an optional Google OAuth Token below.
+                    <strong className="text-(--text-primary) font-semibold">Google Drive Cloud Sync (Optional):</strong> If you want to automatically sync and encrypt backups to your personal Google Drive, you can provide an optional Google OAuth Token below.
                   </li>
                 </ul>
               </div>
