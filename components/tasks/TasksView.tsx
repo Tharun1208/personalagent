@@ -383,7 +383,7 @@ export default function TasksView() {
       </div>
 
       {/* View Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 max-w-6xl mx-auto w-full custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 max-w-6xl mx-auto w-full custom-scrollbar pb-32 sm:pb-36 md:pb-12">
         {filteredTasks.length === 0 ? (
           <div className="py-20 text-center space-y-3">
             <CheckSquare size={36} className="mx-auto text-(--text-muted) opacity-30" />
@@ -405,14 +405,14 @@ export default function TasksView() {
           </div>
         ) : (
           /* STANDARD LIST VIEW - DIVIDED DATE WISE */
-          <div className="space-y-8 pb-16">
+          <div className="space-y-8 pb-4">
             {dateGroups.map((group) => (
               <div key={group.id} className="space-y-3">
                 {/* Date Group Header */}
                 <div className="flex items-center justify-between gap-3 pb-2 border-b border-(--border-subtle)">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <div
-                      className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-semibold ${
+                      className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-semibold shrink-0 ${
                         group.type === 'overdue'
                           ? 'bg-rose-500/15 text-rose-500 border border-rose-500/20'
                           : group.type === 'today'
@@ -434,9 +434,9 @@ export default function TasksView() {
                         <CalendarDays size={14} />
                       )}
                     </div>
-                    <div>
+                    <div className="flex items-center gap-2 min-w-0">
                       <h2
-                        className={`text-xs sm:text-sm font-bold flex items-center gap-2 ${
+                        className={`text-xs sm:text-sm font-bold flex items-center gap-1.5 whitespace-nowrap ${
                           group.type === 'overdue'
                             ? 'text-rose-500'
                             : group.type === 'today'
@@ -447,7 +447,7 @@ export default function TasksView() {
                         {group.title}
                       </h2>
                       {group.subtitle && (
-                        <p className="text-[10px] sm:text-[11px] text-(--text-muted)">{group.subtitle}</p>
+                        <span className="text-[11px] text-(--text-muted) font-cutive whitespace-nowrap truncate">· {group.subtitle}</span>
                       )}
                     </div>
                   </div>
@@ -505,14 +505,14 @@ export default function TasksView() {
                                 </p>
                               )}
 
-                              <div className="flex items-center gap-3 text-[11px] text-(--text-muted) pt-1">
+                              <div className="flex items-center gap-2.5 text-[11px] text-(--text-muted) pt-1 whitespace-nowrap overflow-x-auto no-scrollbar">
                                 {task.dueDate && (
-                                  <span className="flex items-center gap-1 text-amber-500 font-bold font-cutive">
+                                  <span className="inline-flex items-center gap-1 text-amber-500 font-bold font-cutive shrink-0">
                                     <Calendar size={12} />
                                     Due: {new Date(task.dueDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                                   </span>
                                 )}
-                                <span className="font-cutive">Created {new Date(task.createdAt).toLocaleDateString()}</span>
+                                <span className="font-cutive shrink-0 text-[10px] text-(--text-muted)">• Created {new Date(task.createdAt).toLocaleDateString()}</span>
                               </div>
                             </div>
                           </div>

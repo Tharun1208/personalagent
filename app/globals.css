@@ -1,16 +1,17 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Cutive+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cutive+Mono&family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&display=swap');
 
 @theme {
-  --font-sans: var(--font-cutive-mono), "Cutive Mono", monospace;
+  --font-sans: var(--font-ibm-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: var(--font-cormorant), "Cormorant Garamond", serif;
-  --font-mono: var(--font-cutive-mono), "Cutive Mono", monospace;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
   --font-cutive: var(--font-cutive-mono), "Cutive Mono", monospace;
+  --font-ibm: var(--font-ibm-plex-sans), "IBM Plex Sans", sans-serif;
 }
 
 @layer base {
   body {
-    font-family: "Cutive Mono", var(--font-cutive-mono), monospace, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+    font-family: var(--font-ibm-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
   }
 
   :root {
@@ -77,10 +78,10 @@
   body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    font-family: "Cutive Mono", var(--font-cutive-mono), monospace, "Apple Color Emoji", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    font-family: var(--font-ibm-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-optical-sizing: auto;
-    font-size: 16px;
-    line-height: 1.65;
+    font-size: 15px;
+    line-height: 1.6;
     letter-spacing: -0.011em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -101,7 +102,6 @@
     will-change: transform, opacity;
     backface-visibility: hidden;
   }
-
 
   code,
   kbd,
@@ -126,6 +126,14 @@
   .cutive-mono-regular,
   .font-cutive {
     font-family: var(--font-cutive-mono), "Cutive Mono", monospace;
+    font-weight: 400;
+    font-style: normal;
+  }
+
+  .ibm-plex-sans,
+  .font-ibm {
+    font-family: var(--font-ibm-plex-sans), "IBM Plex Sans", sans-serif;
+    font-optical-sizing: auto;
     font-weight: 400;
     font-style: normal;
   }
@@ -192,7 +200,6 @@
   }
 
   .app-card-subtitle {
-    font-family: var(--font-cutive-mono), "Cutive Mono", monospace;
     font-size: 0.6875rem; /* 11px */
     font-weight: 400;
     color: var(--text-muted);
@@ -371,7 +378,7 @@ div:has(> svg[data-nextjs-dev-indicator]) {
   pointer-events: none !important;
 }
 
-/* Hide scrollbar but keep scrollability (used in full-screen sidebar drawer) */
+/* Hide scrollbar but keep scrollability */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -379,10 +386,6 @@ div:has(> svg[data-nextjs-dev-indicator]) {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
-
-/* ==========================================
-   ADVANCED ANIMATIONS & TRANSITIONS SUITE
-   ========================================== */
 
 /* Universal smooth interactive transitions for buttons, cards & inputs */
 button,
@@ -428,91 +431,13 @@ button:active:not(:disabled),
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Animated Shimmer Effect */
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+/* Mobile Bottom Navigation Bar Safe Clearance - Ensures no content is ever hidden behind bottom bar */
+.app-bottom-safe-padding {
+  padding-bottom: 7.5rem !important; /* 120px clearance for mobile nav bar */
 }
 
-.animate-shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.15) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 2.5s infinite linear;
-}
-
-/* Floating pulse glow */
-@keyframes pulseGlow {
-  0%, 100% {
-    box-shadow: 0 0 15px -3px rgba(78, 130, 238, 0.35);
-  }
-  50% {
-    box-shadow: 0 0 25px 2px rgba(155, 114, 207, 0.5);
+@media (min-width: 768px) {
+  .app-bottom-safe-padding {
+    padding-bottom: 2.5rem !important; /* Standard padding for desktop */
   }
 }
-
-.animate-pulse-glow {
-  animation: pulseGlow 3s infinite ease-in-out;
-}
-
-/* Checkmark spring celebration bounce */
-@keyframes springCheck {
-  0% { transform: scale(0.6); opacity: 0; }
-  50% { transform: scale(1.2); }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-.animate-spring-check {
-  animation: springCheck 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-/* Staggered Fade Up for Lists */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in-up {
-  animation: fadeInUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Floating idle bounce */
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
-}
-
-.animate-float {
-  animation: float 4s ease-in-out infinite;
-}
-
-/* Mobile-First Safe Area & Touch Classes */
-.safe-area-bottom {
-  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
-}
-
-.touch-manipulation {
-  touch-action: manipulation;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
-}
-

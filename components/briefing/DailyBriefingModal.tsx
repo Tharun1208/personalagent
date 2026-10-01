@@ -25,12 +25,34 @@ export default function DailyBriefingModal({ isOpen, onClose }: DailyBriefingMod
   const { user, tasks, reminders, goals, ledgerEntries } = useApp();
   const [isPlaying, setIsPlaying] = useState(false);
   const [briefingText, setBriefingText] = useState('');
+  const [voicesLoaded, setVoicesLoaded] = useState(false);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const pendingTasks = tasks.filter((t) => t.status !== 'completed');
   const pendingReminders = reminders.filter((r) => r.status === 'pending');
   const activeGoals = goals.filter((g) => g.status === 'active' || g.progress < 100);
   const pendingDues = (ledgerEntries || []).filter((l) => l.status === 'pending');
+
+  // Load available speech synthesis voices
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+    const loadVoices = () => {
+      const v = window.speechSynthesis.getVoices();
+      if (v && v.length > 0) {
+        setVoicesLoaded(true);
+      }
+    };
+
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, []);
 
   // Generate intelligent daily briefing text
   useEffect(() => {
@@ -61,14 +83,14 @@ export default function DailyBriefingModal({ isOpen, onClose }: DailyBriefingMod
     if (pendingReminders.length > 0) {
       const firstReminder = pendingReminders[0];
       const timeStr = new Date(firstReminder.dueDateTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-      text += `You have an upcoming alarm scheduled for ${timeStr} regarding ${firstReminder.title}. `;
+      text += `You have an upcoming event scheduled for ${timeStr} regarding ${firstReminder.title}. `;
     }
 
     if (pendingDues.length > 0) {
       const giveTotal = pendingDues.filter((d) => d.type === 'give').reduce((acc, d) => acc + d.amount, 0);
       const receiveTotal = pendingDues.filter((d) => d.type === 'receive').reduce((acc, d) => acc + d.amount, 0);
       if (giveTotal > 0 || receiveTotal > 0) {
-        text += `In financial dues, you have pending settlements to review. `;
+        text += `In financial dues, you have pending balance settlements to review. `;
       }
     }
 
@@ -77,44 +99,80 @@ export default function DailyBriefingModal({ isOpen, onClose }: DailyBriefingMod
   }, [isOpen, user, tasks, reminders, goals, ledgerEntries]);
 
   const handlePlayPause = () => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      alert('Speech synthesis is not supported in this browser.');
+    if (typeof window === 'undefined') return;
+
+    const synth = window.speechSynthesis;
+    if (!synth) {
+      // Fallback visual simulation if browser has completely disabled web speech
+      setIsPlaying((prev) => !prev);
       return;
     }
 
     if (isPlaying) {
-      window.speechSynthesis.cancel();
+      synth.cancel();
       setIsPlaying(false);
       return;
     }
 
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(briefingText);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.05;
+    synth.cancel();
 
-    // Pick best English voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const naturalVoice = voices.find(
-      (v) => (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha') || v.name.includes('Daniel')) && v.lang.startsWith('en')
-    );
-    if (naturalVoice) {
-      utterance.voice = naturalVoice;
+    // Chrome/Safari resume check if paused by browser power saving
+    if (synth.paused) {
+      synth.resume();
     }
 
-    utterance.onend = () => setIsPlaying(false);
-    utterance.onerror = () => setIsPlaying(false);
+    const utterance = new SpeechSynthesisUtterance(briefingText);
+    utterance.rate = 0.98;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
 
+    const voices = synth.getVoices();
+    if (voices && voices.length > 0) {
+      const naturalVoice = voices.find(
+        (v) =>
+          (v.name.toLowerCase().includes('google') ||
+            v.name.toLowerCase().includes('natural') ||
+            v.name.toLowerCase().includes('samantha') ||
+            v.name.toLowerCase().includes('daniel') ||
+            v.name.toLowerCase().includes('karen') ||
+            v.name.toLowerCase().includes('moira') ||
+            v.name.toLowerCase().includes('english') ||
+            v.name.toLowerCase().includes('us')) &&
+          v.lang.toLowerCase().startsWith('en')
+      ) || voices.find((v) => v.lang.toLowerCase().startsWith('en')) || voices[0];
+
+      if (naturalVoice) {
+        utterance.voice = naturalVoice;
+      }
+    }
+
+    utterance.onend = () => {
+      setIsPlaying(false);
+    };
+
+    utterance.onerror = (e) => {
+      console.warn('Speech synthesis playback note:', e);
+      setIsPlaying(false);
+    };
+
+    // Retain global reference to avoid V8 garbage collection during speech
+    (window as any).__currentBriefingUtterance = utterance;
     speechRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-    setIsPlaying(true);
+
+    try {
+      synth.speak(utterance);
+      setIsPlaying(true);
+    } catch (err) {
+      console.warn('Speech synthesis speak invocation error:', err);
+      setIsPlaying(false);
+    }
   };
 
   const handleRestart = () => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       setIsPlaying(false);
-      setTimeout(() => handlePlayPause(), 100);
+      setTimeout(() => handlePlayPause(), 150);
     }
   };
 
@@ -160,7 +218,7 @@ export default function DailyBriefingModal({ isOpen, onClose }: DailyBriefingMod
                     : 'bg-(--text-muted)/30'
                 }`}
                 style={{
-                  height: isPlaying ? `${Math.max(15, Math.floor(height * Math.random()))}%` : '20%',
+                  height: isPlaying ? `${Math.max(20, Math.floor(height * (0.6 + Math.random() * 0.4)))}%` : '20%',
                   animationDelay: `${i * 80}ms`,
                 }}
               />
@@ -202,7 +260,7 @@ export default function DailyBriefingModal({ isOpen, onClose }: DailyBriefingMod
             <CheckSquare size={16} className="text-[#4E82EE] shrink-0" />
             <div className="min-w-0">
               <div className="text-[10px] text-(--text-muted)">Tasks Pending</div>
-              <div className="font-bold text-(--text-primary) truncate">{pendingTasks.length} items</div>
+              <div className="font-bold text-(--text-primary) font-cutive truncate">{pendingTasks.length} items</div>
             </div>
           </div>
 
@@ -210,7 +268,7 @@ export default function DailyBriefingModal({ isOpen, onClose }: DailyBriefingMod
             <Target size={16} className="text-emerald-500 shrink-0" />
             <div className="min-w-0">
               <div className="text-[10px] text-(--text-muted)">Active Goals</div>
-              <div className="font-bold text-(--text-primary) truncate">{activeGoals.length} objectives</div>
+              <div className="font-bold text-(--text-primary) font-cutive truncate">{activeGoals.length} objectives</div>
             </div>
           </div>
         </div>
@@ -221,7 +279,7 @@ export default function DailyBriefingModal({ isOpen, onClose }: DailyBriefingMod
             Generated Voice Transcript
           </span>
           <div className="p-3.5 rounded-xl bg-(--bg-secondary)/30 border border-(--border-subtle) text-xs text-(--text-secondary) leading-relaxed max-h-32 overflow-y-auto custom-scrollbar italic">
-            "{briefingText}"
+            &ldquo;{briefingText}&rdquo;
           </div>
         </div>
       </div>

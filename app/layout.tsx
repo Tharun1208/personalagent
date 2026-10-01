@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Montserrat, JetBrains_Mono, Cormorant_Garamond, Cutive_Mono } from 'next/font/google';
+import { Montserrat, JetBrains_Mono, Cormorant_Garamond, Cutive_Mono, IBM_Plex_Sans } from 'next/font/google';
 import './globals.css';
 import { AppProvider } from '@/lib/context/AppContext';
 
@@ -17,8 +17,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 const cormorantGaramond = Cormorant_Garamond({
   subsets: ['latin'],
-  variable: '--font-cormorant',
   weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-cormorant',
   display: 'swap',
 });
 
@@ -26,6 +26,13 @@ const cutiveMono = Cutive_Mono({
   subsets: ['latin'],
   weight: '400',
   variable: '--font-cutive-mono',
+  display: 'swap',
+});
+
+const ibmPlexSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-ibm-plex-sans',
   display: 'swap',
 });
 
@@ -57,19 +64,19 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${montserrat.variable} ${jetbrainsMono.variable} ${cormorantGaramond.variable} ${cutiveMono.variable}`}
+      className={`${montserrat.variable} ${jetbrainsMono.variable} ${cormorantGaramond.variable} ${cutiveMono.variable} ${ibmPlexSans.variable}`}
       suppressHydrationWarning
     >
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Cutive+Mono&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Cutive+Mono&family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&display=swap" rel="stylesheet" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#0c111d" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className={`${cutiveMono.className} cutive-mono-regular antialiased select-none font-cutive`} suppressHydrationWarning>
+      <body className={`${ibmPlexSans.className} ibm-plex-sans antialiased select-none font-sans`} suppressHydrationWarning>
         <AppProvider>{children}</AppProvider>
       </body>
     </html>

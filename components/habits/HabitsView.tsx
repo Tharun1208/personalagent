@@ -194,7 +194,7 @@ export default function HabitsView() {
       </header>
 
       {/* Main Grid */}
-      <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full space-y-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 max-w-4xl mx-auto w-full space-y-6 custom-scrollbar pb-32 sm:pb-36 md:pb-12">
         {/* Habit Summary Card */}
         <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) flex items-center justify-between shadow-2xs">
           <div>

@@ -224,7 +224,7 @@ export default function DashboardView() {
       </div>
 
       {/* ── Main Executive Command Canvas ── */}
-      <div className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-6 max-w-6xl mx-auto w-full space-y-4 sm:space-y-6 custom-scrollbar pb-28 md:pb-8">
+      <div className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-6 max-w-6xl mx-auto w-full space-y-4 sm:space-y-6 custom-scrollbar pb-32 sm:pb-36 md:pb-12">
 
         {/* ── 1. Executive Intelligence Hero Card ── */}
         <div className="p-4 sm:p-6 rounded-3xl bg-gradient-to-br from-[#4E82EE]/12 via-(--bg-card) to-[#9B72CF]/10 border border-[#4E82EE]/25 shadow-lg shadow-blue-500/5 space-y-3 sm:space-y-4 relative overflow-hidden backdrop-blur-md">

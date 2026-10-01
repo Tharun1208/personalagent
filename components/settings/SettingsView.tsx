@@ -325,7 +325,7 @@ export default function SettingsView() {
       </div>
 
       {/* Main Settings Body */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 flex justify-center custom-scrollbar pb-24 md:pb-8">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 flex justify-center custom-scrollbar pb-32 sm:pb-36 md:pb-12">
         <div className="w-full max-w-2xl space-y-6">
           {/* ───────────────────────────────────────────────────────────── */}
           {/* VIEW 1: Main System Settings List Hub (Like iOS / Android)    */}
@@ -541,37 +541,6 @@ export default function SettingsView() {
                         <div className="text-[10px] text-(--text-muted) truncate">Clean modern bright mode</div>
                       </div>
                     </button>
-                  </div>
-                </div>
-
-                {/* Overall UI Accent Palette */}
-                <div className="space-y-3 pt-2">
-                  <label className="block text-xs font-semibold text-(--text-secondary) uppercase tracking-wider">
-                    UI Accent Color Palette
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                    {[
-                      { id: 'blue', label: 'Electric Blue', color: 'bg-blue-500', hex: '#3B82F6' },
-                      { id: 'emerald', label: 'Emerald Matrix', color: 'bg-emerald-500', hex: '#10B981' },
-                      { id: 'violet', label: 'Cyber Violet', color: 'bg-purple-500', hex: '#8B5CF6' },
-                      { id: 'crimson', label: 'Sunset Crimson', color: 'bg-rose-500', hex: '#F43F5E' },
-                      { id: 'amber', label: 'Gold Amber', color: 'bg-amber-500', hex: '#F59E0B' },
-                      { id: 'teal', label: 'Cyan Flow', color: 'bg-cyan-500', hex: '#06B6D4' },
-                    ].map((accent) => (
-                      <button
-                        key={accent.id}
-                        type="button"
-                        onClick={() => {
-                          showToast(`✓ Accent set to ${accent.label}`, 'success');
-                        }}
-                        className="p-3 rounded-2xl bg-(--bg-elevated) hover:bg-(--bg-elevated)/80 border border-(--border-subtle) hover:border-[#4E82EE]/50 transition-all cursor-pointer flex items-center gap-2.5 group"
-                      >
-                        <span className={`w-4 h-4 rounded-full ${accent.color} ring-2 ring-white/20 shrink-0 group-hover:scale-110 transition-transform`} />
-                        <span className="text-xs font-semibold text-(--text-primary) truncate">
-                          {accent.label}
-                        </span>
-                      </button>
-                    ))}
                   </div>
                 </div>
               </div>

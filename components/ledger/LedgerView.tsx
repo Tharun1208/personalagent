@@ -1254,7 +1254,7 @@ export default function LedgerView() {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-y-auto bg-(--bg-primary) text-(--text-primary)">
-      <div className="max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-32 sm:pb-36 md:pb-12 space-y-6">
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1438,54 +1438,125 @@ export default function LedgerView() {
                   const isGive = entry.type === 'give';
                   const isSettled = entry.status === 'settled';
                   return (
-                    <div key={entry.id} className={`rounded-3xl bg-(--bg-card) border p-5 shadow-xs flex flex-col gap-4 relative overflow-hidden transition-all ${isSettled ? 'border-emerald-500/20 opacity-75' : isGive ? 'border-rose-500/30 hover:border-rose-500/50' : 'border-emerald-500/30 hover:border-emerald-500/50'}`}>
-                      <div className={`absolute top-0 left-0 right-0 h-1 ${isSettled ? 'bg-emerald-500' : isGive ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                    <div
+                      key={entry.id}
+                      className={`rounded-3xl bg-(--bg-card) border p-5 shadow-xs flex flex-col justify-between gap-4 relative overflow-hidden transition-all card-lift animate-fade-in-up ${
+                        isSettled
+                          ? 'border-(--border-subtle) opacity-65 bg-(--bg-card)/60'
+                          : isGive
+                          ? 'border-(--border-subtle) hover:border-rose-500/40 shadow-xs'
+                          : 'border-(--border-subtle) hover:border-emerald-500/40 shadow-xs'
+                      }`}
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 ${isSettled ? 'bg-emerald-500/10 text-emerald-500' : isGive ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                          <div
+                            className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs font-cutive ${
+                              isSettled
+                                ? 'bg-(--bg-elevated) text-(--text-muted)'
+                                : isGive
+                                ? 'bg-gradient-to-tr from-rose-500/20 to-orange-500/20 text-rose-500 border border-rose-500/20'
+                                : 'bg-gradient-to-tr from-emerald-500/20 to-teal-500/20 text-emerald-500 border border-emerald-500/20'
+                            }`}
+                          >
                             {entry.personName.substring(0, 2).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-bold text-base truncate">{entry.personName}</h3>
-                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider ${isSettled ? 'bg-emerald-500/20 text-emerald-600' : isGive ? 'bg-rose-500/15 text-rose-600' : 'bg-emerald-500/15 text-emerald-600'}`}>
+                            <h3 className="app-card-title truncate">{entry.personName}</h3>
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                  isSettled
+                                    ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                                    : isGive
+                                    ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                    : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                }`}
+                              >
                                 {isSettled ? '✓ Settled' : isGive ? 'You Owe' : 'Owed to You'}
                               </span>
+                              {entry.category && (
+                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-(--bg-elevated) text-(--text-muted) capitalize border border-(--border-subtle)">
+                                  {entry.category}
+                                </span>
+                              )}
                             </div>
-                            {entry.category && <span className="text-[11px] text-(--text-muted) capitalize">• {entry.category}</span>}
                           </div>
                         </div>
-                        <div className={`text-xl font-extrabold shrink-0 ${isSettled ? 'text-(--text-muted) line-through' : isGive ? 'text-rose-500' : 'text-emerald-500'}`}>
-                          {isGive ? '-' : '+'}{entry.currency}{entry.amount.toLocaleString()}
+
+                        <div className="text-right shrink-0">
+                          <div
+                            className={`text-xl sm:text-2xl font-black font-cutive ${
+                              isSettled
+                                ? 'text-(--text-muted) line-through'
+                                : isGive
+                                ? 'text-rose-500'
+                                : 'text-emerald-500'
+                            }`}
+                          >
+                            {isGive ? '-' : '+'}{entry.currency}{entry.amount.toLocaleString('en-IN')}
+                          </div>
                         </div>
                       </div>
+
                       {entry.description && (
-                        <p className="text-xs text-(--text-secondary) bg-(--bg-elevated) p-2.5 rounded-xl break-words">{entry.description}</p>
+                        <p className="text-xs text-(--text-secondary) bg-(--bg-elevated) p-3 rounded-2xl break-words leading-relaxed border border-(--border-subtle)/50">
+                          {entry.description}
+                        </p>
                       )}
+
                       <div className="pt-3 border-t border-(--border-subtle) flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <div className="flex items-center gap-1.5 text-(--text-muted)">
-                          {entry.dueDate
-                            ? <><Clock size={12} className="text-[#4E82EE]" /><span>Due: {new Date(entry.dueDate).toLocaleDateString()}</span></>
-                            : <span>Created: {new Date(entry.createdAt).toLocaleDateString()}</span>
-                          }
+                        <div className="flex items-center gap-1.5 text-(--text-muted) text-[11px] font-cutive">
+                          {entry.dueDate ? (
+                            <>
+                              <Clock size={12} className="text-[#4E82EE]" />
+                              <span>Due: {new Date(entry.dueDate).toLocaleDateString()}</span>
+                            </>
+                          ) : (
+                            <span>Created: {new Date(entry.createdAt).toLocaleDateString()}</span>
+                          )}
                         </div>
+
                         <div className="flex items-center gap-1.5">
                           {!isSettled && (
                             <>
-                              <button onClick={() => settleLedgerEntry(entry.id)} className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-[11px] flex items-center gap-1 transition-all cursor-pointer">
-                                <CheckCircle2 size={12} /> Settle
+                              <button
+                                onClick={() => settleLedgerEntry(entry.id)}
+                                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+                              >
+                                <CheckCircle2 size={13} />
+                                <span>Settle</span>
                               </button>
-                              <button onClick={() => handleSetReminderForDue(entry)} className="p-1.5 rounded-lg bg-(--bg-elevated) border border-(--border-subtle) text-(--text-secondary) hover:text-[#4E82EE] transition-all cursor-pointer">
-                                <BellRing size={13} />
+                              <button
+                                onClick={() => handleSetReminderForDue(entry)}
+                                className="p-2 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-[#4E82EE] transition-all cursor-pointer active:scale-95"
+                                title="Set reminder notification"
+                              >
+                                <BellRing size={14} />
                               </button>
-                              <button onClick={() => handleOpenEdit(entry)} className="p-1.5 rounded-lg bg-(--bg-elevated) border border-(--border-subtle) text-(--text-secondary) hover:text-[#4E82EE] transition-all cursor-pointer">
-                                <Edit2 size={13} />
+                              <button
+                                onClick={() => handleOpenEdit(entry)}
+                                className="p-2 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-[#4E82EE] transition-all cursor-pointer active:scale-95"
+                                title="Edit due entry"
+                              >
+                                <Edit2 size={14} />
                               </button>
                             </>
                           )}
-                          <button onClick={() => showConfirm({ title: 'Remove Record', message: `Remove ${entry.personName} (${entry.currency}${entry.amount})?`, confirmText: 'Remove', type: 'danger', onConfirm: () => deleteLedgerEntry(entry.id) })}
-                            className="p-1.5 rounded-lg text-(--text-muted) hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer">
-                            <Trash2 size={13} />
+                          <button
+                            onClick={() =>
+                              showConfirm({
+                                title: 'Remove Record',
+                                message: `Remove ${entry.personName} (${entry.currency}${entry.amount}) from dues ledger?`,
+                                confirmText: 'Remove',
+                                type: 'danger',
+                                onConfirm: () => deleteLedgerEntry(entry.id),
+                              })
+                            }
+                            className="p-2 rounded-xl bg-(--bg-elevated) hover:bg-rose-500/15 border border-(--border-subtle) text-(--text-muted) hover:text-rose-500 transition-all cursor-pointer active:scale-95"
+                            title="Delete entry"
+                          >
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </div>

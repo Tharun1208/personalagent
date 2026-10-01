@@ -696,7 +696,7 @@ export default function CalendarView() {
       </div>
 
       {/* Main Viewport Content */}
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6 custom-scrollbar pb-32 sm:pb-36 md:pb-12">
         {/* ── 1. MONTH VIEW ─────────────────────────────────────── */}
         {viewMode === 'month' && (
           <div className="max-w-6xl mx-auto space-y-2 sm:space-y-3">

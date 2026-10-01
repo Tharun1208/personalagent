@@ -221,7 +221,7 @@ function DynamicTipCalc() {
       </div>
 
       {/* Main Canvas */}
-      <div className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-6 max-w-6xl mx-auto w-full space-y-5 custom-scrollbar pb-24 md:pb-8">
+      <div className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-6 max-w-6xl mx-auto w-full space-y-5 custom-scrollbar pb-32 sm:pb-36 md:pb-12">
         
         {/* Category Selector Pills */}
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">

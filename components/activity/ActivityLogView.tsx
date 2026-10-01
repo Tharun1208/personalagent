@@ -61,7 +61,7 @@ export default function ActivityLogView() {
       </div>
 
       {/* Activity Timeline Container */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 max-w-4xl mx-auto w-full custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-6 py-6 max-w-4xl mx-auto w-full custom-scrollbar pb-32 sm:pb-36 md:pb-12">
         {agentActions.length === 0 ? (
           <div className="py-20 text-center space-y-2">
             <Activity size={32} className="mx-auto text-(--text-muted) opacity-40" />
