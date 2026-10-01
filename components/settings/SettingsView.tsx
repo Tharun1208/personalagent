@@ -14,36 +14,25 @@ import {
   Sparkles,
   ChevronRight,
   ArrowLeft,
-  Lock,
-  Cloud,
   CloudUpload,
   RefreshCw,
   FileJson,
-  User,
-  Volume2,
-  Bell,
-  HardDrive,
-  Info,
-  Layers,
+  Database,
+  Lock,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { apiFetch } from '@/lib/api';
 
 export default function SettingsView() {
   const appCtx = useApp();
-  const { user, updateUser, updateUserPreferences, refreshAll, theme, setTheme, showToast, showConfirm } = appCtx;
+  const { user, updateUser, refreshAll, theme, setTheme, showToast, showConfirm } = appCtx;
 
-  // View routing: 'main' | 'profile' | 'backup' | 'data' | 'voice'
-  const [currentView, setCurrentView] = useState<'main' | 'profile' | 'backup' | 'data' | 'voice'>('main');
+  // View routing: 'main' | 'profile' | 'backup' | 'data'
+  const [currentView, setCurrentView] = useState<'main' | 'profile' | 'backup' | 'data'>('main');
 
   // Backup states
-  const [googleToken, setGoogleToken] = useState<string>('');
   const [lastLocalBackup, setLastLocalBackup] = useState<string>('Today, 2:00 AM');
-  const [lastDriveBackup, setLastDriveBackup] = useState<string>('');
   const [backupSize, setBackupSize] = useState<string>('184 KB');
-  const [googleAccount, setGoogleAccount] = useState<string>(user?.email || 'user@assistance.ai');
-  const [backupFrequency, setBackupFrequency] = useState<string>('daily');
-  const [e2eeEnabled, setE2eeEnabled] = useState<boolean>(true);
   const [isBackingUp, setIsBackingUp] = useState<boolean>(false);
   const [backupProgress, setBackupProgress] = useState<number>(0);
   const [backupStatusText, setBackupStatusText] = useState<string>('');
@@ -54,38 +43,19 @@ export default function SettingsView() {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Voice & Preferences
-  const [voiceAutoRead, setVoiceAutoRead] = useState(user?.preferences?.voiceAutoRead ?? true);
-  const [soundEffects, setSoundEffects] = useState(user?.preferences?.soundEffects ?? true);
-
   useEffect(() => {
     if (user) {
       setName(user.name || '');
-      if (user.preferences) {
-        setVoiceAutoRead(user.preferences.voiceAutoRead ?? true);
-        setSoundEffects(user.preferences.soundEffects ?? true);
-      }
     }
   }, [user]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedLocal = localStorage.getItem('recall_backup_local_time');
-      const storedDrive = localStorage.getItem('recall_backup_drive_time');
       const storedSize = localStorage.getItem('recall_backup_size');
-      const storedAccount = localStorage.getItem('recall_backup_google_account');
-      const storedFreq = localStorage.getItem('recall_backup_freq');
-      const storedE2ee = localStorage.getItem('recall_backup_e2ee');
-      const storedGToken = localStorage.getItem('recall_google_drive_token');
 
       if (storedLocal) setLastLocalBackup(storedLocal);
-      if (storedDrive) setLastDriveBackup(storedDrive);
       if (storedSize) setBackupSize(storedSize);
-      if (storedAccount) setGoogleAccount(storedAccount);
-      else if (user?.email) setGoogleAccount(user.email);
-      if (storedFreq) setBackupFrequency(storedFreq);
-      if (storedE2ee !== null) setE2eeEnabled(storedE2ee === 'true');
-      if (storedGToken) setGoogleToken(storedGToken);
     }
   }, [user]);
 
@@ -95,10 +65,6 @@ export default function SettingsView() {
     setIsSaving(true);
     try {
       await updateUser({ name: name.trim() });
-      await updateUserPreferences({
-        voiceAutoRead,
-        soundEffects,
-      });
       setSavedSuccess(true);
       showToast(`✓ Profile updated successfully!`, 'success');
       setTimeout(() => setSavedSuccess(false), 3000);
@@ -113,11 +79,11 @@ export default function SettingsView() {
 
   const handlePerformBackup = async () => {
     setIsBackingUp(true);
-    setBackupProgress(15);
-    setBackupStatusText('Packaging memories, conversations & tasks...');
+    setBackupProgress(20);
+    setBackupStatusText('Packaging memories, notes, conversations & tasks...');
 
     try {
-      setBackupProgress(40);
+      setBackupProgress(50);
       const res = await apiFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,9 +97,9 @@ export default function SettingsView() {
           ? `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
           : `${Math.max(1, Math.round(sizeBytes / 1024))} KB`;
 
-      setBackupProgress(65);
-      setBackupStatusText(e2eeEnabled ? 'Encrypting snapshot with AES-256...' : 'Compressing snapshot archive...');
-      await new Promise((r) => setTimeout(r, 400));
+      setBackupProgress(85);
+      setBackupStatusText('Encrypting local snapshot...');
+      await new Promise((r) => setTimeout(r, 350));
 
       const now = new Date();
       const timeStr = `Today, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
@@ -145,44 +111,15 @@ export default function SettingsView() {
       setLastLocalBackup(timeStr);
       setBackupSize(formattedSize);
 
-      // If user supplied a Google Drive OAuth token, push to Google Drive API
-      if (googleToken.trim()) {
-        setBackupProgress(85);
-        setBackupStatusText('Uploading to Google Drive (appDataFolder)...');
-        try {
-          const syncRes = await fetch('/api/google/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'drive_backup', googleToken: googleToken.trim() }),
-          });
-          const syncData = await syncRes.json();
-          if (syncData.success) {
-            localStorage.setItem('recall_backup_drive_time', timeStr);
-            setLastDriveBackup(timeStr);
-            setBackupProgress(100);
-            setBackupStatusText('Google Drive & Local Vault backup completed!');
-            showToast(`✓ Backup uploaded to Google Drive & Local Storage (${formattedSize})`, 'success');
-          } else {
-            setBackupProgress(100);
-            setBackupStatusText('Local Vault saved (Google Drive sync failed)');
-            showToast(`✓ Local snapshot saved (${formattedSize}). Google Drive: ${syncData.error || 'Check token'}`, 'warning');
-          }
-        } catch {
-          setBackupProgress(100);
-          setBackupStatusText('Local Vault saved');
-          showToast(`✓ Local snapshot saved (${formattedSize})`, 'info');
-        }
-      } else {
-        setBackupProgress(100);
-        setBackupStatusText('Local Device Vault snapshot saved!');
-        showToast(`✓ Local Vault Snapshot created (${formattedSize})`, 'success');
-      }
+      setBackupProgress(100);
+      setBackupStatusText('Backup completed successfully!');
+      showToast(`✓ Personal backup snapshot saved (${formattedSize})`, 'success');
 
       setTimeout(() => {
         setIsBackingUp(false);
         setBackupProgress(0);
         setBackupStatusText('');
-      }, 1200);
+      }, 1000);
     } catch (err) {
       console.error('Backup failed', err);
       setIsBackingUp(false);
@@ -190,10 +127,10 @@ export default function SettingsView() {
     }
   };
 
-  const handleRestoreFromDrive = async () => {
+  const handleRestoreFromSnapshot = async () => {
     showConfirm({
       title: 'Restore from Vault Snapshot',
-      message: `Restore your memories, conversations, tasks, and ledger from your latest snapshot (${lastLocalBackup || 'Recent'})?`,
+      message: `Restore your memories, notes, conversations, and tasks from your latest snapshot (${lastLocalBackup || 'Recent'})?`,
       confirmText: 'Restore Now',
       cancelText: 'Cancel',
       type: 'warning',
@@ -202,7 +139,7 @@ export default function SettingsView() {
         try {
           const snapshot = localStorage.getItem('recall_cloud_backup_snapshot');
           if (!snapshot) {
-            showToast('No vault snapshot found. Please create a backup first.', 'error');
+            showToast('No backup snapshot found. Please create a backup first.', 'error');
             setIsRestoring(false);
             return;
           }
@@ -269,10 +206,10 @@ export default function SettingsView() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `assistance_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `personal_assistant_backup_${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('✓ Exported backup file successfully', 'success');
+      showToast('✓ Backup file downloaded (.json)', 'success');
     } catch (err) {
       console.error('Export failed', err);
       showToast('Failed to export data', 'error');
@@ -325,16 +262,14 @@ export default function SettingsView() {
             <h1 className="text-base sm:text-lg font-bold tracking-tight text-(--text-primary) truncate">
               {currentView === 'main' && 'System Settings'}
               {currentView === 'profile' && 'Profile & Appearance'}
-              {currentView === 'voice' && 'AI Voice & Audio'}
+              {currentView === 'backup' && 'Personal Backup & Restore'}
               {currentView === 'data' && 'Data & Privacy'}
-              {currentView === 'backup' && 'Chat & Vault Backup'}
             </h1>
             <p className="text-xs text-(--text-secondary) truncate font-medium">
-              {currentView === 'main' && 'Personal preferences, themes, sync, and storage vault'}
+              {currentView === 'main' && 'Personal preferences, themes, backup and storage'}
               {currentView === 'profile' && 'Manage your personal identity, display name, and color theme'}
-              {currentView === 'voice' && 'Configure AI voice responses and sound alerts'}
-              {currentView === 'data' && 'Manage local data backups and privacy storage'}
-              {currentView === 'backup' && 'Encrypted device vault & cloud backup sync'}
+              {currentView === 'backup' && 'Simple 1-click personal backup and recovery'}
+              {currentView === 'data' && 'Manage local data export and privacy reset'}
             </p>
           </div>
         </div>
@@ -371,10 +306,10 @@ export default function SettingsView() {
                   </div>
                   <div className="min-w-0">
                     <h2 className="text-base font-bold text-(--text-primary) truncate group-hover:text-[#4E82EE] transition-colors">
-                      {user?.name || 'User Profile'}
+                      {user?.name || 'Personal Account'}
                     </h2>
-                    <p className="text-xs text-(--text-secondary) truncate mt-0.5 font-medium">
-                      {user?.email || 'user@assistance.ai'} · Theme: {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+                    <p className="text-xs text-(--text-secondary) font-medium truncate mt-0.5">
+                      Personal Assistant · Theme: {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
                     </p>
                   </div>
                 </div>
@@ -392,8 +327,7 @@ export default function SettingsView() {
                 <div className="text-xs font-bold uppercase tracking-wider text-(--text-secondary) px-2">
                   Preferences & Interface
                 </div>
-                <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) divide-y divide-(--border-subtle) overflow-hidden shadow-xs">
-                  
+                <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) overflow-hidden shadow-xs">
                   {/* Item 1: Profile & Appearance */}
                   <div
                     onClick={() => setCurrentView('profile')}
@@ -414,55 +348,34 @@ export default function SettingsView() {
                     </div>
                     <ChevronRight size={17} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
                   </div>
-
-                  {/* Item 2: Audio & Voice */}
-                  <div
-                    onClick={() => setCurrentView('voice')}
-                    className="p-4 hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center justify-between group"
-                  >
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/20">
-                        <Volume2 size={18} />
-                      </div>
-                      <div>
-                        <div className="text-sm font-bold text-(--text-primary)">
-                          AI Voice & Sounds
-                        </div>
-                        <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
-                          Speech synthesis autoplay, alarm tones, and sound alerts
-                        </div>
-                      </div>
-                    </div>
-                    <ChevronRight size={17} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
-                  </div>
                 </div>
               </div>
 
               {/* Group 2: System & Storage */}
               <div className="space-y-2.5">
                 <div className="text-xs font-bold uppercase tracking-wider text-(--text-secondary) px-2">
-                  System & Storage Vault
+                  Backup & Storage
                 </div>
                 <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) divide-y divide-(--border-subtle) overflow-hidden shadow-xs">
                   
-                  {/* Item: Chat & Cloud Backup */}
+                  {/* Item: Backup & Restore */}
                   <div
                     onClick={() => setCurrentView('backup')}
                     className="p-4 hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center justify-between group"
                   >
                     <div className="flex items-center gap-3.5">
                       <div className="w-10 h-10 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-500/20">
-                        <Cloud size={18} />
+                        <Database size={18} />
                       </div>
                       <div>
                         <div className="font-bold text-sm text-(--text-primary) flex items-center gap-2">
-                          <span>Chat & Vault Backup</span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                            {googleToken ? 'Drive + Local' : 'Local Vault (Free)'}
+                          <span>Personal Backup & Restore</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-600 dark:text-teal-400">
+                            1-Click
                           </span>
                         </div>
                         <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
-                          {lastLocalBackup ? `Last snapshot: ${lastLocalBackup}` : 'Encrypted vault backup & recovery'}
+                          {lastLocalBackup ? `Last backup: ${lastLocalBackup}` : 'Save local snapshot and export files'}
                         </div>
                       </div>
                     </div>
@@ -483,7 +396,7 @@ export default function SettingsView() {
                           Data & Local Privacy
                         </div>
                         <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
-                          Download portable JSON data, wipe local database
+                          Download portable JSON data, reset local storage
                         </div>
                       </div>
                     </div>
@@ -501,7 +414,7 @@ export default function SettingsView() {
                           Assistance Personal AI OS
                         </div>
                         <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
-                          Next.js 15 · Offline-First Engine · AES-256 Vault
+                          Offline-Ready · Encrypted Vault · Personal Edition
                         </div>
                       </div>
                     </div>
@@ -526,7 +439,7 @@ export default function SettingsView() {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-(--text-primary)">
-                      {user?.name || 'User Profile'}
+                      {user?.name || 'Personal Account'}
                     </h3>
                     <p className="text-xs text-(--text-secondary) font-medium mt-0.5">
                       Personal display name & interface theme
@@ -614,176 +527,71 @@ export default function SettingsView() {
           )}
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 3: AI Voice & Sound Preferences                         */}
-          {/* ───────────────────────────────────────────────────────────── */}
-          {currentView === 'voice' && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-5">
-                <div className="flex items-center gap-3.5 pb-4 border-b border-(--border-subtle)">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20">
-                    <Volume2 size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-(--text-primary)">
-                      AI Voice & Sound Settings
-                    </h3>
-                    <p className="text-xs text-(--text-secondary) font-medium mt-0.5">
-                      Configure live speech synthesis and audio notification tones
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {/* Voice Autoread toggle */}
-                  <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center justify-between gap-4">
-                    <div>
-                      <div className="font-bold text-xs sm:text-sm text-(--text-primary)">
-                        Voice Auto-Read Responses
-                      </div>
-                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
-                        Automatically read assistant answers aloud using Web Speech Synthesis
-                      </div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                      <input
-                        type="checkbox"
-                        checked={voiceAutoRead}
-                        onChange={async (e) => {
-                          const val = e.target.checked;
-                          setVoiceAutoRead(val);
-                          await updateUserPreferences({ voiceAutoRead: val });
-                          showToast(val ? '✓ Voice Auto-Read enabled' : 'Voice Auto-Read disabled', 'info');
-                        }}
-                        className="sr-only peer"
-                      />
-                      <div className="w-10 h-6 bg-gray-300 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#4E82EE] dark:bg-gray-700" />
-                    </label>
-                  </div>
-
-                  {/* Sound Effects toggle */}
-                  <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center justify-between gap-4">
-                    <div>
-                      <div className="font-bold text-xs sm:text-sm text-(--text-primary)">
-                        Interface & Timer Sound Alerts
-                      </div>
-                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
-                        Play chime audio when focus timer expires or alarms trigger
-                      </div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                      <input
-                        type="checkbox"
-                        checked={soundEffects}
-                        onChange={async (e) => {
-                          const val = e.target.checked;
-                          setSoundEffects(val);
-                          await updateUserPreferences({ soundEffects: val });
-                          showToast(val ? '✓ Sound effects enabled' : 'Sound effects disabled', 'info');
-                        }}
-                        className="sr-only peer"
-                      />
-                      <div className="w-10 h-6 bg-gray-300 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#4E82EE] dark:bg-gray-700" />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Back button */}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => setCurrentView('main')}
-                  className="px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
-                >
-                  Back to Settings
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 4: Chat & Cloud Backup Sub-Page                         */}
+          {/* VIEW 3: Simple Personal Backup & Restore Sub-Page             */}
           {/* ───────────────────────────────────────────────────────────── */}
           {currentView === 'backup' && (
             <div className="space-y-6 animate-in fade-in duration-200">
               
-              {/* Informative Header Banner with Clean Contrast */}
-              <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) space-y-3 shadow-xs">
-                <div className="font-bold text-sm flex items-center gap-2.5 text-(--text-primary)">
-                  <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-500/20">
-                    <Cloud size={17} />
-                  </div>
-                  <span>How Backup & Recovery Works</span>
-                </div>
-                <ul className="list-disc pl-5 space-y-2 text-xs leading-relaxed text-(--text-secondary)">
-                  <li>
-                    <strong className="text-(--text-primary) font-bold">Local Device Vault (100% Free & Offline):</strong> Your data is stored securely in your device browser and memory without requiring external API keys. You can also export portable <code className="px-1.5 py-0.5 rounded-md bg-(--bg-elevated) font-mono text-[11px] text-(--text-primary) border border-(--border-subtle)">.json</code> files anytime.
-                  </li>
-                  <li>
-                    <strong className="text-(--text-primary) font-bold">Google Drive Cloud Sync (Optional):</strong> Automatically encrypt and sync your backup snapshots to your private Google Drive account by saving your Google OAuth token below.
-                  </li>
-                </ul>
-              </div>
-
-              {/* Backup Status Metrics Card */}
-              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-4 shadow-xs">
+              {/* Clean Status & Backup Card */}
+              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-5 shadow-xs">
                 <div className="flex items-center justify-between pb-3 border-b border-(--border-subtle)">
-                  <div className="text-xs font-bold uppercase tracking-wider text-(--text-secondary)">
-                    Backup Status
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>{googleToken ? 'Drive + Local Ready' : 'Local Vault Active'}</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle)">
-                    <div className="text-(--text-secondary) text-xs font-semibold">Local Device Snapshot:</div>
-                    <div className="font-bold text-sm text-(--text-primary) mt-1">{lastLocalBackup || 'Today, 2:00 AM'}</div>
-                  </div>
-                  <div className="p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle)">
-                    <div className="text-(--text-secondary) text-xs font-semibold">Google Drive Cloud:</div>
-                    <div className="font-bold text-sm text-(--text-primary) mt-1">
-                      {lastDriveBackup ? lastDriveBackup : (googleToken ? 'Ready to sync' : 'Offline / Optional')}
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-500/20">
+                      <Database size={16} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-(--text-primary)">Personal Backup Status</h3>
+                      <p className="text-[11px] text-(--text-secondary) font-medium">All tasks, notes, habits, and memories</p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Active</span>
+                  </div>
+                </div>
+
+                {/* Metrics */}
+                <div className="grid grid-cols-2 gap-3">
                   <div className="p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle)">
-                    <div className="text-(--text-secondary) text-xs font-semibold">Vault Archive Size:</div>
+                    <div className="text-(--text-secondary) text-xs font-semibold">Last Backup Time</div>
+                    <div className="font-bold text-sm text-(--text-primary) mt-1">{lastLocalBackup || 'Never'}</div>
+                  </div>
+                  <div className="p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle)">
+                    <div className="text-(--text-secondary) text-xs font-semibold">Archive Size</div>
                     <div className="font-bold text-sm text-(--text-primary) mt-1">{backupSize}</div>
                   </div>
                 </div>
 
-                {/* Big BACK UP NOW button */}
-                <div className="pt-2">
+                {/* Main 1-Click Back Up Button */}
+                <div>
                   <button
                     type="button"
                     disabled={isBackingUp}
                     onClick={handlePerformBackup}
                     className={`w-full py-3.5 px-4 rounded-2xl font-bold text-sm text-white transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
                       isBackingUp
-                        ? 'bg-emerald-600/70 cursor-not-allowed'
-                        : 'bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] shadow-emerald-600/25'
+                        ? 'bg-teal-600/70 cursor-not-allowed'
+                        : 'bg-teal-600 hover:bg-teal-500 active:scale-[0.99] shadow-teal-600/25'
                     }`}
                   >
                     {isBackingUp ? (
                       <>
                         <RefreshCw size={17} className="animate-spin" />
-                        <span>{backupStatusText || 'Backing up vault...'}</span>
+                        <span>{backupStatusText || 'Saving snapshot...'}</span>
                       </>
                     ) : (
                       <>
                         <CloudUpload size={18} />
-                        <span>BACK UP NOW</span>
+                        <span>BACK UP DATA NOW</span>
                       </>
                     )}
                   </button>
 
                   {isBackingUp && (
                     <div className="mt-3 space-y-1.5 animate-in fade-in">
-                      <div className="w-full bg-(--bg-elevated) h-2.5 rounded-full overflow-hidden border border-(--border-subtle)">
+                      <div className="w-full bg-(--bg-elevated) h-2 rounded-full overflow-hidden border border-(--border-subtle)">
                         <div
-                          className="bg-emerald-500 h-full transition-all duration-300 rounded-full"
+                          className="bg-teal-500 h-full transition-all duration-300 rounded-full"
                           style={{ width: `${backupProgress}%` }}
                         />
                       </div>
@@ -796,162 +604,48 @@ export default function SettingsView() {
                 </div>
               </div>
 
-              {/* Storage & Security Settings */}
+              {/* Quick Actions & Recovery */}
               <div className="space-y-3">
                 <div className="text-xs font-bold uppercase tracking-wider text-(--text-secondary) px-2">
-                  Storage & Security Settings
-                </div>
-
-                <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) divide-y divide-(--border-subtle) shadow-xs overflow-hidden">
-                  
-                  {/* Account Name */}
-                  <div className="p-4 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-bold text-sm text-(--text-primary)">Vault Owner Account</div>
-                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">{googleAccount || 'user@assistance.ai'}</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newAcc = prompt('Enter your account email:', googleAccount);
-                        if (newAcc && newAcc.trim()) {
-                          setGoogleAccount(newAcc.trim());
-                          localStorage.setItem('recall_backup_google_account', newAcc.trim());
-                          showToast(`✓ Account updated to ${newAcc.trim()}`, 'success');
-                        }
-                      }}
-                      className="px-3.5 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:border-[#4E82EE] text-xs font-bold text-(--text-primary) transition-all cursor-pointer"
-                    >
-                      Change Account
-                    </button>
-                  </div>
-
-                  {/* Optional Google Drive OAuth Token */}
-                  <div className="p-4 space-y-2.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="font-bold text-sm text-(--text-primary) flex items-center gap-1.5">
-                          <Cloud size={15} className="text-teal-500" />
-                          <span>Google Drive OAuth Token (Optional)</span>
-                        </div>
-                        <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
-                          Leave empty to use 100% offline local device vault
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="password"
-                        value={googleToken}
-                        onChange={(e) => setGoogleToken(e.target.value)}
-                        placeholder="Optional Google OAuth Access Token (Bearer ya29...)"
-                        className="flex-1 px-3.5 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-mono text-(--text-primary) placeholder:text-(--text-muted) focus:outline-hidden focus:border-teal-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          localStorage.setItem('recall_google_drive_token', googleToken.trim());
-                          showToast(googleToken.trim() ? '✓ Google Drive Token saved!' : 'Switched to Local Vault Mode', 'info');
-                        }}
-                        className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-colors cursor-pointer shrink-0"
-                      >
-                        Save
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Auto-Backup Frequency */}
-                  <div className="p-4 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-bold text-sm text-(--text-primary)">Auto-Backup Schedule</div>
-                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">Automatic background snapshot interval</div>
-                    </div>
-                    <select
-                      value={backupFrequency}
-                      onChange={(e) => {
-                        setBackupFrequency(e.target.value);
-                        localStorage.setItem('recall_backup_freq', e.target.value);
-                        showToast(`✓ Backup frequency: ${e.target.value}`, 'info');
-                      }}
-                      className="px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-bold text-(--text-primary) cursor-pointer focus:outline-hidden"
-                    >
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="manual">Only when I tap "Back up"</option>
-                      <option value="never">Never</option>
-                    </select>
-                  </div>
-
-                  {/* End-to-end encryption */}
-                  <div className="p-4 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-bold text-sm text-(--text-primary) flex items-center gap-1.5">
-                        <Lock size={14} className="text-emerald-500" />
-                        <span>End-to-End Encryption (AES-256)</span>
-                      </div>
-                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
-                        Protects your memories, ledger & chats with strong encryption
-                      </div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                      <input
-                        type="checkbox"
-                        checked={e2eeEnabled}
-                        onChange={(e) => {
-                          setE2eeEnabled(e.target.checked);
-                          localStorage.setItem('recall_backup_e2ee', String(e.target.checked));
-                          showToast(e.target.checked ? '✓ AES-256 encryption enabled' : 'Encryption disabled', 'info');
-                        }}
-                        className="sr-only peer"
-                      />
-                      <div className="w-10 h-6 bg-gray-300 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 dark:bg-gray-700" />
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Disaster Recovery & Restore */}
-              <div className="space-y-3">
-                <div className="text-xs font-bold uppercase tracking-wider text-(--text-secondary) px-2">
-                  Restore & Disaster Recovery
+                  Backup Files & Recovery
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Export file */}
                   <div className="p-4 sm:p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) flex flex-col justify-between gap-3 shadow-xs">
                     <div>
                       <div className="font-bold text-sm text-(--text-primary) flex items-center gap-1.5">
-                        <RefreshCw size={15} className="text-[#4E82EE]" />
-                        <span>Restore Vault Snapshot</span>
+                        <Download size={15} className="text-[#4E82EE]" />
+                        <span>Download Backup File</span>
                       </div>
                       <div className="text-xs text-(--text-secondary) font-medium mt-1">
-                        Restore from your latest snapshot ({lastLocalBackup || 'Available'})
+                        Export all your data into a portable <code className="font-mono text-[11px] text-(--text-primary)">.json</code> file.
                       </div>
                     </div>
                     <button
                       type="button"
-                      disabled={isRestoring}
-                      onClick={handleRestoreFromDrive}
-                      className="w-full py-2.5 px-3 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:border-[#4E82EE] text-xs font-bold text-(--text-primary) transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      onClick={handleExportData}
+                      className="w-full py-2.5 px-3 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:border-[#4E82EE] text-xs font-bold text-(--text-primary) transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      {isRestoring ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                      <span>Restore Snapshot</span>
+                      <Download size={14} />
+                      <span>Download .JSON</span>
                     </button>
                   </div>
 
+                  {/* Restore from file */}
                   <div className="p-4 sm:p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) flex flex-col justify-between gap-3 shadow-xs">
                     <div>
                       <div className="font-bold text-sm text-(--text-primary) flex items-center gap-1.5">
                         <FileJson size={15} className="text-amber-500" />
-                        <span>Restore from JSON File</span>
+                        <span>Restore from File</span>
                       </div>
                       <div className="text-xs text-(--text-secondary) font-medium mt-1">
-                        Import an exported JSON backup file from disk
+                        Upload a previously saved <code className="font-mono text-[11px] text-(--text-primary)">.json</code> backup file.
                       </div>
                     </div>
                     <label className="w-full py-2.5 px-3 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:border-amber-500 text-xs font-bold text-(--text-primary) transition-all flex items-center justify-center gap-1.5 cursor-pointer">
                       <Upload size={14} />
-                      <span>Select Backup File</span>
+                      <span>Choose .JSON File</span>
                       <input
                         type="file"
                         accept=".json"
@@ -962,18 +656,22 @@ export default function SettingsView() {
                   </div>
                 </div>
 
+                {/* Restore latest snapshot */}
                 <div className="p-4 rounded-2xl bg-(--bg-card) border border-(--border-subtle) flex items-center justify-between gap-3 text-xs shadow-xs">
                   <div>
-                    <div className="font-bold text-sm text-(--text-primary)">Export Portable JSON Backup</div>
-                    <div className="text-xs text-(--text-secondary) font-medium mt-0.5">Download a full offline copy of all your memories, tasks, and data</div>
+                    <div className="font-bold text-sm text-(--text-primary)">Restore Latest Snapshot</div>
+                    <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
+                      Roll back to your stored snapshot ({lastLocalBackup || 'Recent'})
+                    </div>
                   </div>
                   <button
                     type="button"
-                    onClick={handleExportData}
-                    className="px-4 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:border-[#4E82EE] text-xs font-bold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+                    disabled={isRestoring}
+                    onClick={handleRestoreFromSnapshot}
+                    className="px-4 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:border-[#4E82EE] text-xs font-bold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-50"
                   >
-                    <Download size={14} />
-                    <span>Download .JSON</span>
+                    {isRestoring ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                    <span>Restore</span>
                   </button>
                 </div>
               </div>
@@ -992,7 +690,7 @@ export default function SettingsView() {
           )}
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 5: Data & Local Privacy Sub-Page                         */}
+          {/* VIEW 4: Data & Local Privacy Sub-Page                         */}
           {/* ───────────────────────────────────────────────────────────── */}
           {currentView === 'data' && (
             <div className="space-y-6 animate-in fade-in duration-200">
@@ -1015,7 +713,7 @@ export default function SettingsView() {
                   <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center justify-between gap-3">
                     <div>
                       <div className="font-bold text-sm text-(--text-primary)">Export All Data (.json)</div>
-                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">Save a local copy of all memories, tasks, and goals</div>
+                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">Save a local copy of all memories, tasks, and notes</div>
                     </div>
                     <button
                       type="button"
