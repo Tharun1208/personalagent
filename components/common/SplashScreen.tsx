@@ -33,8 +33,6 @@ export default function SplashScreen({
     };
   }, [durationMs, onFinish]);
 
-  if (phase === 'done') return null;
-
   return (
     <AnimatePresence>
       {phase !== 'done' && (
