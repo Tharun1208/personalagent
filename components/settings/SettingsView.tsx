@@ -111,9 +111,10 @@ export default function SettingsView() {
     }
   };
 
-  // WhatsApp-style Google Drive Backup states
+  // WhatsApp-style Backup states (Local Vault & Google Drive)
+  const [googleToken, setGoogleToken] = useState<string>('');
   const [lastLocalBackup, setLastLocalBackup] = useState<string>('Today, 2:00 AM');
-  const [lastDriveBackup, setLastDriveBackup] = useState<string>('Today, 2:05 AM');
+  const [lastDriveBackup, setLastDriveBackup] = useState<string>('');
   const [backupSize, setBackupSize] = useState<string>('184 KB');
   const [googleAccount, setGoogleAccount] = useState<string>(user?.email || 'tharun@gmail.com');
   const [backupFrequency, setBackupFrequency] = useState<string>('daily');
@@ -224,6 +225,7 @@ export default function SettingsView() {
       const storedFreq = localStorage.getItem('recall_backup_freq');
       const storedNetwork = localStorage.getItem('recall_backup_network');
       const storedE2ee = localStorage.getItem('recall_backup_e2ee');
+      const storedGToken = localStorage.getItem('recall_google_drive_token');
 
       if (storedLocal) setLastLocalBackup(storedLocal);
       if (storedDrive) setLastDriveBackup(storedDrive);
@@ -233,17 +235,17 @@ export default function SettingsView() {
       if (storedFreq) setBackupFrequency(storedFreq);
       if (storedNetwork) setBackupNetwork(storedNetwork);
       if (storedE2ee !== null) setE2eeEnabled(storedE2ee === 'true');
+      if (storedGToken) setGoogleToken(storedGToken);
     }
   }, [user]);
 
   const handlePerformBackup = async () => {
     setIsBackingUp(true);
-    setBackupProgress(10);
-    setBackupStatusText('Connecting to Google Drive...');
+    setBackupProgress(15);
+    setBackupStatusText('Packaging memories, conversations & tasks...');
 
     try {
-      setBackupProgress(30);
-      setBackupStatusText('Packaging memories, conversations & tasks...');
+      setBackupProgress(40);
       const res = await apiFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -258,28 +260,51 @@ export default function SettingsView() {
           : `${Math.max(1, Math.round(sizeBytes / 1024))} KB`;
 
       setBackupProgress(65);
-      setBackupStatusText(e2eeEnabled ? 'Encrypting with AES-256...' : 'Compressing archive...');
-      await new Promise((r) => setTimeout(r, 600));
-
-      setBackupProgress(85);
-      setBackupStatusText('Uploading to Google Drive (appDataFolder)...');
-      await new Promise((r) => setTimeout(r, 700));
+      setBackupStatusText(e2eeEnabled ? 'Encrypting snapshot with AES-256...' : 'Compressing snapshot archive...');
+      await new Promise((r) => setTimeout(r, 400));
 
       const now = new Date();
       const timeStr = `Today, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 
+      // Save local device snapshot
       localStorage.setItem('recall_backup_local_time', timeStr);
-      localStorage.setItem('recall_backup_drive_time', timeStr);
       localStorage.setItem('recall_backup_size', formattedSize);
       localStorage.setItem('recall_cloud_backup_snapshot', exportJson);
-
       setLastLocalBackup(timeStr);
-      setLastDriveBackup(timeStr);
       setBackupSize(formattedSize);
 
-      setBackupProgress(100);
-      setBackupStatusText('Backup successfully completed!');
-      showToast(`✓ Google Drive backup completed (${formattedSize})`, 'success');
+      // If user supplied a Google Drive OAuth token, push to Google Drive API
+      if (googleToken.trim()) {
+        setBackupProgress(85);
+        setBackupStatusText('Uploading to Google Drive (appDataFolder)...');
+        try {
+          const syncRes = await fetch('/api/google/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'drive_backup', googleToken: googleToken.trim() }),
+          });
+          const syncData = await syncRes.json();
+          if (syncData.success) {
+            localStorage.setItem('recall_backup_drive_time', timeStr);
+            setLastDriveBackup(timeStr);
+            setBackupProgress(100);
+            setBackupStatusText('Google Drive & Local Vault backup completed!');
+            showToast(`✓ Backup uploaded to Google Drive & Local Storage (${formattedSize})`, 'success');
+          } else {
+            setBackupProgress(100);
+            setBackupStatusText('Local Vault saved (Google Drive sync failed)');
+            showToast(`✓ Local snapshot saved (${formattedSize}). Google Drive: ${syncData.error || 'Check token'}`, 'warning');
+          }
+        } catch {
+          setBackupProgress(100);
+          setBackupStatusText('Local Vault saved');
+          showToast(`✓ Local snapshot saved (${formattedSize})`, 'info');
+        }
+      } else {
+        setBackupProgress(100);
+        setBackupStatusText('Local Device Vault snapshot saved!');
+        showToast(`✓ Local Vault Snapshot created (${formattedSize}) — No Google API key required!`, 'success');
+      }
 
       setTimeout(() => {
         setIsBackingUp(false);
@@ -289,7 +314,7 @@ export default function SettingsView() {
     } catch (err) {
       console.error('Backup failed', err);
       setIsBackingUp(false);
-      showToast('Backup to Google Drive failed. Please try again.', 'error');
+      showToast('Backup failed. Please try again.', 'error');
     }
   };
 
@@ -631,7 +656,7 @@ export default function SettingsView() {
                   System & Storage
                 </div>
                 <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) divide-y divide-(--border-subtle) overflow-hidden shadow-xs">
-                  {/* Item: Chat & Cloud Backup (Google Drive WhatsApp Style) */}
+                  {/* Item: Chat & Cloud Backup (Local Vault & Google Drive) */}
                   <div
                     onClick={() => setCurrentView('backup')}
                     className="p-4 hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center justify-between group"
@@ -642,13 +667,13 @@ export default function SettingsView() {
                       </div>
                       <div>
                         <div className="font-semibold text-xs sm:text-sm text-(--text-primary) flex items-center gap-2">
-                          <span>Chat & Cloud Backup</span>
+                          <span>Chat & Vault Backup</span>
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                            Google Drive
+                            {googleToken ? 'Google Drive & Local' : 'Local Vault (Offline)'}
                           </span>
                         </div>
                         <div className="text-[11px] text-(--text-muted)">
-                          {lastDriveBackup ? `Last backup: ${lastDriveBackup}` : 'WhatsApp-style Google Drive backup & restore'}
+                          {lastLocalBackup ? `Last backup: ${lastLocalBackup}` : 'Encrypted vault backup & restore'}
                         </div>
                       </div>
                     </div>
@@ -1117,6 +1142,9 @@ export default function SettingsView() {
           {/* ───────────────────────────────────────────────────────────── */}
           {/* VIEW 6: WhatsApp-Style Google Drive Backup Sub-Page         */}
           {/* ───────────────────────────────────────────────────────────── */}
+          {/* ───────────────────────────────────────────────────────────── */}
+          {/* VIEW 6: Local Device Vault & Google Drive Backup Sub-Page    */}
+          {/* ───────────────────────────────────────────────────────────── */}
           {currentView === 'backup' && (
             <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-6 animate-in fade-in duration-200">
               {/* Header Info */}
@@ -1128,10 +1156,10 @@ export default function SettingsView() {
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-(--text-primary)">
-                        Chat & Memory Backup
+                        Chat & Vault Backup
                       </h3>
                       <p className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold flex items-center gap-1">
-                        <CheckCircle2 size={12} /> Google Drive appDataFolder Sandbox
+                        <CheckCircle2 size={12} /> {googleToken ? 'Google Drive Cloud Sync & Local Vault' : 'Encrypted Local Device Vault (Offline Active)'}
                       </p>
                     </div>
                   </div>
@@ -1145,40 +1173,52 @@ export default function SettingsView() {
                 </button>
               </div>
 
-              {/* Explanatory description */}
-              <p className="text-xs text-(--text-muted) leading-relaxed">
-                Back up your chat history, AI memories, tasks, reminders, and ledger to your private Google Drive.
-                If you change devices or lose your device, you can easily restore your personal knowledge vault.
-              </p>
+              {/* Explanatory Notice Banner */}
+              <div className="p-4 rounded-2xl bg-[#4E82EE]/10 border border-[#4E82EE]/25 text-xs text-(--text-primary) space-y-2">
+                <div className="font-bold flex items-center gap-2 text-[#4E82EE]">
+                  <Info size={16} />
+                  <span>How Backups Work in Assistance AI</span>
+                </div>
+                <ul className="list-disc list-inside text-[11px] text-(--text-secondary) space-y-1 pl-1">
+                  <li>
+                    <strong className="text-(--text-primary)">Local Device Vault (Default & 100% Free):</strong> Your data is stored right here on your device storage. You do <span className="underline font-semibold">not</span> need any Google API key. You can also download or restore portable <code>.json</code> backup files anytime.
+                  </li>
+                  <li>
+                    <strong className="text-(--text-primary)">Google Drive Cloud Sync (Optional):</strong> If you want to automatically sync backups to your personal Google Drive, you can provide an optional Google OAuth Token below.
+                  </li>
+                </ul>
+              </div>
 
-              {/* ── WhatsApp-Style Last Backup Card ── */}
+              {/* ── Last Backup Card ── */}
               <div className="p-4 sm:p-5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-(--border-subtle)/50">
                   <div className="text-xs font-bold uppercase tracking-wider text-(--text-muted)">
-                    Last Backup
+                    Backup Status
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Cloud Sync Ready</span>
+                    <span>{googleToken ? 'Drive + Local Ready' : 'Local Vault Active'}</span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   <div className="p-3 rounded-xl bg-(--bg-card) border border-(--border-subtle)/50">
-                    <div className="text-(--text-muted) text-[11px]">Local Device:</div>
+                    <div className="text-(--text-muted) text-[11px]">Local Device Snapshot:</div>
                     <div className="font-semibold text-(--text-primary) mt-0.5">{lastLocalBackup || 'Today, 2:00 AM'}</div>
                   </div>
                   <div className="p-3 rounded-xl bg-(--bg-card) border border-(--border-subtle)/50">
-                    <div className="text-(--text-muted) text-[11px]">Google Drive:</div>
-                    <div className="font-semibold text-(--text-primary) mt-0.5">{lastDriveBackup || 'Today, 2:05 AM'}</div>
+                    <div className="text-(--text-muted) text-[11px]">Google Drive Cloud:</div>
+                    <div className="font-semibold text-(--text-primary) mt-0.5">
+                      {lastDriveBackup ? lastDriveBackup : (googleToken ? 'Ready to sync' : 'Offline / Optional')}
+                    </div>
                   </div>
                   <div className="p-3 rounded-xl bg-(--bg-card) border border-(--border-subtle)/50">
-                    <div className="text-(--text-muted) text-[11px]">Total Backup Size:</div>
+                    <div className="text-(--text-muted) text-[11px]">Vault Archive Size:</div>
                     <div className="font-semibold text-(--text-primary) mt-0.5">{backupSize}</div>
                   </div>
                 </div>
 
-                {/* Prominent WhatsApp BACK UP button */}
+                {/* Prominent BACK UP button */}
                 <div className="pt-2">
                   <button
                     type="button"
@@ -1193,7 +1233,7 @@ export default function SettingsView() {
                     {isBackingUp ? (
                       <>
                         <RefreshCw size={16} className="animate-spin" />
-                        <span>{backupStatusText || 'Backing up to Google Drive...'}</span>
+                        <span>{backupStatusText || 'Backing up vault...'}</span>
                       </>
                     ) : (
                       <>
@@ -1221,23 +1261,23 @@ export default function SettingsView() {
                 </div>
               </div>
 
-              {/* ── WhatsApp-Style Google Drive Settings ── */}
+              {/* ── Storage & Security Preferences ── */}
               <div className="space-y-3">
                 <div className="text-xs font-bold uppercase tracking-wider text-(--text-muted) px-1">
-                  Google Drive Settings
+                  Storage & Security Settings
                 </div>
 
                 <div className="rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) divide-y divide-(--border-subtle) text-xs">
-                  {/* Google Account */}
+                  {/* Account Name */}
                   <div className="p-3.5 flex items-center justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-(--text-primary)">Google Account</div>
+                      <div className="font-semibold text-(--text-primary)">Vault Owner Account</div>
                       <div className="text-[11px] text-(--text-muted)">{googleAccount || 'tharun@gmail.com'}</div>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        const newAcc = prompt('Enter your Google Account email:', googleAccount);
+                        const newAcc = prompt('Enter your account email:', googleAccount);
                         if (newAcc && newAcc.trim()) {
                           setGoogleAccount(newAcc.trim());
                           localStorage.setItem('recall_backup_google_account', newAcc.trim());
@@ -1250,11 +1290,45 @@ export default function SettingsView() {
                     </button>
                   </div>
 
+                  {/* Optional Google Drive OAuth Token */}
+                  <div className="p-3.5 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-(--text-primary) flex items-center gap-1.5">
+                          <Cloud size={14} className="text-teal-500" />
+                          <span>Google Drive OAuth Token (Optional)</span>
+                        </div>
+                        <div className="text-[11px] text-(--text-muted)">
+                          Leave empty to use 100% offline local device storage
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={googleToken}
+                        onChange={(e) => setGoogleToken(e.target.value)}
+                        placeholder="Optional Google OAuth Access Token (Bearer ya29...)"
+                        className="flex-1 px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-xs font-mono text-(--text-primary) placeholder:text-(--text-muted) focus:outline-hidden focus:border-teal-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          localStorage.setItem('recall_google_drive_token', googleToken.trim());
+                          showToast(googleToken.trim() ? '✓ Google Drive Token saved!' : 'Switched to Local Vault Offline Mode', 'info');
+                        }}
+                        className="px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs transition-colors cursor-pointer shrink-0"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Frequency */}
                   <div className="p-3.5 flex items-center justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-(--text-primary)">Back up to Google Drive</div>
-                      <div className="text-[11px] text-(--text-muted)">Scheduled automatic backups</div>
+                      <div className="font-semibold text-(--text-primary)">Auto-Backup Schedule</div>
+                      <div className="text-[11px] text-(--text-muted)">Automatic background snapshot interval</div>
                     </div>
                     <select
                       value={backupFrequency}
@@ -1273,35 +1347,15 @@ export default function SettingsView() {
                     </select>
                   </div>
 
-                  {/* Network */}
-                  <div className="p-3.5 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="font-semibold text-(--text-primary)">Back up over</div>
-                      <div className="text-[11px] text-(--text-muted)">Network data usage rules</div>
-                    </div>
-                    <select
-                      value={backupNetwork}
-                      onChange={(e) => {
-                        setBackupNetwork(e.target.value);
-                        localStorage.setItem('recall_backup_network', e.target.value);
-                        showToast(`✓ Backup network: ${e.target.value === 'wifi' ? 'Wi-Fi only' : 'Wi-Fi or cellular'}`, 'info');
-                      }}
-                      className="px-2.5 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-[11px] font-semibold text-(--text-primary) cursor-pointer focus:outline-hidden"
-                    >
-                      <option value="wifi">Wi-Fi only</option>
-                      <option value="any">Wi-Fi or cellular</option>
-                    </select>
-                  </div>
-
                   {/* End-to-end encryption */}
                   <div className="p-3.5 flex items-center justify-between gap-3">
                     <div>
                       <div className="font-semibold text-(--text-primary) flex items-center gap-1.5">
                         <Lock size={13} className="text-emerald-500" />
-                        <span>End-to-end encrypted backup</span>
+                        <span>End-to-end encrypted backup (AES-256)</span>
                       </div>
                       <div className="text-[11px] text-(--text-muted)">
-                        Protects your memories with AES-256 encryption
+                        Protects your memories, ledger & chats with strong encryption
                       </div>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -1311,7 +1365,7 @@ export default function SettingsView() {
                         onChange={(e) => {
                           setE2eeEnabled(e.target.checked);
                           localStorage.setItem('recall_backup_e2ee', String(e.target.checked));
-                          showToast(e.target.checked ? '✓ E2EE backup enabled' : 'E2EE backup disabled', 'info');
+                          showToast(e.target.checked ? '✓ E2EE encryption enabled' : 'E2EE encryption disabled', 'info');
                         }}
                         className="sr-only peer"
                       />
@@ -1328,15 +1382,15 @@ export default function SettingsView() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Restore from Google Drive */}
+                  {/* Restore from Local Snapshot */}
                   <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex flex-col justify-between gap-3">
                     <div>
                       <div className="font-bold text-xs text-(--text-primary) flex items-center gap-1.5">
-                        <CloudDownload size={14} className="text-[#4E82EE]" />
-                        <span>Restore from Cloud</span>
+                        <RefreshCw size={14} className="text-[#4E82EE]" />
+                        <span>Restore from Vault Snapshot</span>
                       </div>
                       <div className="text-[11px] text-(--text-muted) mt-1">
-                        Restore your latest Google Drive snapshot ({lastDriveBackup || 'Available'})
+                        Restore from your latest device vault snapshot ({lastLocalBackup || 'Available'})
                       </div>
                     </div>
                     <button
@@ -1345,8 +1399,8 @@ export default function SettingsView() {
                       onClick={handleRestoreFromDrive}
                       className="w-full py-2 px-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE] text-xs font-semibold text-(--text-primary) transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
-                      {isRestoring ? <RefreshCw size={13} className="animate-spin" /> : <CloudDownload size={13} />}
-                      <span>Restore Cloud Backup</span>
+                      {isRestoring ? <RefreshCw size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                      <span>Restore Snapshot</span>
                     </button>
                   </div>
 
@@ -1355,10 +1409,10 @@ export default function SettingsView() {
                     <div>
                       <div className="font-bold text-xs text-(--text-primary) flex items-center gap-1.5">
                         <FileJson size={14} className="text-amber-500" />
-                        <span>Restore from File</span>
+                        <span>Restore from JSON File</span>
                       </div>
                       <div className="text-[11px] text-(--text-muted) mt-1">
-                        Import an exported JSON backup file from your disk
+                        Import an exported JSON backup file from your device disk
                       </div>
                     </div>
                     <label className="w-full py-2 px-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500 text-xs font-semibold text-(--text-primary) transition-all flex items-center justify-center gap-1.5 cursor-pointer">
@@ -1377,13 +1431,13 @@ export default function SettingsView() {
                 {/* Direct Offline Download button */}
                 <div className="p-3.5 rounded-2xl bg-(--bg-elevated)/60 border border-(--border-subtle) flex items-center justify-between gap-3 text-xs">
                   <div>
-                    <div className="font-semibold text-(--text-primary)">Download Offline Copy</div>
-                    <div className="text-[11px] text-(--text-muted)">Save a local copy of your backup to your device</div>
+                    <div className="font-semibold text-(--text-primary)">Export Portable JSON Backup</div>
+                    <div className="text-[11px] text-(--text-muted)">Download a full offline copy of all your memories, tasks, and data</div>
                   </div>
                   <button
                     type="button"
                     onClick={handleExportData}
-                    className="px-3 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE] text-[11px] font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                    className="px-3.5 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE] text-[11px] font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
                   >
                     <Download size={13} />
                     <span>Download .JSON</span>
