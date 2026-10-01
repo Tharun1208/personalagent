@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const { id, title, description, category, targetDate, milestones } = await req.json();
+    const { id, title, description, notes, category, targetDate, milestones } = await req.json();
     if (!title || !title.trim()) {
       return NextResponse.json({ error: 'Goal title cannot be empty' }, { status: 400 });
     }
@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       title: title.trim(),
       description: description || '',
+      notes: notes || '',
       category: category || 'personal',
       targetDate,
       progress,

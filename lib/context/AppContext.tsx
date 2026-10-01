@@ -109,7 +109,7 @@ interface AppContextType {
   createReminder: (title: string, dueDateTime: string, recurrence?: string, notes?: string) => Promise<void>;
   updateReminder: (id: string, patch: Partial<Reminder>) => Promise<void>;
   deleteReminder: (id: string) => Promise<void>;
-  createGoal: (title: string, description?: string, category?: Goal['category'], targetDate?: string, milestones?: string[]) => Promise<void>;
+  createGoal: (title: string, description?: string, category?: Goal['category'], targetDate?: string, milestones?: string[], notes?: string) => Promise<void>;
   updateGoal: (id: string, patch: Partial<Goal>) => Promise<void>;
   toggleGoalMilestone: (goalId: string, milestoneId: string) => Promise<void>;
   deleteGoal: (id: string) => Promise<void>;
@@ -1349,7 +1349,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     description?: string,
     category: Goal['category'] = 'personal',
     targetDate?: string,
-    milestones: string[] = []
+    milestones: string[] = [],
+    notes?: string
   ) => {
     const formattedMilestones = milestones.map((m, idx) => ({
       id: `m_${Date.now()}_${idx}`,
@@ -1363,6 +1364,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       userId: user?.id || 'usr_primary_default',
       title: title.trim(),
       description: description?.trim() || undefined,
+      notes: notes?.trim() || undefined,
       category,
       targetDate: targetDate || undefined,
       milestones: formattedMilestones,
@@ -1386,6 +1388,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           id: newGoalId,
           title,
           description,
+          notes,
           category,
           targetDate,
           milestones: formattedMilestones,

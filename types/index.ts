@@ -137,6 +137,7 @@ export interface Goal {
   userId: string;
   title: string;
   description?: string;
+  notes?: string;
   category: 'career' | 'health' | 'finance' | 'learning' | 'personal';
   targetDate?: string;
   progress: number; // 0 to 100

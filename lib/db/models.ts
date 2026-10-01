@@ -150,6 +150,7 @@ const GoalSchema = new Schema<Goal>(
     userId: { type: String, required: true, index: true },
     title: { type: String, required: true },
     description: { type: String },
+    notes: { type: String },
     category: { type: String, enum: ['career', 'health', 'finance', 'learning', 'personal'], default: 'personal' },
     targetDate: { type: String },
     progress: { type: Number, default: 0 },

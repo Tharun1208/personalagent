@@ -328,13 +328,23 @@ export const toolRegistry: Record<string, ToolModule> = {
       },
       createGoal: {
         name: 'createGoal',
-        description: 'Creates a new goal or OKR objective with milestones.',
+        description: 'Creates a new goal or OKR objective with milestones and optional strategic notes.',
         parameters: {
           title: { type: 'string', description: 'Title of the goal', required: true },
           description: { type: 'string', description: 'Goal summary or strategy' },
+          notes: { type: 'string', description: 'Strategic notes, reflections or execution plan' },
           category: { type: 'string', description: 'career | health | finance | learning | personal' },
           targetDate: { type: 'string', description: 'Target completion date (YYYY-MM-DD)' },
           milestones: { type: 'array', description: 'List of milestone titles' },
+        },
+        permissionLevel: 'WRITE',
+      },
+      updateGoalNotes: {
+        name: 'updateGoalNotes',
+        description: 'Updates or saves strategic notes for an existing goal or OKR.',
+        parameters: {
+          goalTitle: { type: 'string', description: 'Goal title or ID', required: true },
+          notes: { type: 'string', description: 'The strategic notes content to save', required: true },
         },
         permissionLevel: 'WRITE',
       },
@@ -379,6 +389,7 @@ export const toolRegistry: Record<string, ToolModule> = {
           userId,
           title: args.title,
           description: args.description || '',
+          notes: args.notes || '',
           category: args.category || 'personal',
           targetDate: args.targetDate,
           progress: 0,
@@ -392,6 +403,22 @@ export const toolRegistry: Record<string, ToolModule> = {
           success: true,
           data: newGoal,
           message: `✓ Goal "${newGoal.title}" created successfully.`,
+        };
+      }
+      if (action === 'updateGoalNotes') {
+        const goals = db.getGoals(userId);
+        const gName = args.goalTitle.toLowerCase();
+        const goal = goals.find(
+          (g) => g.title.toLowerCase().includes(gName) || g.id === args.goalTitle
+        );
+        if (!goal) {
+          return { success: false, message: `Goal "${args.goalTitle}" not found.` };
+        }
+        const updated = db.updateGoal(goal.id, userId, { notes: args.notes });
+        return {
+          success: true,
+          data: updated,
+          message: `✓ Strategic notes updated for "${goal.title}".`,
         };
       }
       return { success: false, message: `Unknown goal action: ${action}` };
