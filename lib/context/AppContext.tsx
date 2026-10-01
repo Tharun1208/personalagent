@@ -142,23 +142,27 @@ async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promi
 
 function getInitialUser(): User | null {
   if (typeof window === 'undefined') return null;
+  const customName = typeof window !== 'undefined' ? localStorage.getItem('recall_user_custom_name') : null;
   try {
     const cached = localStorage.getItem('recall_user');
     if (cached) {
       const parsed = JSON.parse(cached);
-      if (parsed?.name) return parsed;
+      if (parsed) {
+        if (customName) parsed.name = customName;
+        return parsed;
+      }
     }
   } catch {}
   return {
     id: 'guest_instant',
-    name: 'Guest User',
-    email: 'guest@agent.local',
+    name: customName || 'Personal User',
+    email: 'user@assistance.ai',
     avatar: '',
     createdAt: new Date().toISOString(),
     preferences: {
       theme: 'light',
       aiProvider: 'builtin',
-      model: 'gemini-1.5-flash',
+      model: 'Recall Core Ultra',
       voiceEnabled: true,
       voiceAutoRead: false,
       proactiveReminders: true,
@@ -430,6 +434,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const updated = prev ? { ...prev, ...patch } : (patch as User);
       try {
         localStorage.setItem('recall_user', JSON.stringify(updated));
+        if (patch.name) {
+          localStorage.setItem('recall_user_custom_name', patch.name);
+        }
       } catch {}
       return updated;
     });
@@ -445,6 +452,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setUser(data.user);
         try {
           localStorage.setItem('recall_user', JSON.stringify(data.user));
+          if (patch.name) {
+            localStorage.setItem('recall_user_custom_name', patch.name);
+          }
           if (data.token) {
             localStorage.setItem('recall_token', data.token);
           }
@@ -487,6 +497,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshAll = useCallback(async () => {
     try {
       let token = typeof window !== 'undefined' ? localStorage.getItem('recall_token') : null;
+      const customName = typeof window !== 'undefined' ? localStorage.getItem('recall_user_custom_name') : null;
 
       // 1. Check current authenticated user session
       let userRes = await apiFetch('/api/auth/me');
@@ -507,9 +518,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (userData?.user) {
-        setUser(userData.user);
+        const finalUser = {
+          ...userData.user,
+          name: customName || userData.user.name,
+        };
+        setUser(finalUser);
         try {
-          localStorage.setItem('recall_user', JSON.stringify(userData.user));
+          localStorage.setItem('recall_user', JSON.stringify(finalUser));
         } catch {}
       }
 

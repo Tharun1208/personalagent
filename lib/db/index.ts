@@ -493,7 +493,7 @@ export const db = {
       if (patch.preferences) u.preferences = { ...u.preferences, ...patch.preferences };
     });
     persistDb();
-    persistDocs('users', user);
+    persistDocs('users', data.users);
     return user;
   },
 
@@ -509,7 +509,7 @@ export const db = {
       u.preferences = { ...u.preferences, ...prefs };
     });
     persistDb();
-    persistDocs('users', user);
+    persistDocs('users', data.users);
     return user;
   },
 

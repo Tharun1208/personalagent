@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady } from '@/lib/db';
+import { db, ensureDbReady, flushDb } from '@/lib/db';
 import { User } from '@/types';
 
 function getOrCreateUser(req: NextRequest): User {
@@ -58,6 +58,8 @@ export async function PATCH(req: NextRequest) {
   if (prefsToUpdate) {
     updatedUser = db.updateUserPreferences(user.id, prefsToUpdate) || updatedUser;
   }
+
+  await flushDb();
 
   const token = auth.signToken({ userId: updatedUser.id, email: updatedUser.email });
   const res = NextResponse.json({ success: true, user: updatedUser, token });

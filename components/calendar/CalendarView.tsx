@@ -749,7 +749,7 @@ export default function CalendarView() {
                       <div className="flex items-center gap-1">
                         {holiday && (
                           <span
-                            className="text-[10px] px-1 py-0.2 rounded bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold leading-tight"
+                            className="text-xs leading-none select-none inline-block"
                             title={`Government Holiday: ${holiday.name} (${holiday.type.toUpperCase()})`}
                           >
                             {holiday.emoji || '🏛️'}
@@ -1179,9 +1179,9 @@ export default function CalendarView() {
             {getHolidayForDate(selectedDate) && (
               <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-500/15 via-amber-500/10 to-emerald-500/15 border border-rose-500/30 flex items-center justify-between gap-3 shadow-xs">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center text-xl shrink-0">
+                  <span className="text-2xl shrink-0 select-none">
                     {getHolidayForDate(selectedDate)?.emoji || '🏛️'}
-                  </div>
+                  </span>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-bold text-sm text-(--text-primary)">
