@@ -79,7 +79,7 @@ export default function TopNavbar({
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="font-extrabold text-sm sm:text-base tracking-tight text-(--text-primary) group-hover:text-[#4E82EE] transition-colors">
+            <span className="font-bold text-sm sm:text-base tracking-tight font-cutive text-(--text-primary) group-hover:text-[#4E82EE] transition-colors">
               Assistance
             </span>
             <span className="text-[9px] uppercase font-mono font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-[#4E82EE]/15 text-[#4E82EE]">

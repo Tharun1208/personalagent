@@ -102,10 +102,10 @@ export default function SplashScreen({
               transition={{ delay: 0.3, duration: 0.6, ease: 'easeOut' }}
               className="flex flex-col items-center gap-1.5"
             >
-              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#4E82EE] bg-clip-text text-transparent">
+              <h1 className="text-3xl sm:text-4xl font-bold font-cutive tracking-tight bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#4E82EE] bg-clip-text text-transparent">
                 Assistance AI
               </h1>
-              <p className="text-xs sm:text-sm font-semibold text-(--text-muted) tracking-wide">
+              <p className="text-xs sm:text-sm font-medium font-ibm text-(--text-muted) tracking-wider">
                 Your Personal AI Companion
               </p>
             </motion.div>
