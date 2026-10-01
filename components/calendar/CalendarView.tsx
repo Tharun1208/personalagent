@@ -411,12 +411,12 @@ export default function CalendarView() {
     <div className="flex-1 flex flex-col h-screen overflow-hidden bg-(--bg-primary) text-(--text-primary) font-sans select-none">
       
       {/* ── Google Calendar Header Bar (Single Clean Header Row) ── */}
-      <header className="h-14 px-2 sm:px-4 border-b border-(--border-subtle) bg-(--bg-card) flex items-center justify-between shrink-0 z-30">
+      <header className="h-14 px-2 sm:px-4 border-b border-(--border-subtle) bg-(--bg-card) flex items-center justify-between gap-1 shrink-0 z-30">
         
         {/* Left: Google Calendar Brand Icon, Title, Today Button, Arrows, Month/Year */}
-        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
-          {/* Google Calendar Blue Logo Tile */}
-          <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2.5 min-w-0">
+          {/* Google Calendar Blue Logo Tile (Hidden on mobile to ensure zero overlap) */}
+          <div className="hidden sm:flex items-center gap-2 shrink-0">
             <div className="w-8 h-8 rounded-lg bg-[#1a73e8] text-white flex items-center justify-center font-bold text-sm shadow-xs select-none">
               {new Date().getDate()}
             </div>
@@ -428,7 +428,7 @@ export default function CalendarView() {
           {/* Today Button (Google Calendar style outlined pill) */}
           <button
             onClick={handleToday}
-            className={`px-3 py-1 sm:py-1.5 rounded-full border text-xs sm:text-sm font-medium transition-colors cursor-pointer shadow-2xs ${
+            className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border text-xs sm:text-sm font-medium transition-colors cursor-pointer shadow-2xs shrink-0 ${
               isToday
                 ? 'border-[#1a73e8] text-[#1a73e8] bg-[#1a73e8]/10 font-semibold'
                 : 'border-(--border-subtle) text-(--text-primary) hover:bg-(--bg-elevated)'
@@ -438,20 +438,20 @@ export default function CalendarView() {
           </button>
 
           {/* Previous / Next Arrows (< >) */}
-          <div className="flex items-center">
+          <div className="flex items-center shrink-0">
             <button
               onClick={handlePrev}
-              className="p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
+              className="p-1 sm:p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
               title="Previous"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={17} />
             </button>
             <button
               onClick={handleNext}
-              className="p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
+              className="p-1 sm:p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
               title="Next"
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={17} />
             </button>
           </div>
 
@@ -543,13 +543,13 @@ export default function CalendarView() {
           </button>
 
           {/* Google Calendar Style View Selector Dropdown [Month ▾] */}
-          <div className="relative" ref={viewModeAnchorRef}>
+          <div className="relative shrink-0" ref={viewModeAnchorRef}>
             <button
               onClick={() => setViewModeDropdownOpen((o) => !o)}
-              className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-lg border border-(--border-subtle) bg-(--bg-card) hover:bg-(--bg-elevated) text-xs sm:text-sm font-medium text-(--text-primary) transition-colors cursor-pointer shadow-2xs capitalize"
+              className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-(--border-subtle) bg-(--bg-card) hover:bg-(--bg-elevated) text-xs sm:text-sm font-medium text-(--text-primary) transition-colors cursor-pointer shadow-2xs capitalize shrink-0"
             >
               <span>{viewMode}</span>
-              <ChevronDown size={14} className={`text-(--text-muted) transition-transform duration-200 ${viewModeDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={13} className={`text-(--text-muted) transition-transform duration-200 ${viewModeDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {viewModeDropdownOpen && (
@@ -591,7 +591,7 @@ export default function CalendarView() {
           {/* Google Calendar Style + Create Event Button */}
           <button
             onClick={() => openScheduleModal()}
-            className="px-2.5 sm:px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs sm:text-sm font-semibold hover:opacity-95 active:scale-95 transition-all cursor-pointer shadow-md shadow-blue-500/20 flex items-center gap-1 shrink-0"
+            className="p-1.5 sm:px-3 sm:py-1.5 rounded-full bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-semibold hover:opacity-95 active:scale-95 transition-all cursor-pointer shadow-md shadow-blue-500/20 flex items-center justify-center gap-1 shrink-0"
           >
             <Plus size={16} strokeWidth={2.5} />
             <span className="hidden sm:inline">Create</span>
