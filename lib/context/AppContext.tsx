@@ -211,44 +211,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const setActiveTab = useCallback((tab: AppTab) => {
     if (!isValidTab(tab)) return;
+
     setActiveTabState((prev) => {
       if (prev === tab) return prev;
-      if (typeof window !== 'undefined') {
-        const targetUrl = tab === 'dashboard' ? window.location.pathname : `${window.location.pathname}#${tab}`;
-        window.history.pushState({ tab }, '', targetUrl);
-      }
       return tab;
     });
+
+    if (typeof window !== 'undefined') {
+      const currentHash = window.location.hash.replace('#', '');
+      const targetHash = tab === 'dashboard' ? '' : tab;
+
+      if (currentHash !== targetHash) {
+        if (tab === 'dashboard') {
+          window.history.pushState({ tab: 'dashboard' }, '', window.location.pathname);
+        } else {
+          window.history.pushState({ tab }, '', `#${tab}`);
+        }
+      }
+    }
   }, []);
 
   // Synchronize Mobile Hardware/System Back Button & Browser History
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Handle initial route on app launch
-    const hash = window.location.hash.replace('#', '') as AppTab;
-    const initialTab: AppTab = isValidTab(hash) ? hash : 'dashboard';
-    setActiveTabState(initialTab);
-
-    const initialUrl = initialTab === 'dashboard' ? window.location.pathname : `${window.location.pathname}#${initialTab}`;
-    window.history.replaceState({ tab: initialTab, isInitial: true }, '', initialUrl);
-
-    const handlePopState = (event: PopStateEvent) => {
-      const stateTab = event.state?.tab;
-      const currentHash = window.location.hash.replace('#', '') as AppTab;
-
-      let targetTab: AppTab = 'dashboard';
-      if (isValidTab(stateTab)) {
-        targetTab = stateTab;
-      } else if (isValidTab(currentHash)) {
-        targetTab = currentHash;
-      }
-
+    const syncFromLocation = () => {
+      const hash = window.location.hash.replace('#', '') as AppTab;
+      const targetTab: AppTab = isValidTab(hash) ? hash : 'dashboard';
       setActiveTabState(targetTab);
     };
 
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    // Ensure root entry exists in history so back button always returns to Dashboard
+    const initialHash = window.location.hash.replace('#', '') as AppTab;
+    if (isValidTab(initialHash) && initialHash !== 'dashboard') {
+      window.history.replaceState({ tab: 'dashboard' }, '', window.location.pathname);
+      window.history.pushState({ tab: initialHash }, '', `#${initialHash}`);
+      setActiveTabState(initialHash);
+    } else {
+      window.history.replaceState({ tab: 'dashboard' }, '', window.location.pathname);
+      setActiveTabState('dashboard');
+    }
+
+    window.addEventListener('popstate', syncFromLocation);
+    window.addEventListener('hashchange', syncFromLocation);
+
+    return () => {
+      window.removeEventListener('popstate', syncFromLocation);
+      window.removeEventListener('hashchange', syncFromLocation);
+    };
   }, []);
   const [conversations, setConversations] = useState<Conversation[]>(() => getInitialList<Conversation>('recall_conversations'));
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
