@@ -265,23 +265,33 @@ export default function HabitsView() {
         </div>
 
         {/* Habit Consistency Metric Card */}
-        <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) flex items-center justify-between shadow-xs">
-          <div className="space-y-1">
+        <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+          <div className="space-y-1.5">
+            {/* 1. Daily Consistency Header */}
             <div className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">
               Daily Consistency
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-(--text-primary)">
-              {completedTodayCount} <span className="text-sm font-normal text-(--text-muted)">/ {habits.length} Done</span>
+            
+            {/* 2. 0/0 Done and 0 habits */}
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-extrabold text-(--text-primary)">
+                {completedTodayCount}/{habits.length} Done
+              </span>
+              <span className="text-xs sm:text-sm font-semibold text-(--text-muted)">
+                ({habits.length} {habits.length === 1 ? 'habit' : 'habits'})
+              </span>
             </div>
+
             <p className="text-[11px] text-(--text-muted)">
               {habits.length > 0 && completedTodayCount === habits.length
-                ? '🔥 All habits completed today! Fantastic job!'
+                ? 'All habits completed today! Fantastic job!'
                 : `${habits.length - completedTodayCount} habits remaining for today`}
             </p>
           </div>
 
-          <div className="flex items-center gap-2 text-amber-500 font-extrabold text-xl sm:text-2xl font-mono shrink-0 bg-amber-500/10 px-4 py-2.5 rounded-2xl border border-amber-500/20">
-            <Flame size={24} className="animate-pulse shrink-0" />
+          {/* 3. Streaks with fire emoji without any background */}
+          <div className="flex items-center gap-2 text-amber-500 font-extrabold text-xl sm:text-2xl font-mono shrink-0">
+            <span className="text-2xl leading-none select-none">🔥</span>
             <span>{totalStreaks} Total Streaks</span>
           </div>
         </div>
@@ -290,7 +300,7 @@ export default function HabitsView() {
         {habits.length === 0 ? (
           <div className="py-20 text-center text-xs text-(--text-muted) space-y-3 bg-(--bg-card) border border-(--border-subtle) rounded-3xl p-8">
             <div className="w-14 h-14 rounded-3xl bg-(--bg-elevated) flex items-center justify-center mx-auto text-(--text-muted)">
-              <Flame size={28} className="text-neutral-400" />
+              <span className="text-2xl select-none">🔥</span>
             </div>
             <h3 className="font-bold text-base text-(--text-primary)">No Habits Created Yet</h3>
             <p className="text-xs text-(--text-muted) max-w-sm mx-auto">
@@ -326,13 +336,9 @@ export default function HabitsView() {
                       {habit.title}
                     </h3>
 
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`inline-flex items-center gap-1 font-mono font-bold text-xs px-2.5 py-0.5 rounded-full border transition-all ${
-                        isCompletedToday
-                          ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20'
-                          : 'text-amber-500 bg-amber-500/10 border-amber-500/20'
-                      }`}>
-                        <Flame size={13} className={isCompletedToday ? 'animate-bounce' : ''} />
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="inline-flex items-center gap-1 font-mono font-bold text-xs text-amber-500">
+                        <span className="text-sm select-none">🔥</span>
                         <span>{habit.streak || 0} day streak</span>
                       </span>
 
