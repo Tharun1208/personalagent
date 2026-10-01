@@ -3,24 +3,19 @@
 import React from 'react';
 import {
   LayoutDashboard,
-  Sparkles,
   CheckSquare,
-  Flame,
+  FileText,
   Wallet,
   Calendar,
-  Settings,
-  Target,
-  FileText,
-  Menu,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 
 interface MobileTabBarProps {
-  onOpenMobileMenu: () => void;
+  onOpenMobileMenu?: () => void;
 }
 
-export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
-  const { activeTab, setActiveTab, tasks, ledgerEntries, goals } = useApp();
+export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {}) {
+  const { activeTab, setActiveTab, tasks, ledgerEntries } = useApp();
 
   const pendingTasks = tasks.filter((t) => t.status !== 'completed').length;
   const pendingLedger = (ledgerEntries || []).filter((l) => l.status === 'pending').length;
@@ -36,17 +31,6 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
       label: 'Tasks',
       icon: CheckSquare,
       badge: pendingTasks,
-    },
-    {
-      key: 'habits',
-      label: 'Habits',
-      icon: Flame,
-    },
-    {
-      key: 'goals',
-      label: 'OKRs',
-      icon: Target,
-      badge: goals.length > 0 ? goals.length : undefined,
     },
     {
       key: 'notes',
@@ -67,7 +51,7 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-(--bg-card)/95 backdrop-blur-xl border-t border-(--border-subtle)/60 px-1.5 py-1.5 flex items-center justify-around select-none safe-area-bottom shadow-lg">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-(--bg-card)/95 backdrop-blur-xl border-t border-(--border-subtle)/60 px-2 py-1.5 flex items-center justify-around select-none safe-area-bottom shadow-lg">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.key;
         const Icon = tab.icon;
@@ -105,7 +89,7 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
             </div>
 
             <span
-              className={`text-[9.5px] font-semibold mt-0.5 tracking-tight truncate max-w-[54px] ${
+              className={`text-[10px] font-semibold mt-0.5 tracking-tight truncate max-w-[56px] ${
                 isActive ? 'font-bold text-[#4E82EE]' : 'text-(--text-muted)'
               }`}
             >
@@ -114,18 +98,6 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
           </button>
         );
       })}
-
-      {/* Menu / Drawer button */}
-      <button
-        type="button"
-        onClick={onOpenMobileMenu}
-        className="relative flex flex-col items-center justify-center py-1 px-2 rounded-2xl text-(--text-muted) hover:text-(--text-primary) transition-all duration-200 cursor-pointer active:scale-90 touch-manipulation flex-1"
-      >
-        <div className="relative">
-          <Menu size={20} />
-        </div>
-        <span className="text-[9.5px] font-semibold mt-0.5 tracking-tight">More</span>
-      </button>
     </nav>
   );
 }
