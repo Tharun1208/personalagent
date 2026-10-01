@@ -72,7 +72,6 @@ function groupTasksByDate(tasksList: Task[]): DateTaskGroup[] {
   const noDateGroup: DateTaskGroup = {
     id: 'no_date',
     title: 'No Due Date',
-    subtitle: 'Backlog & unscheduled items',
     type: 'no_date',
     tasks: [],
     dateSortKey: Number.MAX_SAFE_INTEGER,

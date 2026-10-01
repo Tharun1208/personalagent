@@ -720,9 +720,9 @@ export default function CalendarView() {
                     onClick={() => handleDayClick(day.date)}
                     className={`min-h-[68px] sm:min-h-[110px] p-1.5 sm:p-2.5 rounded-xl sm:rounded-2xl border transition-all cursor-pointer flex flex-col justify-between group relative active:scale-98 ${
                       isSelected
-                        ? 'border-[#4E82EE] bg-[#4E82EE]/5 ring-1 sm:ring-2 ring-[#4E82EE]/20 shadow-xs'
+                        ? 'border-[#4E82EE] bg-[#4E82EE]/10 ring-2 ring-[#4E82EE]/30 shadow-md'
                         : holiday
-                        ? 'bg-(--bg-card) border-rose-500/30 hover:border-rose-500/60'
+                        ? 'bg-rose-500/15 dark:bg-rose-950/40 border-rose-500/50 hover:border-rose-500 hover:bg-rose-500/25 shadow-xs'
                         : day.isCurrentMonth
                         ? 'bg-(--bg-card) border-(--border-subtle) hover:border-[#4E82EE]/40 hover:bg-(--bg-elevated)'
                         : 'bg-(--bg-sidebar)/30 border-(--border-subtle)/30 opacity-40'
@@ -737,7 +737,7 @@ export default function CalendarView() {
                             : isSelected
                             ? 'text-[#4E82EE] font-black'
                             : holiday
-                            ? 'text-rose-500 font-bold'
+                            ? 'bg-rose-500 text-white font-bold shadow-xs'
                             : 'text-(--text-primary)'
                         }`}
                       >
@@ -764,11 +764,11 @@ export default function CalendarView() {
                     {/* Mobile Dots & Holiday View (<sm) */}
                     <div className="flex sm:hidden items-center justify-center gap-1 my-1 flex-wrap pointer-events-none">
                       {holiday && (
-                        <span className="text-[10px] leading-none" title={holiday.name}>
-                          {holiday.emoji || '🏛️'}
+                        <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 truncate max-w-full text-center" title={holiday.name}>
+                          {holiday.name}
                         </span>
                       )}
-                      {day.items.slice(0, holiday ? 3 : 4).map((item) => (
+                      {day.items.slice(0, holiday ? 2 : 4).map((item) => (
                         <span
                           key={item.id}
                           className={`w-2 h-2 rounded-full ring-1 ring-black/10 ${
@@ -789,7 +789,7 @@ export default function CalendarView() {
                     <div className="hidden sm:block space-y-1 my-1 flex-1 overflow-hidden pointer-events-none">
                       {holiday && (
                         <div
-                          className="text-[10px] sm:text-[11px] truncate px-1.5 py-0.5 rounded-md flex items-center gap-1 font-bold bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 shadow-2xs"
+                          className="text-[10px] sm:text-[11px] truncate px-1.5 py-1 rounded-lg flex items-center gap-1.5 font-bold bg-rose-600 text-white shadow-xs"
                           title={`🏛️ Official Govt Holiday: ${holiday.name} (${holiday.type.toUpperCase()})`}
                         >
                           <span className="text-xs shrink-0">{holiday.emoji || '🏛️'}</span>
@@ -1033,7 +1033,7 @@ export default function CalendarView() {
                     isSelected
                       ? 'border-[#4E82EE] shadow-md ring-2 ring-[#4E82EE]/15'
                       : holiday
-                      ? 'border-rose-500/30'
+                      ? 'border-rose-500/50 bg-rose-500/10 dark:bg-rose-950/30'
                       : 'border-(--border-subtle) hover:border-[#4E82EE]/30'
                   } ${isWeekend ? 'opacity-80' : ''}`}
                 >
@@ -1047,12 +1047,12 @@ export default function CalendarView() {
                       isSelected
                         ? 'bg-[#4E82EE]/8'
                         : holiday
-                        ? 'bg-rose-500/5 hover:bg-rose-500/10'
+                        ? 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400'
                         : 'bg-(--bg-elevated) hover:bg-(--bg-card)'
                     }`}
                   >
                     <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                      w.isToday ? 'text-[#4E82EE]' : holiday ? 'text-rose-500' : 'text-(--text-muted)'
+                      w.isToday ? 'text-[#4E82EE]' : holiday ? 'text-rose-600 dark:text-rose-400 font-black' : 'text-(--text-muted)'
                     }`}>
                       {dayLabel}
                     </span>
@@ -1062,13 +1062,13 @@ export default function CalendarView() {
                         : isSelected
                         ? 'text-[#4E82EE] bg-[#4E82EE]/10'
                         : holiday
-                        ? 'text-rose-500 bg-rose-500/15'
+                        ? 'text-white bg-rose-500 shadow-xs'
                         : 'text-(--text-primary)'
                     }`}>
                       {w.date.getDate()}
                     </div>
                     {holiday && (
-                      <span className="mt-1 text-[10px]" title={holiday.name}>
+                      <span className="mt-1 text-[10px] font-bold text-rose-600 dark:text-rose-400" title={holiday.name}>
                         {holiday.emoji || '🏛️'}
                       </span>
                     )}
