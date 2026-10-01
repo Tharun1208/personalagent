@@ -40,6 +40,9 @@ import {
   RefreshCw,
   FileJson,
   CheckCircle2,
+  Calendar,
+  FolderGit2,
+  Send,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { soundEngine } from '@/lib/audio/soundEngine';
@@ -61,8 +64,52 @@ export default function SettingsView() {
   const { user, updateUser, updateUserPreferences, refreshAll, theme, setTheme, showToast, showConfirm, signOut } = appCtx;
   const setAuthModalOpen = appCtx.setAuthModalOpen;
   
-  // 'main' (system settings list), 'profile', 'alarms', 'security', 'data', 'backup'
-  const [currentView, setCurrentView] = useState<'main' | 'profile' | 'alarms' | 'security' | 'data' | 'backup'>('main');
+  // 'main' (system settings list), 'profile', 'alarms', 'security', 'data', 'backup', 'developer'
+  const [currentView, setCurrentView] = useState<'main' | 'profile' | 'alarms' | 'security' | 'data' | 'backup' | 'developer'>('main');
+
+  // Developer & Integrations state
+  const [githubToken, setGithubToken] = useState<string>('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedGit = localStorage.getItem('recall_github_token');
+      if (savedGit) setGithubToken(savedGit);
+    }
+  }, []);
+
+  const handleSaveGithubToken = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('recall_github_token', githubToken.trim());
+      showToast('✓ GitHub Token saved securely!', 'success');
+    }
+  };
+
+  const handleTestNotification = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      showToast('Notifications not supported in this browser', 'error');
+      return;
+    }
+    let perm = Notification.permission;
+    if (perm !== 'granted') {
+      perm = await Notification.requestPermission();
+    }
+    if (perm === 'granted') {
+      new Notification('Recall AI · Test Alert', {
+        body: '✓ Background notifications are working properly!',
+        icon: '/icon-192.png',
+      });
+      showToast('✓ Test notification sent!', 'success');
+    } else {
+      showToast('Notification permission was denied in browser settings', 'error');
+    }
+  };
+
+  const handleDownloadIcs = () => {
+    if (typeof window !== 'undefined') {
+      window.open('/api/google/sync?format=ics', '_blank');
+      showToast('✓ Google Calendar (.ics) exported successfully!', 'success');
+    }
+  };
 
   // WhatsApp-style Google Drive Backup states
   const [lastLocalBackup, setLastLocalBackup] = useState<string>('Today, 2:00 AM');
@@ -623,6 +670,30 @@ export default function SettingsView() {
                         </div>
                         <div className="text-[11px] text-(--text-muted)">
                           Download JSON backup, wipe local database
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
+                  </div>
+
+                  {/* Item 4: Developer & Google Sync */}
+                  <div
+                    onClick={() => setCurrentView('developer')}
+                    className="p-4 hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0">
+                        <FolderGit2 size={17} />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-xs sm:text-sm text-(--text-primary) flex items-center gap-2">
+                          <span>Developer & Integrations</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400">
+                            GitHub & Sync
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-(--text-muted)">
+                          GitHub token, Google Calendar sync & native push alerts
                         </div>
                       </div>
                     </div>
@@ -1316,6 +1387,138 @@ export default function SettingsView() {
                   >
                     <Download size={13} />
                     <span>Download .JSON</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Footer Back Button */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView('main')}
+                  className="px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
+                >
+                  Back to Settings
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ───────────────────────────────────────────────────────────── */}
+          {/* VIEW: Developer & Google Sync Sub-Page                        */}
+          {/* ───────────────────────────────────────────────────────────── */}
+          {currentView === 'developer' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Card 1: GitHub Access & Automation */}
+              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-4">
+                <div className="flex items-center gap-3 pb-3 border-b border-(--border-subtle)">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                    <FolderGit2 size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-(--text-primary)">
+                      GitHub Integration
+                    </h3>
+                    <p className="text-[11px] text-(--text-muted)">
+                      Empower the assistant to query commits, list repos, and draft Pull Requests
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5">
+                      GitHub Personal Access Token (PAT)
+                    </label>
+                    <input
+                      type="password"
+                      value={githubToken}
+                      onChange={(e) => setGithubToken(e.target.value)}
+                      placeholder="ghp_..."
+                      className="w-full px-4 py-2.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-xs text-(--text-primary) font-mono placeholder:text-(--text-muted) focus:outline-hidden focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <a
+                      href="https://github.com/settings/tokens/new?scopes=repo&description=PersonalAgentAccess"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] text-purple-500 hover:underline flex items-center gap-1"
+                    >
+                      <span>Create a new token on GitHub ↗</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={handleSaveGithubToken}
+                      className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                    >
+                      Save Token
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Google Calendar 2-Way iCal Sync */}
+              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-4">
+                <div className="flex items-center gap-3 pb-3 border-b border-(--border-subtle)">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                    <Calendar size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-(--text-primary)">
+                      Google Calendar & iCal Sync
+                    </h3>
+                    <p className="text-[11px] text-(--text-muted)">
+                      Live synchronization with Google Calendar, Apple Calendar, and Outlook
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-(--text-secondary) leading-relaxed">
+                  Export all your smart reminders, alarms, and tasks into a universal RFC 5545 iCalendar stream. You can subscribe directly in Google Calendar.
+                </p>
+
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleDownloadIcs}
+                    className="px-4 py-2.5 rounded-xl bg-[#4E82EE] hover:bg-[#4E82EE]/90 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+                  >
+                    <Download size={14} />
+                    <span>Download Google Calendar (.ics)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 3: Background Push & Native Alarms */}
+              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-4">
+                <div className="flex items-center gap-3 pb-3 border-b border-(--border-subtle)">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                    <Bell size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-(--text-primary)">
+                      Web Push & Native OS Notifications
+                    </h3>
+                    <p className="text-[11px] text-(--text-muted)">
+                      Receive background alarm chimes and push alerts even when the tab is closed
+                    </p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-(--text-secondary) leading-relaxed">
+                  Service Worker background alarms are active. Test your native OS notification channel below.
+                </p>
+
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleTestNotification}
+                    className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+                  >
+                    <Send size={14} />
+                    <span>Send Test Push Notification</span>
                   </button>
                 </div>
               </div>

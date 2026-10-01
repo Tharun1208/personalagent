@@ -309,6 +309,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setGuestPromptsUsed(readGuestPromptCount());
     setIsHydrated(true);
+
+    // Register Service Worker for Background Push Notifications & Alarms
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        console.log('Recall AI Service Worker registered:', reg.scope);
+      }).catch((err) => {
+        console.warn('Service Worker registration skipped:', err);
+      });
+
+      // Listen for Background Alarm actions from Service Worker
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type === 'ALARM_ACTION') {
+          const { action, id } = event.data;
+          if (action === 'snooze' && id) {
+            setReminders((prev) =>
+              prev.map((r) =>
+                r.id === id
+                  ? {
+                      ...r,
+                      status: 'pending',
+                      dueDateTime: new Date(Date.now() + 5 * 60000).toISOString(),
+                    }
+                  : r
+              )
+            );
+          } else if (action === 'complete' && id) {
+            setReminders((prev) =>
+              prev.map((r) =>
+                r.id === id ? { ...r, status: 'dismissed' } : r
+              )
+            );
+          }
+        }
+      });
+    }
   }, []);
 
   // ── Auto-persist all collections to localStorage ONLY when hydrated ─────

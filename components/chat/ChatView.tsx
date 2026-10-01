@@ -174,7 +174,7 @@ export default function ChatView() {
           </div>
         ) : (
           /* Render Messages */
-          messages.map((msg) => {
+          messages.map((msg, index) => {
             const isUser = msg.role === 'user';
 
             return (
@@ -250,57 +250,12 @@ export default function ChatView() {
                         </div>
                       )}
 
-                      {/* Clean Markdown Body */}
+                      {/* Clean Markdown Body with Smooth Streaming */}
                       <div className="prose-recall leading-[1.75]">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            p({ children, ...props }: any) {
-                              return <p {...props}>{renderChildrenWithIosEmoji(children)}</p>;
-                            },
-                            li({ children, ...props }: any) {
-                              return <li {...props}>{renderChildrenWithIosEmoji(children)}</li>;
-                            },
-                            h1({ children, ...props }: any) {
-                              return <h1 {...props}>{renderChildrenWithIosEmoji(children)}</h1>;
-                            },
-                            h2({ children, ...props }: any) {
-                              return <h2 {...props}>{renderChildrenWithIosEmoji(children)}</h2>;
-                            },
-                            h3({ children, ...props }: any) {
-                              return <h3 {...props}>{renderChildrenWithIosEmoji(children)}</h3>;
-                            },
-                            strong({ children, ...props }: any) {
-                              return <strong {...props}>{renderChildrenWithIosEmoji(children)}</strong>;
-                            },
-                            em({ children, ...props }: any) {
-                              return <em {...props}>{renderChildrenWithIosEmoji(children)}</em>;
-                            },
-                            span({ children, ...props }: any) {
-                              return <span {...props}>{renderChildrenWithIosEmoji(children)}</span>;
-                            },
-                            code({ node, inline, className, children, ...props }: any) {
-                              const match = /language-(\w+)/.exec(className || '');
-                              const codeString = String(children).replace(/\n$/, '');
-
-                              if (!inline && match) {
-                                return (
-                                  <CodeBlock
-                                    language={match[1]}
-                                    value={codeString}
-                                  />
-                                );
-                              }
-                              return (
-                                <code className={className} {...props}>
-                                  {children}
-                                </code>
-                              );
-                            },
-                          }}
-                        >
-                          {msg.content}
-                        </ReactMarkdown>
+                        <StreamingMessageContent
+                          content={msg.content}
+                          isLatest={index === messages.length - 1}
+                        />
                       </div>
 
                     {/* Action Confirmation Safeguard Card */}
@@ -438,6 +393,87 @@ function CodeBlock({ language, value }: { language: string; value: string }) {
           <code>{value}</code>
         </pre>
       </div>
+    </div>
+  );
+}
+
+/* Streaming Markdown Content Component */
+function StreamingMessageContent({ content, isLatest }: { content: string; isLatest: boolean }) {
+  const [displayedLength, setDisplayedLength] = useState(() => (isLatest ? Math.min(60, content.length) : content.length));
+  const isComplete = displayedLength >= content.length;
+
+  useEffect(() => {
+    if (!isLatest) {
+      setDisplayedLength(content.length);
+      return;
+    }
+
+    if (displayedLength < content.length) {
+      const timer = setTimeout(() => {
+        setDisplayedLength((prev) => Math.min(prev + 12, content.length));
+      }, 16);
+      return () => clearTimeout(timer);
+    }
+  }, [displayedLength, content.length, isLatest]);
+
+  const textToRender = isLatest ? content.slice(0, displayedLength) : content;
+
+  return (
+    <div className="relative">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p({ children, ...props }: any) {
+            return <p {...props}>{renderChildrenWithIosEmoji(children)}</p>;
+          },
+          li({ children, ...props }: any) {
+            return <li {...props}>{renderChildrenWithIosEmoji(children)}</li>;
+          },
+          h1({ children, ...props }: any) {
+            return <h1 {...props}>{renderChildrenWithIosEmoji(children)}</h1>;
+          },
+          h2({ children, ...props }: any) {
+            return <h2 {...props}>{renderChildrenWithIosEmoji(children)}</h2>;
+          },
+          h3({ children, ...props }: any) {
+            return <h3 {...props}>{renderChildrenWithIosEmoji(children)}</h3>;
+          },
+          strong({ children, ...props }: any) {
+            return <strong {...props}>{renderChildrenWithIosEmoji(children)}</strong>;
+          },
+          em({ children, ...props }: any) {
+            return <em {...props}>{renderChildrenWithIosEmoji(children)}</em>;
+          },
+          span({ children, ...props }: any) {
+            return <span {...props}>{renderChildrenWithIosEmoji(children)}</span>;
+          },
+          code({ node, inline, className, children, ...props }: any) {
+            const match = /language-(\w+)/.exec(className || '');
+            const codeString = String(children).replace(/\n$/, '');
+
+            if (!inline && match) {
+              return (
+                <CodeBlock
+                  language={match[1]}
+                  value={codeString}
+                />
+              );
+            }
+            return (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            );
+          },
+        }}
+      >
+        {textToRender}
+      </ReactMarkdown>
+
+      {/* Subtle pulsing cursor while streaming */}
+      {isLatest && !isComplete && (
+        <span className="inline-block w-2 h-4 ml-1 bg-[#4E82EE] rounded-xs animate-pulse align-middle" />
+      )}
     </div>
   );
 }
