@@ -72,16 +72,16 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     key: 'goals',
-    title: 'Goals & OKRs',
-    subtitle: 'Strategic milestones',
+    title: 'Goals & Strategic OKRs',
+    subtitle: 'Objectives, milestones & notes',
     icon: Target,
     gradient: 'from-cyan-500 to-blue-600',
     glow: 'shadow-cyan-500/25',
   },
   {
     key: 'ledger',
-    title: 'Ledger & Dues',
-    subtitle: 'Debts & receivables',
+    title: 'Ledger & Spending',
+    subtitle: 'Dues & daily expenses',
     icon: Wallet,
     gradient: 'from-emerald-600 to-teal-600',
     glow: 'shadow-teal-500/25',
@@ -119,7 +119,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
   };
 
   return (
-    <aside className="w-full md:w-[275px] bg-(--bg-sidebar) flex flex-col h-screen select-none shrink-0 border-r border-(--border-subtle) font-sans overflow-hidden">
+    <aside className="w-full md:w-[275px] bg-(--bg-sidebar) flex flex-col h-full select-none shrink-0 border-r border-(--border-subtle) font-sans overflow-hidden">
       
       {/* ── Brand Header ── */}
       <div className="shrink-0 p-4 pb-3 border-b border-(--border-subtle)/50">
@@ -129,30 +129,11 @@ export default function Sidebar({ onClose }: SidebarProps) {
               setActiveTab('dashboard');
               if (onClose) onClose();
             }}
-            className="flex items-center gap-3 cursor-pointer group"
+            className="flex items-center gap-2.5 cursor-pointer group"
           >
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] p-0.5 shadow-md shadow-blue-500/20 shrink-0 group-hover:scale-105 transition-transform">
-              <div className="w-full h-full bg-(--bg-card) rounded-[14px] flex items-center justify-center overflow-hidden p-1">
-                <img
-                  src="/logo.png"
-                  alt="Assistance Logo"
-                  className="w-full h-full object-contain rounded-[10px]"
-                />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-[15px] tracking-tight font-cutive text-(--text-primary) group-hover:text-[#4E82EE] transition-colors">
-                  Assistance
-                </span>
-                <span className="text-[9px] uppercase font-mono font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-[#4E82EE]/15 text-[#4E82EE]">
-                  v3.0 OS
-                </span>
-              </div>
-              <p className="text-[11px] text-(--text-muted) font-medium font-cutive">
-                Personal Executive OS
-              </p>
-            </div>
+            <span className="font-bold text-lg tracking-tight text-(--text-primary) group-hover:text-[#4E82EE] transition-colors">
+              Assistance
+            </span>
           </div>
 
           {onClose && (
@@ -167,9 +148,9 @@ export default function Sidebar({ onClose }: SidebarProps) {
         </div>
       </div>
 
-      {/* ── Main Navigation List (No scrolling, fits cleanly) ── */}
-      <div className="flex-1 overflow-hidden px-3 py-1.5 space-y-1">
-        <div className="px-3 pt-0.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-(--text-muted)">
+      {/* ── Main Navigation List (Scrollable on mobile & desktop) ── */}
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1 custom-scrollbar">
+        <div className="px-3 pt-0.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-(--text-muted)">
           Workspace Modules
         </div>
 
@@ -185,16 +166,16 @@ export default function Sidebar({ onClose }: SidebarProps) {
                 setActiveTab(item.key as any);
                 if (onClose) onClose();
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-all duration-200 cursor-pointer group relative ${
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 cursor-pointer group relative ${
                 isActive
                   ? `bg-gradient-to-r ${item.gradient} text-white shadow-md ${item.glow}`
                   : 'text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
               }`}
             >
-              {/* Clean Lucide Icon without background box */}
+              {/* Clean Lucide Icon */}
               <div className="w-6 h-6 flex items-center justify-center shrink-0">
                 <Icon
-                  size={20}
+                  size={19}
                   className={`transition-transform duration-200 group-hover:scale-110 ${
                     isActive
                       ? 'text-white'
@@ -224,7 +205,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
               {/* Counter Badge */}
               {badge > 0 && (
                 <span
-                  className={`text-[11px] font-cutive px-2 py-0.5 rounded-full font-bold shrink-0 shadow-xs ${
+                  className={`text-[11px] font-mono px-2 py-0.5 rounded-full font-bold shrink-0 shadow-xs ${
                     isActive
                       ? 'bg-white text-slate-900'
                       : 'bg-(--bg-elevated) text-[#4E82EE] border border-[#4E82EE]/30'
@@ -242,7 +223,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
         })}
       </div>
 
-      {/* ── Quick Tools Row (Glassmorphic Cards) ── */}
+      {/* ── Quick Tools Row ── */}
       <div className="p-3 pt-2 border-t border-(--border-subtle)/50 space-y-2 shrink-0 bg-(--bg-card)/30">
         <div className="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) px-1">
           Quick Launch
@@ -268,7 +249,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
             className="h-10 px-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/50 hover:bg-(--bg-elevated) text-(--text-primary) transition-all text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-2xs group"
           >
             <Flame size={15} className="text-amber-500 group-hover:scale-110 transition-transform" />
-            <span>Focus 25m</span>
+            <span>Focus Timer</span>
           </button>
         </div>
 
@@ -276,7 +257,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
         <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium">
           <div className="flex items-center gap-1.5">
             <Database size={13} className="shrink-0" />
-            <span>MongoDB Cloud</span>
+            <span>Database</span>
           </div>
           <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

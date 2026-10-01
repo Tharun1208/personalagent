@@ -2,6 +2,17 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, Ta
 import jsPDF from 'jspdf';
 import { Goal } from '@/types';
 
+export interface StandaloneNote {
+  id: string;
+  title: string;
+  content: string;
+  category?: string;
+  goalId?: string;
+  goalTitle?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
 }
@@ -12,7 +23,157 @@ const CATEGORY_NAMES: Record<string, string> = {
   finance: 'Financial Wealth',
   learning: 'Learning & Skills',
   personal: 'Personal Growth',
+  general: 'General Strategy',
 };
+
+// ==========================================
+// DOCX EXPORT: STANDALONE NOTE
+// ==========================================
+export async function exportNoteToDocx(note: { title: string; content: string; category?: string; createdAt?: string }): Promise<void> {
+  const categoryLabel = CATEGORY_NAMES[note.category || 'general'] || note.category || 'Strategic Note';
+  const createdDate = note.createdAt ? new Date(note.createdAt).toLocaleDateString() : new Date().toLocaleDateString();
+
+  const doc = new Document({
+    sections: [
+      {
+        properties: {},
+        children: [
+          // Title
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [
+              new TextRun({
+                text: note.title || 'Strategic Note',
+                bold: true,
+                size: 32,
+                color: '1E3A8A',
+              }),
+            ],
+          }),
+
+          // Subtitle
+          new Paragraph({
+            spacing: { before: 100, after: 300 },
+            children: [
+              new TextRun({
+                text: `Category: ${categoryLabel}  |  Date: ${createdDate}  |  Created via Assistance OS`,
+                italics: true,
+                color: '6B7280',
+                size: 20,
+              }),
+            ],
+          }),
+
+          // Divider
+          new Paragraph({
+            spacing: { after: 200 },
+            children: [
+              new TextRun({
+                text: '--------------------------------------------------',
+                color: 'D1D5DB',
+              }),
+            ],
+          }),
+
+          // Note Content Paragraphs
+          ...(note.content && note.content.trim().length > 0
+            ? note.content.split('\n').map(
+                (line) =>
+                  new Paragraph({
+                    spacing: { after: 120 },
+                    children: [
+                      new TextRun({
+                        text: line || ' ',
+                        size: 22,
+                        color: '1F2937',
+                      }),
+                    ],
+                  })
+              )
+            : [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: 'Empty note content.',
+                      italics: true,
+                      size: 20,
+                      color: '9CA3AF',
+                    }),
+                  ],
+                }),
+              ]),
+        ],
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `${sanitizeFilename(note.title || 'Note')}.docx`);
+}
+
+// ==========================================
+// PDF EXPORT: STANDALONE NOTE
+// ==========================================
+export function exportNoteToPdf(note: { title: string; content: string; category?: string; createdAt?: string }): void {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const categoryLabel = CATEGORY_NAMES[note.category || 'general'] || note.category || 'Strategic Note';
+  const createdDate = note.createdAt ? new Date(note.createdAt).toLocaleString() : new Date().toLocaleString();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let y = 18;
+
+  // Header Banner Bar
+  doc.setFillColor(78, 130, 238);
+  doc.rect(0, 0, pageWidth, 5, 'F');
+
+  // Title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(30, 58, 138);
+  const titleLines = doc.splitTextToSize(note.title || 'Strategic Note', pageWidth - 30);
+  doc.text(titleLines, 15, y);
+  y += titleLines.length * 7 + 2;
+
+  // Meta Subtitle
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Category: ${categoryLabel}  |  Created: ${createdDate}`, 15, y);
+  y += 6;
+
+  // Divider line
+  doc.setDrawColor(226, 232, 240);
+  doc.line(15, y, pageWidth - 15, y);
+  y += 8;
+
+  // Content
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10.5);
+  doc.setTextColor(30, 41, 59);
+
+  if (note.content && note.content.trim()) {
+    const lines = doc.splitTextToSize(note.content, pageWidth - 30);
+    for (let i = 0; i < lines.length; i++) {
+      if (y > 275) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(lines[i], 15, y);
+      y += 5.5;
+    }
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(148, 163, 184);
+    doc.text('No content in this note.', 15, y);
+  }
+
+  // Footer
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  doc.text(`Exported from Assistance OS  *  ${new Date().toLocaleDateString()}`, 15, 290);
+
+  doc.save(`${sanitizeFilename(note.title || 'Note')}.pdf`);
+}
 
 // ==========================================
 // DOCX EXPORT: SINGLE GOAL & STRATEGIC NOTE
@@ -68,7 +229,6 @@ export async function exportGoalToDocx(goal: Goal): Promise<void> {
           // Title
           new Paragraph({
             heading: HeadingLevel.HEADING_1,
-            alignment: AlignmentType.LEFT,
             children: [
               new TextRun({
                 text: goal.title,
@@ -145,30 +305,6 @@ export async function exportGoalToDocx(goal: Goal): Promise<void> {
             ],
           }),
 
-          // Objective Overview / Description
-          new Paragraph({
-            heading: HeadingLevel.HEADING_2,
-            spacing: { before: 300, after: 100 },
-            children: [
-              new TextRun({
-                text: 'Objective Description & Intent',
-                bold: true,
-                size: 24,
-                color: '1E3A8A',
-              }),
-            ],
-          }),
-          new Paragraph({
-            spacing: { after: 200 },
-            children: [
-              new TextRun({
-                text: goal.description || 'No description provided.',
-                size: 22,
-                color: '374151',
-              }),
-            ],
-          }),
-
           // Key Milestones
           new Paragraph({
             heading: HeadingLevel.HEADING_2,
@@ -194,57 +330,17 @@ export async function exportGoalToDocx(goal: Goal): Promise<void> {
                   children: [new TextRun({ text: 'No milestones defined.', italics: true, size: 20 })],
                 }),
               ]),
-
-          // Strategic Notes & Action Plan
-          new Paragraph({
-            heading: HeadingLevel.HEADING_2,
-            spacing: { before: 300, after: 100 },
-            children: [
-              new TextRun({
-                text: 'Strategic Notes, Reflections & Action Plan',
-                bold: true,
-                size: 24,
-                color: '1E3A8A',
-              }),
-            ],
-          }),
-          ...(goal.notes && goal.notes.trim().length > 0
-            ? goal.notes.split('\n').map(
-                (line) =>
-                  new Paragraph({
-                    spacing: { after: 100 },
-                    children: [
-                      new TextRun({
-                        text: line || ' ',
-                        size: 22,
-                        color: '1F2937',
-                      }),
-                    ],
-                  })
-              )
-            : [
-                new Paragraph({
-                  children: [
-                    new TextRun({
-                      text: 'No strategic notes saved yet.',
-                      italics: true,
-                      size: 20,
-                      color: '9CA3AF',
-                    }),
-                  ],
-                }),
-              ]),
         ],
       },
     ],
   });
 
   const blob = await Packer.toBlob(doc);
-  downloadBlob(blob, `${sanitizeFilename(goal.title)}_Goal_Notes.docx`);
+  downloadBlob(blob, `${sanitizeFilename(goal.title)}_OKR.docx`);
 }
 
 // ==========================================
-// PDF EXPORT: SINGLE GOAL & STRATEGIC NOTE
+// PDF EXPORT: SINGLE GOAL
 // ==========================================
 export function exportGoalToPdf(goal: Goal): void {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -253,7 +349,7 @@ export function exportGoalToPdf(goal: Goal): void {
   let y = 18;
 
   // Header Banner Bar
-  doc.setFillColor(78, 130, 238); // Primary Blue
+  doc.setFillColor(78, 130, 238);
   doc.rect(0, 0, pageWidth, 6, 'F');
 
   // Title
@@ -314,22 +410,6 @@ export function exportGoalToPdf(goal: Goal): void {
   doc.text(createdDateStr, 162, y + 6);
   y += 20;
 
-  // Section: Description
-  if (goal.description) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.setTextColor(30, 58, 138);
-    doc.text('Objective Intent & Description', 15, y);
-    y += 5;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(51, 65, 85);
-    const descLines = doc.splitTextToSize(goal.description, pageWidth - 30);
-    doc.text(descLines, 15, y);
-    y += descLines.length * 5 + 6;
-  }
-
   // Section: Milestones
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
@@ -345,7 +425,7 @@ export function exportGoalToPdf(goal: Goal): void {
         y = 20;
       }
       if (m.completed) {
-        doc.setTextColor(16, 185, 129); // Emerald
+        doc.setTextColor(16, 185, 129);
         doc.setFont('helvetica', 'bold');
         doc.text('[DONE]', 16, y);
         doc.setTextColor(100, 116, 139);
@@ -370,47 +450,13 @@ export function exportGoalToPdf(goal: Goal): void {
     y += 8;
   }
 
-  // Section: Strategic Notes
-  if (y > 240) {
-    doc.addPage();
-    y = 20;
-  }
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(30, 58, 138);
-  doc.text('Strategic Notes, Reflections & Action Plan', 15, y);
-  y += 5;
-
-  if (goal.notes && goal.notes.trim().length > 0) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(30, 41, 59);
-    const noteLines = doc.splitTextToSize(goal.notes, pageWidth - 30);
-    
-    // Page break handling for notes
-    for (let i = 0; i < noteLines.length; i++) {
-      if (y > 275) {
-        doc.addPage();
-        y = 20;
-      }
-      doc.text(noteLines[i], 15, y);
-      y += 5;
-    }
-  } else {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(9.5);
-    doc.setTextColor(148, 163, 184);
-    doc.text('No notes written yet. You can add notes directly in Recall AI.', 15, y);
-  }
-
   // Footer note
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
-  doc.text(`Generated by Recall AI Strategic OKRs  *  ${new Date().toLocaleString()}`, 15, 290);
+  doc.text(`Generated by Assistance Strategic OKRs  *  ${new Date().toLocaleString()}`, 15, 290);
 
-  doc.save(`${sanitizeFilename(goal.title)}_Goal_Notes.pdf`);
+  doc.save(`${sanitizeFilename(goal.title)}_OKR.pdf`);
 }
 
 // ==========================================
@@ -473,18 +519,6 @@ export async function exportAllGoalsToDocx(goals: Goal[]): Promise<void> {
       })
     );
 
-    if (goal.description) {
-      children.push(
-        new Paragraph({
-          spacing: { after: 100 },
-          children: [
-            new TextRun({ text: 'Description: ', bold: true, size: 20 }),
-            new TextRun({ text: goal.description, size: 20, color: '374151' }),
-          ],
-        })
-      );
-    }
-
     if (goal.milestones && goal.milestones.length > 0) {
       children.push(
         new Paragraph({
@@ -492,7 +526,7 @@ export async function exportAllGoalsToDocx(goals: Goal[]): Promise<void> {
           children: [new TextRun({ text: 'Milestones:', bold: true, size: 20 })],
         })
       );
-      goal.milestones.forEach((m, mIdx) => {
+      goal.milestones.forEach((m) => {
         children.push(
           new Paragraph({
             spacing: { after: 40 },
@@ -513,22 +547,6 @@ export async function exportAllGoalsToDocx(goals: Goal[]): Promise<void> {
           })
         );
       });
-    }
-
-    if (goal.notes && goal.notes.trim()) {
-      children.push(
-        new Paragraph({
-          spacing: { before: 100, after: 50 },
-          children: [new TextRun({ text: 'Strategic Notes:', bold: true, size: 20, color: '1E3A8A' })],
-        }),
-        ...goal.notes.split('\n').map(
-          (line) =>
-            new Paragraph({
-              spacing: { after: 60 },
-              children: [new TextRun({ text: `  ${line}`, size: 20, color: '1F2937' })],
-            })
-        )
-      );
     }
 
     children.push(
@@ -582,10 +600,6 @@ export function exportAllGoalsToPdf(goals: Goal[]): void {
     const completedCount = goal.milestones?.filter((m) => m.completed).length || 0;
     const totalCount = goal.milestones?.length || 0;
 
-    // Goal Box
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(30, 58, 138);
@@ -602,14 +616,6 @@ export function exportAllGoalsToPdf(goals: Goal[]): void {
       y
     );
     y += 5;
-
-    if (goal.description) {
-      doc.setFontSize(9);
-      doc.setTextColor(51, 65, 85);
-      const descLines = doc.splitTextToSize(`Intent: ${goal.description}`, pageWidth - 30);
-      doc.text(descLines, 15, y);
-      y += descLines.length * 4.5 + 2;
-    }
 
     if (goal.milestones && goal.milestones.length > 0) {
       goal.milestones.forEach((m) => {
@@ -636,32 +642,6 @@ export function exportAllGoalsToPdf(goals: Goal[]): void {
       });
     }
 
-    if (goal.notes && goal.notes.trim()) {
-      if (y > 260) {
-        doc.addPage();
-        y = 20;
-      }
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
-      doc.setTextColor(30, 58, 138);
-      doc.text('Strategic Notes:', 15, y);
-      y += 4.5;
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(30, 41, 59);
-      const noteLines = doc.splitTextToSize(goal.notes, pageWidth - 30);
-      for (let i = 0; i < noteLines.length; i++) {
-        if (y > 275) {
-          doc.addPage();
-          y = 20;
-        }
-        doc.text(noteLines[i], 15, y);
-        y += 4.5;
-      }
-    }
-
-    // Divider Line
     doc.setDrawColor(226, 232, 240);
     doc.line(15, y + 2, pageWidth - 15, y + 2);
     y += 7;
@@ -671,7 +651,7 @@ export function exportAllGoalsToPdf(goals: Goal[]): void {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(148, 163, 184);
-  doc.text(`Generated by Recall AI Strategic OKRs  *  ${new Date().toLocaleString()}`, 15, 290);
+  doc.text(`Generated by Assistance Strategic OKRs  *  ${new Date().toLocaleString()}`, 15, 290);
 
   doc.save('Goals_and_Strategic_OKRs_Report.pdf');
 }

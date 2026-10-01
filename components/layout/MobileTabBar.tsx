@@ -9,6 +9,7 @@ import {
   Wallet,
   Calendar,
   Settings,
+  Target,
   Menu,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
@@ -18,7 +19,7 @@ interface MobileTabBarProps {
 }
 
 export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
-  const { activeTab, setActiveTab, tasks, ledgerEntries } = useApp();
+  const { activeTab, setActiveTab, tasks, ledgerEntries, goals } = useApp();
 
   const pendingTasks = tasks.filter((t) => t.status !== 'completed').length;
   const pendingLedger = (ledgerEntries || []).filter((l) => l.status === 'pending').length;
@@ -41,6 +42,12 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
       icon: Flame,
     },
     {
+      key: 'goals',
+      label: 'OKRs & Notes',
+      icon: Target,
+      badge: goals.length > 0 ? goals.length : undefined,
+    },
+    {
       key: 'ledger',
       label: 'Ledger',
       icon: Wallet,
@@ -51,15 +58,10 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
       label: 'Calendar',
       icon: Calendar,
     },
-    {
-      key: 'settings',
-      label: 'Settings',
-      icon: Settings,
-    },
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-(--bg-card)/90 backdrop-blur-xl border-t border-(--border-subtle)/60 px-2 py-1.5 flex items-center justify-around select-none safe-area-bottom shadow-lg">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-(--bg-card)/95 backdrop-blur-xl border-t border-(--border-subtle)/60 px-1.5 py-1.5 flex items-center justify-around select-none safe-area-bottom shadow-lg">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.key;
         const Icon = tab.icon;
@@ -67,8 +69,9 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
         return (
           <button
             key={tab.key}
+            type="button"
             onClick={() => setActiveTab(tab.key as any)}
-            className={`relative flex flex-col items-center justify-center py-1 px-2.5 rounded-2xl transition-all duration-200 cursor-pointer active:scale-90 touch-manipulation ${
+            className={`relative flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all duration-200 cursor-pointer active:scale-90 touch-manipulation flex-1 ${
               isActive
                 ? 'text-[#4E82EE]'
                 : 'text-(--text-muted) hover:text-(--text-primary)'
@@ -76,12 +79,12 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
           >
             {/* Active Pill Glow */}
             {isActive && (
-              <span className="absolute -top-1 w-7 h-1 rounded-full bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] shadow-xs shadow-blue-500/50" />
+              <span className="absolute -top-1 w-6 h-1 rounded-full bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] shadow-xs shadow-blue-500/50" />
             )}
 
             <div className="relative">
               <Icon
-                size={21}
+                size={20}
                 className={`transition-transform duration-200 ${
                   isActive ? 'scale-110 text-[#4E82EE]' : ''
                 }`}
@@ -96,7 +99,7 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
             </div>
 
             <span
-              className={`text-[10px] font-semibold mt-0.5 tracking-tight ${
+              className={`text-[9.5px] font-semibold mt-0.5 tracking-tight truncate max-w-[54px] ${
                 isActive ? 'font-bold text-[#4E82EE]' : 'text-(--text-muted)'
               }`}
             >
@@ -105,6 +108,18 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
           </button>
         );
       })}
+
+      {/* Menu / Drawer button */}
+      <button
+        type="button"
+        onClick={onOpenMobileMenu}
+        className="relative flex flex-col items-center justify-center py-1 px-2 rounded-2xl text-(--text-muted) hover:text-(--text-primary) transition-all duration-200 cursor-pointer active:scale-90 touch-manipulation flex-1"
+      >
+        <div className="relative">
+          <Menu size={20} />
+        </div>
+        <span className="text-[9.5px] font-semibold mt-0.5 tracking-tight">More</span>
+      </button>
     </nav>
   );
 }

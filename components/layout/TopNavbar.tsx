@@ -67,25 +67,11 @@ export default function TopNavbar({
               startNewChat();
             }
           }}
-          className="flex items-center gap-2.5 cursor-pointer group"
+          className="flex items-center cursor-pointer group"
         >
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] p-0.5 shadow-md shadow-blue-500/15 shrink-0 group-hover:scale-105 transition-transform">
-            <div className="w-full h-full bg-(--bg-card) rounded-[10px] flex items-center justify-center overflow-hidden p-0.5">
-              <img
-                src="/logo.png"
-                alt="Assistance Logo"
-                className="w-full h-full object-contain"
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-sm sm:text-base tracking-tight font-cutive text-(--text-primary) group-hover:text-[#4E82EE] transition-colors">
-              Assistance
-            </span>
-            <span className="text-[9px] uppercase font-mono font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-[#4E82EE]/15 text-[#4E82EE]">
-              v3.0
-            </span>
-          </div>
+          <span className="font-bold text-base sm:text-lg tracking-tight text-(--text-primary) group-hover:text-[#4E82EE] transition-colors">
+            Assistance
+          </span>
         </div>
 
         {/* Quick New Chat Button */}
