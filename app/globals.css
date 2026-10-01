@@ -419,3 +419,15 @@ button:active:not(:disabled),
   animation: float 4s ease-in-out infinite;
 }
 
+/* Mobile-First Safe Area & Touch Classes */
+.safe-area-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+

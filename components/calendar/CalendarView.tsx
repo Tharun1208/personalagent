@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Clock,
   CheckCircle2,
+  CheckSquare,
   AlertCircle,
   Plus,
   Sparkles,
@@ -75,7 +76,7 @@ export default function CalendarView() {
     if (!datePickerOpen) setDatePickerAlign(pickAlign(datePickerAnchorRef.current, 240));
     setDatePickerOpen((o) => !o);
   };
-  const [filterType, setFilterType] = useState<'all' | 'tasks' | 'reminders' | 'holidays' | 'completed'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'events' | 'tasks' | 'holidays' | 'completed'>('all');
   
   // Quick natural language input
   const [quickInput, setQuickInput] = useState('');
@@ -136,7 +137,7 @@ export default function CalendarView() {
     return items
       .filter((item) => {
         if (filterType === 'tasks') return item.type === 'task' && item.status !== 'completed';
-        if (filterType === 'reminders') return item.type === 'reminder';
+        if (filterType === 'events') return item.type === 'reminder' || item.type === 'task';
         if (filterType === 'completed') return item.status === 'completed';
         return true;
       })
@@ -674,7 +675,7 @@ export default function CalendarView() {
 
         {/* Filter Badges */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
-          {(['all', 'tasks', 'reminders', 'holidays', 'completed'] as const).map((ft) => (
+          {(['all', 'events', 'tasks', 'holidays', 'completed'] as const).map((ft) => (
             <button
               key={ft}
               onClick={() => setFilterType(ft)}
@@ -685,10 +686,7 @@ export default function CalendarView() {
               }`}
             >
               {ft === 'holidays' ? (
-                <>
-                  <span>🏛️</span>
-                  <span>Govt Holidays</span>
-                </>
+                <span>Govt Holidays</span>
               ) : (
                 ft
               )}
@@ -1465,7 +1463,7 @@ export default function CalendarView() {
                     Schedule Calendar Event
                   </h2>
                   <p className="text-[11px] text-(--text-muted)">
-                    Add an event, task deadline, or reminder alarm
+                    Add a calendar event, milestone, or task deadline
                   </p>
                 </div>
               </div>
@@ -1481,9 +1479,9 @@ export default function CalendarView() {
               {/* Type Selector */}
               <div>
                 <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5 uppercase tracking-wider">
-                  Event Type
+                  Schedule Type
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setModalType('event')}
@@ -1493,18 +1491,8 @@ export default function CalendarView() {
                         : 'bg-(--bg-elevated) border-(--border-subtle) text-(--text-muted)'
                     }`}
                   >
-                    <span>📅 Event</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setModalType('alarm')}
-                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                      modalType === 'alarm'
-                        ? 'bg-amber-500/15 border-amber-500 text-amber-600 dark:text-amber-400 shadow-2xs'
-                        : 'bg-(--bg-elevated) border-(--border-subtle) text-(--text-muted)'
-                    }`}
-                  >
-                    <span>⏰ Alarm</span>
+                    <CalendarIcon size={14} />
+                    <span>Calendar Event</span>
                   </button>
                   <button
                     type="button"
@@ -1515,7 +1503,8 @@ export default function CalendarView() {
                         : 'bg-(--bg-elevated) border-(--border-subtle) text-(--text-muted)'
                     }`}
                   >
-                    <span>✅ Task</span>
+                    <CheckSquare size={14} />
+                    <span>Task Deadline</span>
                   </button>
                 </div>
               </div>

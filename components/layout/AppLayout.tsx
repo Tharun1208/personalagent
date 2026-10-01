@@ -24,6 +24,7 @@ import TimerWidget from '@/components/widgets/TimerWidget';
 import CustomConfirmModal from '@/components/common/CustomConfirmModal';
 import CustomToastAlert from '@/components/common/CustomToastAlert';
 import SplashScreen from '@/components/common/SplashScreen';
+import MobileTabBar from '@/components/layout/MobileTabBar';
 
 export default function AppLayout() {
   const {
@@ -152,6 +153,8 @@ export default function AppLayout() {
             </motion.div>
           </AnimatePresence>
         </main>
+        {/* Native Mobile Bottom Navigation Bar */}
+        <MobileTabBar onOpenMobileMenu={() => setMobileMenuOpen(true)} />
       </div>
 
       {/* Global Modals / Drawers / Widgets */}
@@ -168,7 +171,7 @@ export default function AppLayout() {
       <CustomToastAlert toasts={toasts} onDismiss={dismissToast} />
 
       {focusTimerOpen && (
-        <div className="fixed bottom-16 md:bottom-6 right-4 md:right-6 z-40 shadow-2xl animate-in slide-in-from-bottom-5 duration-200">
+        <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-40 shadow-2xl animate-in slide-in-from-bottom-5 duration-200">
           <TimerWidget onClose={() => setFocusTimerOpen(false)} />
         </div>
       )}

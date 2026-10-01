@@ -13,7 +13,6 @@ import {
   LayoutDashboard,
   Sparkles,
   CheckSquare,
-  Bell,
   Target,
   Wallet,
   Boxes,
@@ -64,14 +63,6 @@ const NAV_ITEMS: NavItem[] = [
     glow: 'shadow-emerald-500/25',
   },
   {
-    key: 'reminders',
-    title: 'Alarms & Alerts',
-    subtitle: 'Real-time notifications',
-    icon: Bell,
-    gradient: 'from-amber-500 to-orange-500',
-    glow: 'shadow-amber-500/25',
-  },
-  {
     key: 'habits',
     title: 'Habits & Streaks',
     subtitle: 'Daily routine tracker',
@@ -110,7 +101,6 @@ export default function Sidebar({ onClose }: SidebarProps) {
     activeTab,
     setActiveTab,
     tasks,
-    reminders,
     goals,
     ledgerEntries,
     user,
@@ -119,12 +109,10 @@ export default function Sidebar({ onClose }: SidebarProps) {
   } = useApp();
 
   const pendingTaskCount = tasks.filter((t) => t.status !== 'completed').length;
-  const pendingReminderCount = reminders.filter((r) => r.status === 'pending').length;
   const pendingLedgerCount = (ledgerEntries || []).filter((l) => l.status === 'pending').length;
 
   const getBadge = (key: string) => {
     if (key === 'tasks') return pendingTaskCount;
-    if (key === 'reminders') return pendingReminderCount;
     if (key === 'ledger') return pendingLedgerCount;
     if (key === 'goals') return goals.length;
     return 0;

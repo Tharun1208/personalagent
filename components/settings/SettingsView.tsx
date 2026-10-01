@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Settings,
-  User as UserIcon,
   Check,
   Download,
   Trash2,
@@ -11,114 +10,33 @@ import {
   Moon,
   Palette,
   ShieldCheck,
-  Bell,
-  Volume2,
-  Play,
   Upload,
   Sparkles,
-  Music,
-  Radio,
-  Zap,
-  Flame,
-  Layers,
-  Compass,
   ChevronRight,
   ArrowLeft,
-  Info,
-  Shield,
   Lock,
-  Mail,
-  LogOut,
-  KeyRound,
-  Eye,
-  EyeOff,
-  AlertCircle,
   Cloud,
   CloudUpload,
-  CloudDownload,
-  HardDrive,
   RefreshCw,
   FileJson,
-  CheckCircle2,
-  Calendar,
-  FolderGit2,
-  Send,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
-import { soundEngine } from '@/lib/audio/soundEngine';
 import { apiFetch } from '@/lib/api';
-
-const BUILT_IN_TONES = [
-  { id: 'digital', name: 'Digital Pulse', desc: 'Crisp high-tech triple electronic beep', IconComponent: Zap, color: 'text-amber-500 bg-amber-500/10' },
-  { id: 'cosmic', name: 'Cosmic Chime', desc: 'Harmonic resonant chime arpeggio', IconComponent: Sparkles, color: 'text-indigo-500 bg-indigo-500/10' },
-  { id: 'zen', name: 'Zen Bell', desc: '432Hz deep soothing Tibetan gong', IconComponent: Compass, color: 'text-emerald-500 bg-emerald-500/10' },
-  { id: 'radar', name: 'Radar Beacon', desc: 'Urgent sonar frequency pulses', IconComponent: Radio, color: 'text-rose-500 bg-rose-500/10' },
-  { id: 'gentle', name: 'Gentle Morning', desc: 'Warm melodic synth chord progression', IconComponent: Sun, color: 'text-amber-400 bg-amber-400/10' },
-  { id: 'retro', name: 'Retro 8-Bit', desc: 'Classic arcade game powerup chime', IconComponent: Layers, color: 'text-cyan-500 bg-cyan-500/10' },
-  { id: 'cyber', name: 'Cyber Wave', desc: 'Futuristic synth crescendo sweep', IconComponent: Flame, color: 'text-purple-500 bg-purple-500/10' },
-  { id: 'custom', name: 'Custom Sound File / URL', desc: 'Your own uploaded MP3/WAV or sound link', IconComponent: Music, color: 'text-blue-500 bg-blue-500/10' },
-];
 
 export default function SettingsView() {
   const appCtx = useApp();
-  const { user, updateUser, updateUserPreferences, refreshAll, theme, setTheme, showToast, showConfirm, signOut } = appCtx;
-  const setAuthModalOpen = appCtx.setAuthModalOpen;
+  const { user, updateUser, refreshAll, theme, setTheme, showToast, showConfirm } = appCtx;
   
-  // 'main' (system settings list), 'profile', 'alarms', 'security', 'data', 'backup', 'developer'
-  const [currentView, setCurrentView] = useState<'main' | 'profile' | 'alarms' | 'security' | 'data' | 'backup' | 'developer'>('main');
-
-  // Developer & Integrations state
-  const [githubToken, setGithubToken] = useState<string>('');
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedGit = localStorage.getItem('recall_github_token');
-      if (savedGit) setGithubToken(savedGit);
-    }
-  }, []);
-
-  const handleSaveGithubToken = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('recall_github_token', githubToken.trim());
-      showToast('✓ GitHub Token saved securely!', 'success');
-    }
-  };
-
-  const handleTestNotification = async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      showToast('Notifications not supported in this browser', 'error');
-      return;
-    }
-    let perm = Notification.permission;
-    if (perm !== 'granted') {
-      perm = await Notification.requestPermission();
-    }
-    if (perm === 'granted') {
-      new Notification('Recall AI · Test Alert', {
-        body: '✓ Background notifications are working properly!',
-        icon: '/icon-192.png',
-      });
-      showToast('✓ Test notification sent!', 'success');
-    } else {
-      showToast('Notification permission was denied in browser settings', 'error');
-    }
-  };
-
-  const handleDownloadIcs = () => {
-    if (typeof window !== 'undefined') {
-      window.open('/api/google/sync?format=ics', '_blank');
-      showToast('✓ Google Calendar (.ics) exported successfully!', 'success');
-    }
-  };
+  // 'main' (system settings list), 'profile', 'data', 'backup'
+  const [currentView, setCurrentView] = useState<'main' | 'profile' | 'data' | 'backup'>('main');
 
   // WhatsApp-style Backup states (Local Vault & Google Drive)
   const [googleToken, setGoogleToken] = useState<string>('');
   const [lastLocalBackup, setLastLocalBackup] = useState<string>('Today, 2:00 AM');
   const [lastDriveBackup, setLastDriveBackup] = useState<string>('');
   const [backupSize, setBackupSize] = useState<string>('184 KB');
-  const [googleAccount, setGoogleAccount] = useState<string>(user?.email || 'tharun@gmail.com');
+  const [googleAccount, setGoogleAccount] = useState<string>(user?.email || 'user@assistance.ai');
   const [backupFrequency, setBackupFrequency] = useState<string>('daily');
-  const [backupNetwork, setBackupNetwork] = useState<string>('wifi');
   const [e2eeEnabled, setE2eeEnabled] = useState<boolean>(true);
   const [isBackingUp, setIsBackingUp] = useState<boolean>(false);
   const [backupProgress, setBackupProgress] = useState<number>(0);
@@ -130,30 +48,9 @@ export default function SettingsView() {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Auth / Security Sub-page states
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authName, setAuthName] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [authSuccess, setAuthSuccess] = useState<string | null>(null);
-
-  // Alarm states
-  const [selectedTone, setSelectedTone] = useState<string>(user?.preferences?.alarmTone || 'digital');
-  const [customUrl, setCustomUrl] = useState(user?.preferences?.customAlarmUrl || '');
-  const [customName, setCustomName] = useState(user?.preferences?.customAlarmName || '');
-  const [volume, setVolume] = useState(user?.preferences?.alarmVolume ?? 0.8);
-  const [isPlayingPreview, setIsPlayingPreview] = useState(false);
-
   useEffect(() => {
     if (user) {
       setName(user.name || '');
-      if (user.preferences?.alarmTone) setSelectedTone(user.preferences.alarmTone);
-      if (user.preferences?.customAlarmUrl) setCustomUrl(user.preferences.customAlarmUrl);
-      if (user.preferences?.customAlarmName) setCustomName(user.preferences.customAlarmName);
-      if (user.preferences?.alarmVolume !== undefined) setVolume(user.preferences.alarmVolume);
     }
   }, [user]);
 
@@ -175,47 +72,6 @@ export default function SettingsView() {
     }
   };
 
-  const handleSaveAlarmPreferences = async () => {
-    setIsSaving(true);
-    try {
-      await updateUserPreferences({
-        alarmTone: selectedTone as any,
-        customAlarmUrl: customUrl || undefined,
-        customAlarmName: customName || undefined,
-        alarmVolume: volume,
-      });
-      setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3000);
-      refreshAll();
-    } catch (err) {
-      console.error('Failed to save alarm preferences', err);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handlePreviewTone = (toneId: string) => {
-    soundEngine.stopCustomAudio();
-    setIsPlayingPreview(true);
-    soundEngine.playAlarm(toneId, volume, toneId === 'custom' ? customUrl : undefined);
-    setTimeout(() => setIsPlayingPreview(false), 2000);
-  };
-
-  const handleCustomAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUri = event.target?.result as string;
-      setCustomUrl(dataUri);
-      setCustomName(file.name);
-      setSelectedTone('custom');
-      soundEngine.playCustomAudio(dataUri, volume);
-    };
-    reader.readAsDataURL(file);
-  };
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedLocal = localStorage.getItem('recall_backup_local_time');
@@ -223,7 +79,6 @@ export default function SettingsView() {
       const storedSize = localStorage.getItem('recall_backup_size');
       const storedAccount = localStorage.getItem('recall_backup_google_account');
       const storedFreq = localStorage.getItem('recall_backup_freq');
-      const storedNetwork = localStorage.getItem('recall_backup_network');
       const storedE2ee = localStorage.getItem('recall_backup_e2ee');
       const storedGToken = localStorage.getItem('recall_google_drive_token');
 
@@ -233,7 +88,6 @@ export default function SettingsView() {
       if (storedAccount) setGoogleAccount(storedAccount);
       else if (user?.email) setGoogleAccount(user.email);
       if (storedFreq) setBackupFrequency(storedFreq);
-      if (storedNetwork) setBackupNetwork(storedNetwork);
       if (storedE2ee !== null) setE2eeEnabled(storedE2ee === 'true');
       if (storedGToken) setGoogleToken(storedGToken);
     }
@@ -408,7 +262,7 @@ export default function SettingsView() {
   const handleWipeData = () => {
     showConfirm({
       title: 'Wipe All Personal Data',
-      message: 'This will permanently delete all your memories, tasks, reminders, and preferences. This action cannot be undone.',
+      message: 'This will permanently delete all your memories, tasks, habits, and preferences. This action cannot be undone.',
       confirmText: 'Yes, Wipe Everything',
       cancelText: 'Cancel',
       type: 'danger',
@@ -424,73 +278,6 @@ export default function SettingsView() {
         } catch (err) {
           console.error('Wipe failed', err);
           showToast('Failed to wipe data. Please try again.', 'error');
-        }
-      },
-    });
-  };
-
-  const handleAuthSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-    setAuthSuccess(null);
-    setAuthLoading(true);
-
-    try {
-      const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
-      const body = authMode === 'login' ? { email: authEmail, password: authPassword } : { name: authName, email: authEmail, password: authPassword };
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setAuthError(data.error || 'Authentication failed');
-        setAuthLoading(false);
-        return;
-      }
-
-      if (data.user) {
-        try {
-          localStorage.setItem('recall_user', JSON.stringify(data.user));
-          if (data.token) {
-            localStorage.setItem('recall_token', data.token);
-          }
-        } catch {}
-        await updateUser(data.user);
-        setAuthSuccess(authMode === 'login' ? 'Signed in successfully!' : 'Account registered successfully!');
-        await refreshAll();
-        setTimeout(() => {
-          setCurrentView('main');
-        }, 1000);
-      }
-    } catch (err) {
-      setAuthError('Connection error. Please try again.');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleSignOut = () => {
-    showConfirm({
-      title: 'Sign Out',
-      message: 'Are you sure you want to sign out? Your local data remains saved on this device.',
-      confirmText: 'Sign Out',
-      cancelText: 'Stay Signed In',
-      type: 'warning',
-      onConfirm: async () => {
-        try {
-          // Proper sign-out: clears token, user cache and all locally cached
-          // data. AppLayout will show the AuthScreen fresh.
-          await signOut();
-          setCurrentView('main');
-          showToast('Signed out successfully.', 'info');
-        } catch (err) {
-          console.error('Sign out error', err);
-          showToast('Sign out failed. Please try again.', 'error');
         }
       },
     });
@@ -518,16 +305,12 @@ export default function SettingsView() {
             <h1 className="font-semibold text-xs sm:text-sm text-(--text-primary)">
               {currentView === 'main' && 'System Settings'}
               {currentView === 'profile' && 'Profile & Appearance'}
-              {currentView === 'alarms' && 'Alarm Sounds & Ringtones'}
-              {currentView === 'security' && 'Account & Cloud Security'}
               {currentView === 'data' && 'Data & Privacy'}
-              {currentView === 'backup' && 'Chat & Cloud Backup'}
+              {currentView === 'backup' && 'Chat & Vault Backup'}
             </h1>
             <p className="text-[10px] sm:text-[11px] text-(--text-muted)">
-              {currentView === 'main' && 'Personal preferences, alarms, themes, and storage'}
+              {currentView === 'main' && 'Personal preferences, themes, sync, and storage'}
               {currentView === 'profile' && 'Manage your personal identity, display name, and color theme'}
-              {currentView === 'alarms' && 'Manage ringtone audio, volume, and custom sounds'}
-              {currentView === 'security' && 'Manage cloud authentication, data sync, and account security'}
               {currentView === 'data' && 'Manage local data backups and privacy storage'}
               {currentView === 'backup' && 'WhatsApp-style Google Drive backup, restore & encryption'}
             </p>
@@ -542,7 +325,7 @@ export default function SettingsView() {
       </div>
 
       {/* Main Settings Body */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 flex justify-center custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 flex justify-center custom-scrollbar pb-24 md:pb-8">
         <div className="w-full max-w-2xl space-y-6">
           {/* ───────────────────────────────────────────────────────────── */}
           {/* VIEW 1: Main System Settings List Hub (Like iOS / Android)    */}
@@ -605,52 +388,10 @@ export default function SettingsView() {
                     </div>
                     <ChevronRight size={16} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
                   </div>
-
-                  {/* Item 2: Alarm Sounds & Ringtones */}
-                  <div
-                    onClick={() => setCurrentView('alarms')}
-                    className="p-4 hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center justify-between group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
-                        <Bell size={17} />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-xs sm:text-sm text-(--text-primary)">
-                          Alarm Sounds & Ringtones
-                        </div>
-                        <div className="text-[11px] text-(--text-muted)">
-                          Ringtone synthesizer, audio upload, volume ({Math.round(volume * 100)}%)
-                        </div>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
-                  </div>
-
-                  {/* Item 3: Account & Cloud Security */}
-                  <div
-                    onClick={() => setCurrentView('security')}
-                    className="p-4 hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center justify-between group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                        <ShieldCheck size={17} />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-xs sm:text-sm text-(--text-primary)">
-                          Account & Security
-                        </div>
-                        <div className="text-[11px] text-(--text-muted)">
-                          {user?.name || 'Personal Account'} · Active & Secured
-                        </div>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
-                  </div>
                 </div>
               </div>
 
-              {/* Group 2: Data & Privacy */}
+              {/* Group 2: Data & Storage */}
               <div className="space-y-2">
                 <div className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider px-2">
                   System & Storage
@@ -680,7 +421,7 @@ export default function SettingsView() {
                     <ChevronRight size={16} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
                   </div>
 
-                  {/* Item 3: Data & Privacy */}
+                  {/* Item 2: Data & Privacy */}
                   <div
                     onClick={() => setCurrentView('data')}
                     className="p-4 hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center justify-between group"
@@ -701,30 +442,6 @@ export default function SettingsView() {
                     <ChevronRight size={16} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
                   </div>
 
-                  {/* Item 4: Developer & Google Sync */}
-                  <div
-                    onClick={() => setCurrentView('developer')}
-                    className="p-4 hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center justify-between group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0">
-                        <FolderGit2 size={17} />
-                      </div>
-                      <div>
-                        <div className="font-semibold text-xs sm:text-sm text-(--text-primary) flex items-center gap-2">
-                          <span>Developer & Integrations</span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400">
-                            GitHub & Sync
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-(--text-muted)">
-                          GitHub token, Google Calendar sync & native push alerts
-                        </div>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
-                  </div>
-
                   {/* App Info row */}
                   <div className="p-4 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3">
@@ -736,12 +453,12 @@ export default function SettingsView() {
                           Assistance Personal AI
                         </div>
                         <div className="text-[11px] text-(--text-muted)">
-                          Version 2.4 · Android & Web
+                          Version 2.5 · Mobile-First OS
                         </div>
                       </div>
                     </div>
                     <span className="text-[11px] px-2.5 py-1 rounded-full bg-(--bg-elevated) text-(--text-secondary) font-mono">
-                      v2.4
+                      v2.5
                     </span>
                   </div>
                 </div>
@@ -769,8 +486,8 @@ export default function SettingsView() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5 uppercase tracking-wider">
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-(--text-secondary) uppercase tracking-wider">
                     Display Name
                   </label>
                   <input
@@ -779,17 +496,14 @@ export default function SettingsView() {
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter your name..."
                     required
-                    className="w-full px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-sm font-medium text-(--text-primary) focus:outline-none focus:border-[#4E82EE]"
+                    className="w-full px-4 py-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-sm text-(--text-primary) focus:outline-hidden focus:border-[#4E82EE] transition-all font-medium"
                   />
-                  <p className="text-[11px] text-(--text-muted) mt-1.5">
-                    When you ask "what is my name", Assistance will reply with this exact name.
-                  </p>
                 </div>
 
                 {/* Theme Selector */}
-                <div className="border-t border-(--border-subtle) pt-5">
-                  <label className="block text-xs font-semibold text-(--text-secondary) mb-2.5 uppercase tracking-wider flex items-center gap-1.5">
-                    <Palette size={14} /> Color Theme
+                <div className="space-y-3 pt-2">
+                  <label className="block text-xs font-semibold text-(--text-secondary) uppercase tracking-wider">
+                    Color Theme Mode
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
@@ -852,334 +566,17 @@ export default function SettingsView() {
           )}
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 3: Alarm Sounds & Ringtones Detail Sub-Page              */}
-          {/* ───────────────────────────────────────────────────────────── */}
-          {currentView === 'alarms' && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-6">
-                <div>
-                  <h3 className="text-sm font-bold text-(--text-primary) flex items-center gap-2">
-                    <Bell size={16} className="text-rose-500" />
-                    Alarm Ringtone & Synthesizer
-                  </h3>
-                  <p className="text-xs text-(--text-muted) mt-1">
-                    Select the audio tone played when alarms and scheduled reminders trigger.
-                  </p>
-                </div>
-
-                {/* Ringtone Tiles Grid */}
-                <div className="space-y-2.5">
-                  <label className="block text-xs font-semibold text-(--text-secondary) uppercase tracking-wider">
-                    Available Ringtones
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {BUILT_IN_TONES.map((tone) => {
-                      const isSelected = selectedTone === tone.id;
-                      const IconComp = tone.IconComponent;
-                      return (
-                        <div
-                          key={tone.id}
-                          onClick={() => {
-                            setSelectedTone(tone.id);
-                            handlePreviewTone(tone.id);
-                          }}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between group ${
-                            isSelected
-                              ? 'border-[#4E82EE] bg-[#4E82EE]/10 ring-2 ring-[#4E82EE]/20 shadow-xs'
-                              : 'border-(--border-subtle) bg-(--bg-elevated) hover:border-(--border-medium)'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0 pr-2">
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${tone.color}`}>
-                              <IconComp size={16} />
-                            </div>
-                            <div className="min-w-0">
-                              <div className="font-semibold text-xs text-(--text-primary) truncate flex items-center gap-1.5">
-                                {tone.name}
-                                {isSelected && <Check size={13} className="text-[#4E82EE]" />}
-                              </div>
-                              <div className="text-[10px] text-(--text-muted) truncate">{tone.desc}</div>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePreviewTone(tone.id);
-                            }}
-                            title="Play Preview"
-                            className="p-1.5 rounded-lg bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-[#4E82EE] transition-colors cursor-pointer shrink-0"
-                          >
-                            <Play size={12} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Custom Audio Upload & URL Section */}
-                <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-(--text-primary) flex items-center gap-1.5">
-                      <Music size={14} className="text-[#4E82EE]" />
-                      Custom Audio File (MP3 / WAV)
-                    </span>
-                    {customName && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-(--bg-card) text-[#4E82EE] font-mono truncate max-w-[160px]">
-                        {customName}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-center gap-2">
-                    <label className="w-full sm:w-auto px-4 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/40 text-xs font-medium text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-2 shrink-0">
-                      <Upload size={13} />
-                      <span>Upload Audio File</span>
-                      <input
-                        type="file"
-                        accept="audio/*"
-                        onChange={handleCustomAudioUpload}
-                        className="hidden"
-                      />
-                    </label>
-
-                    <input
-                      type="url"
-                      value={customUrl.startsWith('data:') ? 'Local audio file attached' : customUrl}
-                      disabled={customUrl.startsWith('data:')}
-                      onChange={(e) => {
-                        setCustomUrl(e.target.value);
-                        setSelectedTone('custom');
-                      }}
-                      placeholder="Or paste direct audio URL..."
-                      className="w-full px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-xs focus:outline-none focus:border-[#4E82EE]"
-                    />
-
-                    {customUrl && (
-                      <button
-                        type="button"
-                        onClick={() => handlePreviewTone('custom')}
-                        className="px-3 py-2 rounded-xl bg-[#4E82EE] text-white text-xs font-semibold hover:opacity-90 transition-all cursor-pointer shrink-0 flex items-center gap-1"
-                      >
-                        <Play size={12} /> Test
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Volume Slider */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-(--text-secondary) flex items-center gap-1.5">
-                      <Volume2 size={14} /> Alarm Volume Level
-                    </span>
-                    <span className="font-mono text-[11px] text-(--text-muted)">{Math.round(volume * 100)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={volume}
-                    onChange={(e) => {
-                      const v = parseFloat(e.target.value);
-                      setVolume(v);
-                    }}
-                    className="w-full accent-[#4E82EE] cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setCurrentView('main')}
-                  className="px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveAlarmPreferences}
-                  disabled={isSaving}
-                  className="px-6 py-2.5 rounded-xl bg-(--accent) text-(--accent-contrast) hover:opacity-90 font-semibold text-sm transition-all cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isSaving ? <span>Saving...</span> : <><span>Save Alarm Settings</span><Check size={16} /></>}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 4: Account & Cloud Security Sub-Page                    */}
-          {/* ───────────────────────────────────────────────────────────── */}
-          {currentView === 'security' && (
-            <div className="space-y-5 animate-in fade-in duration-200">
-              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-6">
-                <div>
-                  <h3 className="text-sm font-bold text-(--text-primary) flex items-center gap-2">
-                    <ShieldCheck size={16} className="text-emerald-500" />
-                    Account & Cloud Security
-                  </h3>
-                  <p className="text-xs text-(--text-muted) mt-1">
-                    Manage your account credentials, cloud synchronization, and active sessions.
-                  </p>
-                </div>
-
-                {/* Active Secured Account Card */}
-                <div className="space-y-4">
-                  <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#4E82EE] to-emerald-500 text-white flex items-center justify-center font-bold text-base shadow-xs">
-                        {user?.name?.[0] || 'U'}
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-(--text-primary)">{user?.name || 'Personal User'}</div>
-                        <div className="text-[11px] text-(--text-muted)">{user?.email || 'user@assistance.ai'}</div>
-                      </div>
-                    </div>
-                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                      <Check size={12} /> Unlimited Full Access
-                    </span>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-3 text-xs">
-                    <div className="font-semibold text-(--text-primary)">Security & Cloud Status</div>
-                    <div className="text-[11px] text-(--text-muted) flex items-center justify-between">
-                      <span>Account Type:</span>
-                      <span className="font-semibold text-(--text-primary)">Primary Administrator (Full Access)</span>
-                    </div>
-                    <div className="text-[11px] text-(--text-muted) flex items-center justify-between">
-                      <span>Device Sync:</span>
-                      <span className="text-emerald-500 font-semibold">Active & Live Synced</span>
-                    </div>
-                    <div className="text-[11px] text-(--text-muted) flex items-center justify-between">
-                      <span>Local Storage:</span>
-                      <span className="text-emerald-500 font-semibold">Encrypted Client Database</span>
-                    </div>
-                    <div className="text-[11px] text-(--text-muted) flex items-center justify-between">
-                      <span>Guest Restrictions:</span>
-                      <span className="text-emerald-500 font-semibold">Disabled (Unlimited Prompts)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setCurrentView('main')}
-                  className="px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
-                >
-                  Back to Settings
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 5: Data & Privacy Detail Sub-Page                       */}
-          {/* ───────────────────────────────────────────────────────────── */}
-          {currentView === 'data' && (
-            <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-5 animate-in fade-in duration-200">
-              <div>
-                <h3 className="text-sm font-bold text-(--text-primary) flex items-center gap-2">
-                  <ShieldCheck size={16} className="text-emerald-500" />
-                  Data Ownership & Privacy
-                </h3>
-                <p className="text-xs text-(--text-muted) mt-1">
-                  All your memories, tasks, alarms, and personal notes are stored locally on your device.
-                </p>
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center justify-between gap-3">
-                  <div>
-                    <div className="font-bold text-xs text-(--text-primary)">Export All Data Backup</div>
-                    <div className="text-[11px] text-(--text-muted)">Download structured JSON of all your data</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleExportData}
-                    className="px-3.5 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/40 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-                  >
-                    <Download size={13} />
-                    <span>Download JSON</span>
-                  </button>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-rose-500/5 border border-rose-500/20 flex items-center justify-between gap-3">
-                  <div>
-                    <div className="font-bold text-xs text-rose-500">Wipe All Personal Data</div>
-                    <div className="text-[11px] text-(--text-muted)">Permanently delete all stored records & preferences</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleWipeData}
-                    className="px-3.5 py-2 rounded-xl bg-rose-500/10 border border-rose-500/30 hover:bg-rose-500/20 text-xs font-semibold text-rose-500 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-                  >
-                    <Trash2 size={13} />
-                    <span>Wipe Data</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-3">
-                <button
-                  type="button"
-                  onClick={() => setCurrentView('main')}
-                  className="px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
-                >
-                  Back to Settings
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 6: WhatsApp-Style Google Drive Backup Sub-Page         */}
-          {/* ───────────────────────────────────────────────────────────── */}
-          {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 6: Local Device Vault & Google Drive Backup Sub-Page    */}
+          {/* VIEW 3: Chat & Cloud Backup Detail Sub-Page                   */}
           {/* ───────────────────────────────────────────────────────────── */}
           {currentView === 'backup' && (
-            <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-6 animate-in fade-in duration-200">
-              {/* Header Info */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
-                      <Cloud size={19} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-(--text-primary)">
-                        Chat & Vault Backup
-                      </h3>
-                      <p className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold flex items-center gap-1">
-                        <CheckCircle2 size={12} /> {googleToken ? 'Google Drive Cloud Sync & Local Vault' : 'Encrypted Local Device Vault (Offline Active)'}
-                      </p>
-                    </div>
-                  </div>
+            <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Informative Header Banner */}
+              <div className="p-4 sm:p-5 rounded-3xl bg-teal-500/10 border border-teal-500/20 text-teal-800 dark:text-teal-200 text-xs space-y-2">
+                <div className="font-bold text-sm flex items-center gap-2 text-teal-900 dark:text-teal-100">
+                  <Cloud size={18} className="text-teal-500 shrink-0" />
+                  <span>How Backup & Recovery Works</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setCurrentView('main')}
-                  className="px-3 py-1.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
-                >
-                  Done
-                </button>
-              </div>
-
-              {/* Explanatory Notice Banner */}
-              <div className="p-4 rounded-2xl bg-[#4E82EE]/10 border border-[#4E82EE]/25 text-xs text-(--text-primary) space-y-2">
-                <div className="font-bold flex items-center gap-2 text-[#4E82EE]">
-                  <Info size={16} />
-                  <span>How Backups Work in Assistance AI</span>
-                </div>
-                <ul className="list-disc list-inside text-[11px] text-(--text-secondary) space-y-1 pl-1">
+                <ul className="list-disc pl-5 space-y-1 text-[11px] leading-relaxed opacity-90">
                   <li>
                     <strong className="text-(--text-primary)">Local Device Vault (Default & 100% Free):</strong> Your data is stored right here on your device storage. You do <span className="underline font-semibold">not</span> need any Google API key. You can also download or restore portable <code>.json</code> backup files anytime.
                   </li>
@@ -1272,7 +669,7 @@ export default function SettingsView() {
                   <div className="p-3.5 flex items-center justify-between gap-3">
                     <div>
                       <div className="font-semibold text-(--text-primary)">Vault Owner Account</div>
-                      <div className="text-[11px] text-(--text-muted)">{googleAccount || 'tharun@gmail.com'}</div>
+                      <div className="text-[11px] text-(--text-muted)">{googleAccount || 'user@assistance.ai'}</div>
                     </div>
                     <button
                       type="button"
@@ -1459,121 +856,55 @@ export default function SettingsView() {
           )}
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW: Developer & Google Sync Sub-Page                        */}
+          {/* VIEW 4: Data & Privacy Sub-Page                              */}
           {/* ───────────────────────────────────────────────────────────── */}
-          {currentView === 'developer' && (
+          {currentView === 'data' && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Card 1: GitHub Access & Automation */}
               <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-4">
                 <div className="flex items-center gap-3 pb-3 border-b border-(--border-subtle)">
-                  <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
-                    <FolderGit2 size={20} />
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                    <ShieldCheck size={20} />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-(--text-primary)">
-                      GitHub Integration
+                      Data & Local Privacy
                     </h3>
                     <p className="text-[11px] text-(--text-muted)">
-                      Empower the assistant to query commits, list repos, and draft Pull Requests
+                      Manage your offline database, downloads, and storage wipe
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5">
-                      GitHub Personal Access Token (PAT)
-                    </label>
-                    <input
-                      type="password"
-                      value={githubToken}
-                      onChange={(e) => setGithubToken(e.target.value)}
-                      placeholder="ghp_..."
-                      className="w-full px-4 py-2.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-xs text-(--text-primary) font-mono placeholder:text-(--text-muted) focus:outline-hidden focus:border-purple-500"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <a
-                      href="https://github.com/settings/tokens/new?scopes=repo&description=PersonalAgentAccess"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] text-purple-500 hover:underline flex items-center gap-1"
-                    >
-                      <span>Create a new token on GitHub ↗</span>
-                    </a>
+                  <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-xs text-(--text-primary)">Export All Data (.json)</div>
+                      <div className="text-[11px] text-(--text-muted)">Save a local copy of all memories, tasks, and goals</div>
+                    </div>
                     <button
                       type="button"
-                      onClick={handleSaveGithubToken}
-                      className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                      onClick={handleExportData}
+                      className="px-3.5 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE] text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5"
                     >
-                      Save Token
+                      <Download size={13} />
+                      <span>Export</span>
                     </button>
                   </div>
-                </div>
-              </div>
 
-              {/* Card 2: Google Calendar 2-Way iCal Sync */}
-              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-4">
-                <div className="flex items-center gap-3 pb-3 border-b border-(--border-subtle)">
-                  <div className="w-10 h-10 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
-                    <Calendar size={20} />
+                  <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-xs text-rose-500">Wipe Local Database</div>
+                      <div className="text-[11px] text-(--text-muted)">Permanently erase all local memories, tasks, and history</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleWipeData}
+                      className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                    >
+                      <Trash2 size={13} />
+                      <span>Wipe All</span>
+                    </button>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-(--text-primary)">
-                      Google Calendar & iCal Sync
-                    </h3>
-                    <p className="text-[11px] text-(--text-muted)">
-                      Live synchronization with Google Calendar, Apple Calendar, and Outlook
-                    </p>
-                  </div>
-                </div>
-
-                <p className="text-xs text-(--text-secondary) leading-relaxed">
-                  Export all your smart reminders, alarms, and tasks into a universal RFC 5545 iCalendar stream. You can subscribe directly in Google Calendar.
-                </p>
-
-                <div className="flex items-center gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleDownloadIcs}
-                    className="px-4 py-2.5 rounded-xl bg-[#4E82EE] hover:bg-[#4E82EE]/90 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
-                  >
-                    <Download size={14} />
-                    <span>Download Google Calendar (.ics)</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Card 3: Background Push & Native Alarms */}
-              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-4">
-                <div className="flex items-center gap-3 pb-3 border-b border-(--border-subtle)">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-                    <Bell size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-(--text-primary)">
-                      Web Push & Native OS Notifications
-                    </h3>
-                    <p className="text-[11px] text-(--text-muted)">
-                      Receive background alarm chimes and push alerts even when the tab is closed
-                    </p>
-                  </div>
-                </div>
-
-                <p className="text-xs text-(--text-secondary) leading-relaxed">
-                  Service Worker background alarms are active. Test your native OS notification channel below.
-                </p>
-
-                <div className="flex items-center gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleTestNotification}
-                    className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
-                  >
-                    <Send size={14} />
-                    <span>Send Test Push Notification</span>
-                  </button>
                 </div>
               </div>
 

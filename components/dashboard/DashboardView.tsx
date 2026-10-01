@@ -3,47 +3,32 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   CheckSquare,
-  Clock,
   Target,
   Sparkles,
   ArrowRight,
   CheckCircle2,
-  Calendar,
   Flame,
   Volume2,
-  Plus,
   HandCoins,
   TrendingUp,
-  TrendingDown,
   Sun,
-  Timer,
-  Check,
   Wallet,
   Zap,
   ArrowUpRight,
   ArrowDownLeft,
-  PieChart,
   ListTodo,
-  AlarmClock,
   Trophy,
   CreditCard,
-  Layers,
   Activity,
-  ChevronRight,
-  CloudSun,
-  Globe,
   DollarSign,
-  RefreshCw,
-  Wind,
-  Droplets,
-  Newspaper,
-  ExternalLink,
+  ChevronRight,
+  ShieldCheck,
+  Calendar,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { Habit } from '@/types';
 import DailyBriefingModal from '@/components/briefing/DailyBriefingModal';
 import { apiFetch } from '@/lib/api';
-
 
 // Storage key for daily spending to pull real-time financial KPI
 const SPENDING_STORAGE_KEY = 'assistance_daily_spending';
@@ -60,22 +45,23 @@ interface SpendingEntry {
 
 function loadSpending(): SpendingEntry[] {
   if (typeof window === 'undefined') return [];
-  try { return JSON.parse(localStorage.getItem(SPENDING_STORAGE_KEY) || '[]'); } catch { return []; }
+  try {
+    return JSON.parse(localStorage.getItem(SPENDING_STORAGE_KEY) || '[]');
+  } catch {
+    return [];
+  }
 }
 
 export default function DashboardView() {
   const {
     user,
     tasks,
-    reminders,
     goals,
     ledgerEntries,
-    conversations,
     setActiveTab,
     sendMessage,
     toggleTask,
     setFocusTimerOpen,
-    setLiveVoiceOpen,
   } = useApp();
 
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -90,7 +76,7 @@ export default function DashboardView() {
       setTimeStr(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     };
     updateTime();
-    const interval = setInterval(updateTime, 30000); // 30-sec tick instead of 1-sec to eliminate mobile lag
+    const interval = setInterval(updateTime, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -125,7 +111,7 @@ export default function DashboardView() {
     }
   };
 
-  // ── KPI Calculations (Memoized for zero-lag mobile performance) ──────────────
+  // ── 1. Task Velocity KPIs ───────────────────────────────────────
   const { totalTasks, completedTasks, pendingTasks, taskCompletionRate, highPriorityTasks } = useMemo(() => {
     const total = tasks.length;
     const completed = tasks.filter((t) => t.status === 'completed');
@@ -135,17 +121,7 @@ export default function DashboardView() {
     return { totalTasks: total, completedTasks: completed, pendingTasks: pending, taskCompletionRate: rate, highPriorityTasks: high };
   }, [tasks]);
 
-  // 2. Alarms & Reminders KPIs
-  const { pendingReminders, nextReminder } = useMemo(() => {
-    const pending = reminders.filter((r) => r.status === 'pending');
-    const sorted = pending
-      .slice()
-      .sort((a, b) => new Date(a.dueDateTime).getTime() - new Date(b.dueDateTime).getTime());
-    return { pendingReminders: pending, nextReminder: sorted[0] };
-  }, [reminders]);
-
-
-  // 3. Financial & Spending KPIs
+  // ── 2. Financial & Spending KPIs ─────────────────────────────────
   const todaySpendingTotal = useMemo(() => {
     return spendingList.filter((e) => e.date === todayStr).reduce((s, e) => s + e.amount, 0);
   }, [spendingList, todayStr]);
@@ -169,7 +145,7 @@ export default function DashboardView() {
     return { give, receive, net, pendingCount: pending.length };
   }, [ledgerEntries]);
 
-  // 4. Goals & Milestone KPIs
+  // ── 3. Goals & Milestone KPIs ────────────────────────────────────
   const activeGoals = goals.filter((g) => g.status === 'active');
   const goalsMilestonesCompleted = useMemo(() => {
     let totalM = 0;
@@ -183,11 +159,11 @@ export default function DashboardView() {
     return { totalM, compM, pct: totalM > 0 ? Math.round((compM / totalM) * 100) : 0 };
   }, [goals]);
 
-  // 5. Habits KPIs
+  // ── 4. Habits KPIs ───────────────────────────────────────────────
   const habitsCompletedToday = habits.filter((h) => h.lastCompletedDate === todayStr).length;
   const habitCompletionRate = habits.length > 0 ? Math.round((habitsCompletedToday / habits.length) * 100) : 0;
 
-  // 6. 7-Day Spending Trend for Mini Chart
+  // ── 5. 7-Day Spending Trend for Chart ───────────────────────────
   const past7Days = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
@@ -220,7 +196,7 @@ export default function DashboardView() {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-(--bg-primary) text-(--text-primary)">
       
-      {/* ── Top Header Toolbar (Mobile Optimized) ── */}
+      {/* ── Top Header Bar ── */}
       <div className="px-4 py-3 sm:px-6 sm:h-16 border-b border-(--border-subtle) flex items-center justify-between shrink-0 bg-(--bg-primary)/95 backdrop-blur-md">
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-xs shrink-0 select-none">
@@ -242,46 +218,44 @@ export default function DashboardView() {
             className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#4E82EE] text-white text-[11px] sm:text-xs font-semibold hover:opacity-95 shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shrink-0"
           >
             <Volume2 size={13} />
-            <span>Briefing</span>
+            <span>AI Briefing</span>
           </button>
         </div>
       </div>
 
-      {/* ── Main KPI Canvas (Mobile-First Scrollable View) ── */}
+      {/* ── Main Executive Command Canvas ── */}
       <div className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-6 max-w-6xl mx-auto w-full space-y-4 sm:space-y-6 custom-scrollbar pb-24 md:pb-8">
 
-        {/* ── 1. Executive Intelligence Card (Mobile Streamlined) ── */}
+        {/* ── 1. Executive Intelligence Hero Card ── */}
         <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#4E82EE]/10 via-(--bg-card) to-[#9B72CF]/10 border border-[#4E82EE]/25 shadow-xs space-y-3 sm:space-y-4 relative overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-bold text-[#4E82EE] uppercase tracking-wider">
               <Sparkles size={14} className="text-[#4E82EE]" />
-              <span>Executive Daily Briefing</span>
+              <span>Executive Daily Intelligence</span>
             </div>
             <button
               onClick={() => {
                 setActiveTab('chat');
-                sendMessage('Analyze my tasks, financial dues, and today\'s schedule. Give me a 3-point action plan.');
+                sendMessage('Analyze my tasks, goals, financial dues, and today\'s schedule. Give me a 3-point action plan.');
               }}
               className="text-[11px] sm:text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
             >
-              <span>AI Plan</span>
+              <span>Generate AI Plan</span>
               <ArrowUpRight size={13} />
             </button>
           </div>
 
           <p className="text-xs sm:text-sm font-medium text-(--text-primary) leading-relaxed">
-            You have <strong className="text-[#4E82EE]">{pendingTasks.length} pending tasks</strong>,{' '}
-            <strong className="text-rose-500">{pendingReminders.length} alarms</strong>, and today&apos;s spending stands at{' '}
-            <strong className="text-emerald-500">₹{todaySpendingTotal.toLocaleString('en-IN')}</strong>.
+            You have <strong className="text-[#4E82EE]">{pendingTasks.length} pending action items</strong>, today&apos;s spending stands at{' '}
+            <strong className="text-emerald-500">₹{todaySpendingTotal.toLocaleString('en-IN')}</strong>, and you have{' '}
+            <strong className="text-indigo-500">{activeGoals.length} active OKR goals</strong> with{' '}
+            <strong className="text-amber-500">{habitsCompletedToday}/{habits.length || 1} habits completed</strong> today.
             {highPriorityTasks.length > 0 && (
-              <span> Focus on high priority: <strong className="text-(--text-primary)">&ldquo;{highPriorityTasks[0].title}&rdquo;</strong>.</span>
-            )}
-            {nextReminder && (
-              <span> Next reminder is at <strong>{new Date(nextReminder.dueDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>.</span>
+              <span> Top priority: <strong className="text-(--text-primary)">&ldquo;{highPriorityTasks[0].title}&rdquo;</strong>.</span>
             )}
           </p>
 
-          {/* Quick Action Buttons Grid (Mobile 2-Row / Desktop Row) */}
+          {/* Quick Action Buttons Grid */}
           <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-1">
             <button
               onClick={() => setActiveTab('tasks')}
@@ -298,11 +272,11 @@ export default function DashboardView() {
               <span>Log Expense</span>
             </button>
             <button
-              onClick={() => setActiveTab('reminders')}
-              className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-rose-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
+              onClick={() => setActiveTab('goals')}
+              className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-purple-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
             >
-              <AlarmClock size={13} className="text-rose-500" />
-              <span>Set Alarm</span>
+              <Target size={13} className="text-purple-500" />
+              <span>Track Goals</span>
             </button>
             <button
               onClick={() => setFocusTimerOpen(true)}
@@ -314,14 +288,14 @@ export default function DashboardView() {
           </div>
         </div>
 
-        {/* ── 2. Master KPI Metrics Grid (Mobile 2-Column / Desktop 6-Column) ── */}
+        {/* ── 2. Master 5-Pillar Executive KPI Grid ── */}
         <div>
           <h2 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-(--text-muted) mb-2.5 px-1 flex items-center gap-1.5">
             <Activity size={14} className="text-[#4E82EE]" />
-            Key Performance Indicators (KPIs)
+            Core Executive KPI Metrics
           </h2>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
             {/* KPI 1: Task Completion Rate */}
             <div
               onClick={() => setActiveTab('tasks')}
@@ -337,7 +311,7 @@ export default function DashboardView() {
                   <div className="h-full rounded-full bg-[#4E82EE]" style={{ width: `${taskCompletionRate}%` }} />
                 </div>
               </div>
-              <p className="text-[10px] text-(--text-muted) truncate">{completedTasks.length}/{totalTasks} done</p>
+              <p className="text-[10px] text-(--text-muted) truncate">{completedTasks.length}/{totalTasks} completed</p>
             </div>
 
             {/* KPI 2: Today's Spending */}
@@ -372,24 +346,7 @@ export default function DashboardView() {
               <p className="text-[10px] text-(--text-muted) truncate">{duesStats.pendingCount} active dues</p>
             </div>
 
-            {/* KPI 4: Alarms & Alerts */}
-            <div
-              onClick={() => setActiveTab('reminders')}
-              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-rose-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
-            >
-              <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-semibold text-[11px] sm:text-xs truncate">Alarms</span>
-                <AlarmClock size={14} className="text-rose-500" />
-              </div>
-              <div>
-                <p className="text-xl sm:text-2xl font-black text-(--text-primary) font-mono">{pendingReminders.length}</p>
-              </div>
-              <p className="text-[10px] text-(--text-muted) truncate">
-                {nextReminder ? new Date(nextReminder.dueDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'None active'}
-              </p>
-            </div>
-
-            {/* KPI 5: Goal Milestones */}
+            {/* KPI 4: Goal Milestones */}
             <div
               onClick={() => setActiveTab('goals')}
               className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-purple-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
@@ -407,10 +364,10 @@ export default function DashboardView() {
               <p className="text-[10px] text-(--text-muted) truncate">{goalsMilestonesCompleted.compM}/{goalsMilestonesCompleted.totalM || 1} milestones</p>
             </div>
 
-            {/* KPI 6: Habits & Daily Streak */}
+            {/* KPI 5: Habits & Daily Streak */}
             <div
               onClick={() => setActiveTab('habits')}
-              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
+              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98 col-span-2 md:col-span-1"
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
                 <span className="font-semibold text-[11px] sm:text-xs truncate">Habit Streak</span>
@@ -527,7 +484,7 @@ export default function DashboardView() {
           </div>
         </div>
 
-        {/* ── 4. Detailed Sections: Priority Tasks & Alarms ── */}
+        {/* ── 4. Detailed Sections: Priority Tasks & Strategic OKRs ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
           {/* Priority Tasks Column */}
@@ -535,7 +492,7 @@ export default function DashboardView() {
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
                 <CheckCircle2 size={14} className="text-emerald-500" />
-                Priority Tasks ({pendingTasks.length})
+                Priority Tasks Queue ({pendingTasks.length})
               </span>
               <button
                 onClick={() => setActiveTab('tasks')}
@@ -574,43 +531,51 @@ export default function DashboardView() {
             </div>
           </div>
 
-          {/* Upcoming Alarms Column */}
+          {/* Strategic OKRs Column */}
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
-                <AlarmClock size={14} className="text-rose-500" />
-                Upcoming Alarms ({pendingReminders.length})
+                <Target size={14} className="text-purple-500" />
+                Active Goals & OKRs ({activeGoals.length})
               </span>
               <button
-                onClick={() => setActiveTab('reminders')}
-                className="text-xs text-rose-500 font-semibold hover:underline cursor-pointer"
+                onClick={() => setActiveTab('goals')}
+                className="text-xs text-purple-500 font-semibold hover:underline cursor-pointer"
               >
-                View All
+                View Goals
               </button>
             </div>
 
             <div className="space-y-2">
-              {pendingReminders.length === 0 ? (
+              {activeGoals.length === 0 ? (
                 <div className="py-8 text-center text-xs text-(--text-muted)">
-                  No upcoming alarms scheduled
+                  No active goals created yet. Set a strategic goal!
                 </div>
               ) : (
-                pendingReminders.slice(0, 4).map((r) => (
-                  <div
-                    key={r.id}
-                    className="p-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center justify-between gap-2.5"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0 animate-pulse" />
-                      <span className="text-xs font-medium text-(--text-primary) truncate">
-                        {r.title}
-                      </span>
+                activeGoals.slice(0, 4).map((g) => {
+                  const milestones = g.milestones || [];
+                  const compCount = milestones.filter((m) => m.completed).length;
+                  const pct = milestones.length > 0 ? Math.round((compCount / milestones.length) * 100) : 0;
+                  return (
+                    <div
+                      key={g.id}
+                      onClick={() => setActiveTab('goals')}
+                      className="p-3 rounded-2xl bg-(--bg-elevated) hover:bg-(--bg-elevated)/80 border border-(--border-subtle) transition-all cursor-pointer space-y-2"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-(--text-primary) truncate">
+                          {g.title}
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-purple-500 shrink-0">
+                          {pct}%
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-(--bg-card) overflow-hidden">
+                        <div className="h-full rounded-full bg-purple-500 transition-all duration-300" style={{ width: `${pct}%` }} />
+                      </div>
                     </div>
-                    <span className="text-[11px] font-semibold text-rose-500 shrink-0 font-mono">
-                      {new Date(r.dueDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
