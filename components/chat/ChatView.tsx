@@ -38,6 +38,10 @@ import {
   FileText,
   Image as ImageIcon,
   Paperclip,
+  ListTodo,
+  AlarmClock,
+  Flame,
+  HandCoins,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { Message, ToolExecutionStep } from '@/types';
@@ -129,32 +133,38 @@ export default function ChatView() {
             <div className="flex flex-wrap gap-2 w-full pt-2">
               {[
                 {
-                  icon: '🌅',
+                  Icon: Volume2,
+                  iconColor: 'text-amber-500',
                   label: 'Daily Briefing',
                   desc: 'Give me my daily briefing and today\'s schedule',
                 },
                 {
-                  icon: '📋',
+                  Icon: ListTodo,
+                  iconColor: 'text-[#4E82EE]',
                   label: 'Pending Tasks',
                   desc: 'What are my pending tasks?',
                 },
                 {
-                  icon: '⏰',
+                  Icon: AlarmClock,
+                  iconColor: 'text-rose-500',
                   label: 'Today\'s Alarms',
                   desc: 'Show my scheduled alarms and reminders',
                 },
                 {
-                  icon: '💪',
+                  Icon: Flame,
+                  iconColor: 'text-amber-500',
                   label: 'Daily Habits',
                   desc: 'Show my habits for today',
                 },
                 {
-                  icon: '💰',
+                  Icon: HandCoins,
+                  iconColor: 'text-indigo-500',
                   label: 'Money Dues',
                   desc: 'Who owes me money and what are my dues?',
                 },
                 {
-                  icon: '📅',
+                  Icon: Calendar,
+                  iconColor: 'text-emerald-500',
                   label: 'Date & Time',
                   desc: 'What is today\'s date, day, and current local time?',
                 },
@@ -162,9 +172,9 @@ export default function ChatView() {
                 <button
                   key={idx}
                   onClick={() => sendMessage(item.desc)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 hover:bg-(--bg-elevated) transition-all text-left cursor-pointer shadow-2xs"
+                  className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 hover:bg-(--bg-elevated) transition-all text-left cursor-pointer shadow-2xs group active:scale-95"
                 >
-                  <span className="text-[13px]">{item.icon}</span>
+                  <item.Icon size={13} className={item.iconColor} />
                   <span className="text-xs font-medium text-(--text-secondary) group-hover:text-(--text-primary)">
                     {item.label}
                   </span>

@@ -174,7 +174,7 @@ export default function AppLayout() {
       )}
 
       {/* Native App Opening Splash Animation */}
-      <SplashScreen durationMs={1100} />
+      <SplashScreen durationMs={2400} />
     </motion.div>
   );
 }

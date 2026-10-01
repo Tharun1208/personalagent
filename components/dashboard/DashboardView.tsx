@@ -223,8 +223,8 @@ export default function DashboardView() {
       {/* ── Top Header Toolbar (Mobile Optimized) ── */}
       <div className="px-4 py-3 sm:px-6 sm:h-16 border-b border-(--border-subtle) flex items-center justify-between shrink-0 bg-(--bg-primary)/95 backdrop-blur-md">
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-xs shrink-0 select-none">
-            ☀️
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-xs shrink-0 select-none">
+            <Sun size={18} />
           </div>
           <div className="min-w-0">
             <h1 className="font-extrabold text-xs sm:text-base text-(--text-primary) truncate">
@@ -239,9 +239,9 @@ export default function DashboardView() {
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={() => setBriefingOpen(true)}
-            className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-[11px] sm:text-xs font-semibold hover:opacity-95 shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shrink-0"
+            className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#4E82EE] text-white text-[11px] sm:text-xs font-semibold hover:opacity-95 shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shrink-0"
           >
-            <span className="text-xs">🎙️</span>
+            <Volume2 size={13} />
             <span>Briefing</span>
           </button>
         </div>
@@ -254,7 +254,7 @@ export default function DashboardView() {
         <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#4E82EE]/10 via-(--bg-card) to-[#9B72CF]/10 border border-[#4E82EE]/25 shadow-xs space-y-3 sm:space-y-4 relative overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-bold text-[#4E82EE] uppercase tracking-wider">
-              <span className="text-sm">✨</span>
+              <Sparkles size={14} className="text-[#4E82EE]" />
               <span>Executive Daily Briefing</span>
             </div>
             <button
@@ -265,7 +265,7 @@ export default function DashboardView() {
               className="text-[11px] sm:text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
             >
               <span>AI Plan</span>
-              <span>🚀</span>
+              <ArrowUpRight size={13} />
             </button>
           </div>
 
@@ -287,28 +287,28 @@ export default function DashboardView() {
               onClick={() => setActiveTab('tasks')}
               className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
             >
-              <span>📝</span>
+              <CheckSquare size={13} className="text-[#4E82EE]" />
               <span>New Task</span>
             </button>
             <button
               onClick={() => setActiveTab('ledger')}
               className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-emerald-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
             >
-              <span>💳</span>
+              <CreditCard size={13} className="text-emerald-500" />
               <span>Log Expense</span>
             </button>
             <button
               onClick={() => setActiveTab('reminders')}
               className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-rose-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
             >
-              <span>⏰</span>
+              <AlarmClock size={13} className="text-rose-500" />
               <span>Set Alarm</span>
             </button>
             <button
               onClick={() => setFocusTimerOpen(true)}
               className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
             >
-              <span>🔥</span>
+              <Flame size={13} className="text-amber-500" />
               <span>Focus 25m</span>
             </button>
           </div>
@@ -317,7 +317,7 @@ export default function DashboardView() {
         {/* ── 2. Master KPI Metrics Grid (Mobile 2-Column / Desktop 6-Column) ── */}
         <div>
           <h2 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-(--text-muted) mb-2.5 px-1 flex items-center gap-1.5">
-            <span>📊</span>
+            <Activity size={14} className="text-[#4E82EE]" />
             Key Performance Indicators (KPIs)
           </h2>
 
@@ -329,7 +329,7 @@ export default function DashboardView() {
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
                 <span className="font-semibold text-[11px] sm:text-xs truncate">Tasks</span>
-                <span className="text-sm">📋</span>
+                <ListTodo size={14} className="text-[#4E82EE]" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-black text-(--text-primary) font-mono">{taskCompletionRate}%</p>
@@ -347,7 +347,7 @@ export default function DashboardView() {
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
                 <span className="font-semibold text-[11px] sm:text-xs truncate">Today Spend</span>
-                <span className="text-sm">💰</span>
+                <DollarSign size={14} className="text-emerald-500" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-black text-emerald-500 font-mono truncate">₹{todaySpendingTotal.toLocaleString('en-IN')}</p>
@@ -362,7 +362,7 @@ export default function DashboardView() {
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
                 <span className="font-semibold text-[11px] sm:text-xs truncate">Net Dues</span>
-                <span className="text-sm">🤝</span>
+                <HandCoins size={14} className="text-indigo-500" />
               </div>
               <div>
                 <p className={`text-xl sm:text-2xl font-black font-mono truncate ${duesStats.net >= 0 ? 'text-[#4E82EE]' : 'text-rose-500'}`}>
@@ -379,7 +379,7 @@ export default function DashboardView() {
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
                 <span className="font-semibold text-[11px] sm:text-xs truncate">Alarms</span>
-                <span className="text-sm">⏰</span>
+                <AlarmClock size={14} className="text-rose-500" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-black text-(--text-primary) font-mono">{pendingReminders.length}</p>
@@ -396,7 +396,7 @@ export default function DashboardView() {
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
                 <span className="font-semibold text-[11px] sm:text-xs truncate">Goals</span>
-                <span className="text-sm">🎯</span>
+                <Target size={14} className="text-purple-500" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-black text-purple-500 font-mono">{activeGoals.length}</p>
@@ -414,7 +414,7 @@ export default function DashboardView() {
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
                 <span className="font-semibold text-[11px] sm:text-xs truncate">Habit Streak</span>
-                <span className="text-sm">🔥</span>
+                <Flame size={14} className="text-amber-500" />
               </div>
               <div>
                 <p className="text-xl sm:text-2xl font-black text-amber-500 font-mono">{habitCompletionRate}%</p>
@@ -435,7 +435,7 @@ export default function DashboardView() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-(--text-primary) flex items-center gap-1.5">
-                  <span className="text-sm">📈</span>
+                  <TrendingUp size={14} className="text-[#4E82EE]" />
                   7-Day Spending Velocity
                 </h3>
                 <p className="text-[11px] text-(--text-muted)">Daily spend trends for the past week</p>
@@ -445,7 +445,7 @@ export default function DashboardView() {
                 className="text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>Full Ledger</span>
-                <span>👉</span>
+                <ArrowRight size={13} />
               </button>
             </div>
 
@@ -483,7 +483,7 @@ export default function DashboardView() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-(--text-primary) flex items-center gap-1.5">
-                  <span className="text-sm">🏦</span>
+                  <Wallet size={14} className="text-teal-500" />
                   Financial Health Overview
                 </h3>
                 <p className="text-[11px] text-(--text-muted)">Dues, receivables, and net cashflow</p>
@@ -493,7 +493,7 @@ export default function DashboardView() {
                 className="text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>View Dues</span>
-                <span>👉</span>
+                <ArrowRight size={13} />
               </button>
             </div>
 
@@ -501,7 +501,7 @@ export default function DashboardView() {
               <div className="p-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-1">
                 <div className="flex items-center justify-between text-xs text-(--text-muted)">
                   <span>You Need to Give</span>
-                  <span className="text-xs">💸</span>
+                  <ArrowUpRight size={13} className="text-rose-500" />
                 </div>
                 <p className="text-xl font-bold text-rose-500 font-mono">₹{duesStats.give.toLocaleString('en-IN')}</p>
               </div>
@@ -509,7 +509,7 @@ export default function DashboardView() {
               <div className="p-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-1">
                 <div className="flex items-center justify-between text-xs text-(--text-muted)">
                   <span>Owed to You</span>
-                  <span className="text-xs">💵</span>
+                  <ArrowDownLeft size={13} className="text-emerald-500" />
                 </div>
                 <p className="text-xl font-bold text-emerald-500 font-mono">₹{duesStats.receive.toLocaleString('en-IN')}</p>
               </div>
@@ -517,7 +517,9 @@ export default function DashboardView() {
 
             <div className="p-3 rounded-2xl bg-[#4E82EE]/10 border border-[#4E82EE]/20 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-[#4E82EE] text-white flex items-center justify-center font-bold text-xs select-none">⚡</div>
+                <div className="w-6 h-6 rounded-lg bg-[#4E82EE] text-white flex items-center justify-center">
+                  <Zap size={13} />
+                </div>
                 <span className="text-xs font-semibold text-(--text-primary)">Optimal Smart Settlements Active</span>
               </div>
               <span className="text-xs font-mono font-bold text-[#4E82EE]">DSA O(V log V)</span>
@@ -528,12 +530,11 @@ export default function DashboardView() {
         {/* ── 4. Detailed Sections: Priority Tasks & Alarms ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-          
           {/* Priority Tasks Column */}
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
-                <span className="text-sm select-none">✅</span>
+                <CheckCircle2 size={14} className="text-emerald-500" />
                 Priority Tasks ({pendingTasks.length})
               </span>
               <button
@@ -577,7 +578,7 @@ export default function DashboardView() {
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
-                <span className="text-sm select-none">🔔</span>
+                <AlarmClock size={14} className="text-rose-500" />
                 Upcoming Alarms ({pendingReminders.length})
               </span>
               <button
@@ -620,7 +621,7 @@ export default function DashboardView() {
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
-                <span className="text-sm select-none">🏆</span>
+                <Trophy size={14} className="text-amber-500" />
                 Habit Streak & Daily Progress
               </span>
               <button
