@@ -223,9 +223,9 @@ export default function HabitsView() {
               return (
                 <div
                   key={habit.id}
-                  className={`p-5 rounded-3xl border transition-all flex items-center justify-between shadow-2xs group ${
+                  className={`p-5 rounded-3xl border transition-all flex items-center justify-between shadow-2xs group card-lift animate-fade-in-up ${
                     isCompletedToday
-                      ? 'bg-(--bg-card) border-emerald-500/40'
+                      ? 'bg-(--bg-card) border-emerald-500/40 shadow-emerald-500/10'
                       : 'bg-(--bg-card) border-(--border-subtle) hover:border-[#4E82EE]/40'
                   }`}
                 >
@@ -237,8 +237,10 @@ export default function HabitsView() {
                     </div>
 
                     <div className="flex items-center gap-2 text-xs">
-                      <span className="flex items-center gap-1 font-mono font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                        <Flame size={13} />
+                      <span className={`flex items-center gap-1 font-mono font-bold px-2 py-0.5 rounded-full transition-all ${
+                        isCompletedToday ? 'text-emerald-500 bg-emerald-500/10' : 'text-amber-500 bg-amber-500/10'
+                      }`}>
+                        <Flame size={13} className={isCompletedToday ? 'animate-bounce' : ''} />
                         <span>{habit.streak} day streak</span>
                       </span>
                     </div>
@@ -247,9 +249,9 @@ export default function HabitsView() {
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => handleToggle(habit.id)}
-                      className={`w-11 h-11 rounded-2xl flex items-center justify-center font-semibold text-xs transition-all cursor-pointer shadow-xs ${
+                      className={`w-11 h-11 rounded-2xl flex items-center justify-center font-semibold text-xs transition-all cursor-pointer shadow-xs btn-press ${
                         isCompletedToday
-                          ? 'bg-emerald-500 text-white shadow-emerald-500/30'
+                          ? 'bg-emerald-500 text-white shadow-emerald-500/30 animate-spring-check'
                           : 'bg-(--bg-elevated) text-(--text-muted) hover:bg-emerald-500/20 hover:text-emerald-500'
                       }`}
                       title={isCompletedToday ? 'Completed today' : 'Mark done for today'}

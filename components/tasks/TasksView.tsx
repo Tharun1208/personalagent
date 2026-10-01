@@ -467,7 +467,7 @@ export default function TasksView() {
                     return (
                       <div
                         key={task.id}
-                        className={`p-4 rounded-2xl border transition-all space-y-3 group shadow-2xs ${
+                        className={`p-4 rounded-2xl border transition-all space-y-3 group shadow-2xs card-lift animate-fade-in-up ${
                           isDone
                             ? 'bg-(--bg-card)/50 border-(--border-subtle) opacity-60'
                             : 'bg-(--bg-card) border-(--border-subtle) hover:border-indigo-500/40'
@@ -478,12 +478,12 @@ export default function TasksView() {
                             {/* Parent Task Checkbox */}
                             <button
                               onClick={() => toggleTask(task.id, task.status)}
-                              className="mt-0.5 text-(--text-muted) hover:text-emerald-500 transition-colors cursor-pointer shrink-0"
+                              className="mt-0.5 text-(--text-muted) hover:text-emerald-500 transition-colors cursor-pointer shrink-0 btn-press"
                             >
                               {isDone ? (
-                                <CheckCircle2 size={20} className="text-emerald-500" />
+                                <CheckCircle2 size={20} className="text-emerald-500 animate-spring-check" />
                               ) : (
-                                <Circle size={20} />
+                                <Circle size={20} className="hover:scale-110 transition-transform" />
                               )}
                             </button>
 
