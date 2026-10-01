@@ -335,7 +335,7 @@ export default function TasksView() {
 
           <button
             onClick={() => setIsAddOpen(true)}
-            className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white hover:opacity-95 text-xs font-semibold transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+            className="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white hover:opacity-95 text-xs font-bold transition-all cursor-pointer shadow-md shadow-blue-500/20 active:scale-95 flex items-center gap-1.5"
           >
             <Plus size={15} />
             <span>New Task</span>
@@ -353,7 +353,7 @@ export default function TasksView() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tasks..."
-              className="w-full pl-9 pr-4 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) focus:border-indigo-500 text-xs focus:outline-none text-(--text-primary)"
+              className="w-full pl-9 pr-4 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) focus:border-[#4E82EE] text-xs focus:outline-none text-(--text-primary)"
             />
           </div>
 
@@ -369,7 +369,7 @@ export default function TasksView() {
                   onClick={() => setFilterStatus(f.key)}
                   className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     filterStatus === f.key
-                      ? 'bg-indigo-500 text-white shadow-xs'
+                      ? 'bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] text-white shadow-xs'
                       : 'bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary)'
                   }`}
                 >
@@ -708,7 +708,7 @@ export default function TasksView() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-(--accent) text-(--accent-contrast) text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold hover:opacity-95 active:scale-95 transition-all cursor-pointer shadow-md shadow-blue-500/20"
                 >
                   Save Task
                 </button>

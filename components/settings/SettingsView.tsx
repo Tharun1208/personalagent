@@ -518,7 +518,7 @@ export default function SettingsView() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] text-white hover:opacity-95 font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-md shadow-blue-500/20 disabled:opacity-50 flex items-center gap-2"
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white hover:opacity-95 font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-md shadow-blue-500/20 disabled:opacity-50 flex items-center gap-2 active:scale-95"
                 >
                   {isSaving ? <span>Saving...</span> : <><span>Save Profile</span><Check size={16} /></>}
                 </button>
@@ -536,7 +536,7 @@ export default function SettingsView() {
               <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-5 shadow-xs">
                 <div className="flex items-center justify-between pb-3 border-b border-(--border-subtle)">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-500/20">
+                    <div className="w-8 h-8 rounded-xl bg-[#4E82EE]/10 text-[#4E82EE] flex items-center justify-center shrink-0 border border-[#4E82EE]/20">
                       <Database size={16} />
                     </div>
                     <div>
@@ -570,8 +570,8 @@ export default function SettingsView() {
                     onClick={handlePerformBackup}
                     className={`w-full py-3.5 px-4 rounded-2xl font-bold text-sm text-white transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
                       isBackingUp
-                        ? 'bg-teal-600/70 cursor-not-allowed'
-                        : 'bg-teal-600 hover:bg-teal-500 active:scale-[0.99] shadow-teal-600/25'
+                        ? 'bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] opacity-70 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] hover:opacity-95 active:scale-[0.99] shadow-blue-500/25'
                     }`}
                   >
                     {isBackingUp ? (
@@ -591,7 +591,7 @@ export default function SettingsView() {
                     <div className="mt-3 space-y-1.5 animate-in fade-in">
                       <div className="w-full bg-(--bg-elevated) h-2 rounded-full overflow-hidden border border-(--border-subtle)">
                         <div
-                          className="bg-teal-500 h-full transition-all duration-300 rounded-full"
+                          className="bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] h-full transition-all duration-300 rounded-full"
                           style={{ width: `${backupProgress}%` }}
                         />
                       </div>

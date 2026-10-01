@@ -76,12 +76,12 @@ export default function CustomConfirmModal({ dialog, onClose }: CustomConfirmMod
 
   const getConfirmButtonClasses = () => {
     if (type === 'danger') {
-      return 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20';
+      return 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20 active:scale-95';
     }
     if (type === 'warning') {
-      return 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20';
+      return 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20 active:scale-95';
     }
-    return 'bg-[#4E82EE] hover:bg-[#3D6FD6] text-white shadow-[#4E82EE]/20';
+    return 'bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] hover:opacity-95 text-white shadow-blue-500/20 active:scale-95';
   };
 
   return (

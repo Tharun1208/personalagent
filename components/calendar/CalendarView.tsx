@@ -524,7 +524,7 @@ export default function CalendarView() {
           {/* Schedule Event Action Button */}
           <button
             onClick={() => openScheduleModal()}
-            className="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-[11px] sm:text-xs font-semibold hover:opacity-95 transition-all cursor-pointer shadow-sm flex items-center gap-1.5 shrink-0"
+            className="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-[11px] sm:text-xs font-bold hover:opacity-95 active:scale-95 transition-all cursor-pointer shadow-md shadow-blue-500/20 flex items-center gap-1.5 shrink-0"
           >
             <Plus size={15} />
             <span>Schedule Event</span>
@@ -1636,7 +1636,7 @@ export default function CalendarView() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-full bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-semibold hover:opacity-95 shadow-sm transition-opacity cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold hover:opacity-95 active:scale-95 shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Check size={15} />
                   <span>Confirm Schedule</span>

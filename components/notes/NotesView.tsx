@@ -250,7 +250,7 @@ export default function NotesView() {
             <button
               type="button"
               onClick={openCreateModal}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-amber-500/25 cursor-pointer hover:opacity-95 active:scale-95"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-blue-500/20 cursor-pointer hover:opacity-95 active:scale-95"
             >
               <Plus size={16} />
               <span>Create Note</span>
@@ -267,7 +267,7 @@ export default function NotesView() {
               placeholder="Search notes by title or content..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-xs text-(--text-primary) placeholder:text-(--text-muted) focus:outline-hidden focus:border-amber-500 transition-all shadow-xs"
+              className="w-full pl-9 pr-4 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-xs text-(--text-primary) placeholder:text-(--text-muted) focus:outline-hidden focus:border-[#4E82EE] transition-all shadow-xs"
             />
             {searchQuery && (
               <button
@@ -287,7 +287,7 @@ export default function NotesView() {
               onClick={() => setSelectedCategory('all')}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                 selectedCategory === 'all'
-                  ? 'bg-amber-500 text-white shadow-xs'
+                  ? 'bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] text-white shadow-xs'
                   : 'bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary)'
               }`}
             >
@@ -303,7 +303,7 @@ export default function NotesView() {
                   onClick={() => setSelectedCategory(key)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
                     isSelected
-                      ? 'bg-amber-500 text-white shadow-xs'
+                      ? 'bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] text-white shadow-xs'
                       : 'bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary)'
                   }`}
                 >
@@ -328,7 +328,7 @@ export default function NotesView() {
       <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
         {filteredNotes.length === 0 ? (
           <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-center p-6 rounded-2xl border border-dashed border-(--border-subtle) bg-(--bg-card)/30">
-            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mb-3">
+            <div className="w-16 h-16 rounded-2xl bg-[#4E82EE]/10 text-[#4E82EE] flex items-center justify-center mb-3 border border-[#4E82EE]/20">
               <BookOpen size={28} />
             </div>
             <h3 className="text-base font-bold text-(--text-primary)">
@@ -342,7 +342,7 @@ export default function NotesView() {
             <button
               type="button"
               onClick={openCreateModal}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-amber-500/20 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-blue-500/20 cursor-pointer hover:opacity-95 active:scale-95"
             >
               <Plus size={15} />
               <span>Create Your First Note</span>
@@ -579,7 +579,7 @@ export default function NotesView() {
                 <button
                   type="button"
                   onClick={handleSaveNote}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-amber-500/25 cursor-pointer hover:opacity-95 active:scale-95"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold flex items-center gap-2 shadow-md shadow-blue-500/20 cursor-pointer hover:opacity-95 active:scale-95"
                 >
                   <Save size={15} />
                   <span>{editingNote ? 'Save Changes' : 'Create Note'}</span>
