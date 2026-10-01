@@ -142,10 +142,10 @@ export default function AppLayout() {
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, y: 6, scale: 0.998 }}
+              initial={{ opacity: 0, y: 14, scale: 0.995 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -6, scale: 0.998 }}
-              transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
+              exit={{ opacity: 0, y: -10, scale: 0.995 }}
+              transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
               className="flex-1 flex flex-col h-full overflow-hidden w-full"
             >
               {renderActiveView()}
