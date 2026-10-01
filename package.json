@@ -54,5 +54,18 @@
   },
   "overrides": {
     "postcss": "^8.5.28"
+  },
+  "allowScripts": {
+    "core-js": true
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "core-js"
+    ]
+  },
+  "lavamoat": {
+    "allowScripts": {
+      "core-js": true
+    }
   }
 }

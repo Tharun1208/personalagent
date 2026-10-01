@@ -10,6 +10,7 @@ import {
   Calendar,
   Settings,
   Target,
+  FileText,
   Menu,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
@@ -43,9 +44,14 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
     },
     {
       key: 'goals',
-      label: 'OKRs & Notes',
+      label: 'OKRs',
       icon: Target,
       badge: goals.length > 0 ? goals.length : undefined,
+    },
+    {
+      key: 'notes',
+      label: 'Notes',
+      icon: FileText,
     },
     {
       key: 'ledger',

@@ -36,6 +36,7 @@ export type AppTab =
   | 'tasks'
   | 'reminders'
   | 'goals'
+  | 'notes'
   | 'ledger'
   | 'actions'
   | 'dashboard'
@@ -49,6 +50,7 @@ export const VALID_TABS: AppTab[] = [
   'tasks',
   'reminders',
   'goals',
+  'notes',
   'ledger',
   'actions',
   'dashboard',

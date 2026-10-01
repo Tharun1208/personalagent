@@ -10,6 +10,7 @@ import CalendarView from '@/components/calendar/CalendarView';
 import HabitsView from '@/components/habits/HabitsView';
 import TasksView from '@/components/tasks/TasksView';
 import GoalsView from '@/components/goals/GoalsView';
+import NotesView from '@/components/notes/NotesView';
 import ActivityLogView from '@/components/activity/ActivityLogView';
 import DashboardView from '@/components/dashboard/DashboardView';
 import DynamicAppsView from '@/components/apps/DynamicAppsView';
@@ -69,6 +70,7 @@ export default function AppLayout() {
       case 'habits':    return <HabitsView />;
       case 'tasks':     return <TasksView />;
       case 'goals':     return <GoalsView />;
+      case 'notes':     return <NotesView />;
       case 'ledger':    return <LedgerView />;
       case 'actions':   return <ActivityLogView />;
       case 'dashboard': return <DashboardView />;

@@ -176,6 +176,203 @@ export function exportNoteToPdf(note: { title: string; content: string; category
 }
 
 // ==========================================
+// DOCX EXPORT: ALL NOTES BUNDLE
+// ==========================================
+export async function exportAllNotesToDocx(notes: StandaloneNote[]): Promise<void> {
+  const children: any[] = [
+    new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      children: [
+        new TextRun({
+          text: 'Executive Notes & Knowledge Base',
+          bold: true,
+          size: 32,
+          color: '1E3A8A',
+        }),
+      ],
+    }),
+    new Paragraph({
+      spacing: { before: 100, after: 200 },
+      children: [
+        new TextRun({
+          text: `Total Notes: ${notes.length}  |  Generated on ${new Date().toLocaleDateString()}  |  Assistance OS`,
+          italics: true,
+          color: '6B7280',
+          size: 20,
+        }),
+      ],
+    }),
+    new Paragraph({
+      spacing: { after: 300 },
+      children: [
+        new TextRun({
+          text: '==================================================',
+          color: 'D1D5DB',
+        }),
+      ],
+    }),
+  ];
+
+  notes.forEach((note, idx) => {
+    const categoryLabel = CATEGORY_NAMES[note.category || 'general'] || note.category || 'General';
+    const dateStr = note.createdAt ? new Date(note.createdAt).toLocaleDateString() : 'N/A';
+
+    children.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 200, after: 80 },
+        children: [
+          new TextRun({
+            text: `${idx + 1}. ${note.title || 'Untitled Note'}`,
+            bold: true,
+            size: 26,
+            color: '1E3A8A',
+          }),
+        ],
+      }),
+      new Paragraph({
+        spacing: { after: 120 },
+        children: [
+          new TextRun({
+            text: `Category: ${categoryLabel}  |  Date: ${dateStr}`,
+            italics: true,
+            color: '6B7280',
+            size: 18,
+          }),
+        ],
+      })
+    );
+
+    if (note.content && note.content.trim()) {
+      note.content.split('\n').forEach((line) => {
+        children.push(
+          new Paragraph({
+            spacing: { after: 80 },
+            children: [
+              new TextRun({
+                text: line || ' ',
+                size: 20,
+                color: '1F2937',
+              }),
+            ],
+          })
+        );
+      });
+    }
+
+    children.push(
+      new Paragraph({
+        spacing: { before: 100, after: 200 },
+        children: [
+          new TextRun({
+            text: '--------------------------------------------------',
+            color: 'E5E7EB',
+          }),
+        ],
+      })
+    );
+  });
+
+  const doc = new Document({
+    sections: [
+      {
+        properties: {},
+        children,
+      },
+    ],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `Assistance_Notes_Portfolio_${new Date().toISOString().split('T')[0]}.docx`);
+}
+
+// ==========================================
+// PDF EXPORT: ALL NOTES BUNDLE
+// ==========================================
+export function exportAllNotesToPdf(notes: StandaloneNote[]): void {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let y = 18;
+
+  // Header Banner Bar
+  doc.setFillColor(78, 130, 238);
+  doc.rect(0, 0, pageWidth, 5, 'F');
+
+  // Title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(30, 58, 138);
+  doc.text('Executive Notes & Knowledge Base', 15, y);
+  y += 7;
+
+  // Subtitle
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Total Notes: ${notes.length}  |  Exported on: ${new Date().toLocaleDateString()}`, 15, y);
+  y += 6;
+
+  doc.setDrawColor(226, 232, 240);
+  doc.line(15, y, pageWidth - 15, y);
+  y += 10;
+
+  notes.forEach((note, idx) => {
+    if (y > 250) {
+      doc.addPage();
+      y = 20;
+    }
+
+    const categoryLabel = CATEGORY_NAMES[note.category || 'general'] || note.category || 'General';
+    const dateStr = note.createdAt ? new Date(note.createdAt).toLocaleDateString() : 'N/A';
+
+    // Note Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(30, 58, 138);
+    const titleLines = doc.splitTextToSize(`${idx + 1}. ${note.title || 'Untitled Note'}`, pageWidth - 30);
+    doc.text(titleLines, 15, y);
+    y += titleLines.length * 5.5 + 1;
+
+    // Metadata
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Category: ${categoryLabel}  *  Date: ${dateStr}`, 15, y);
+    y += 5;
+
+    // Note Content
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(51, 65, 85);
+
+    if (note.content && note.content.trim()) {
+      const lines = doc.splitTextToSize(note.content, pageWidth - 30);
+      for (let i = 0; i < lines.length; i++) {
+        if (y > 275) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(lines[i], 15, y);
+        y += 4.8;
+      }
+    }
+
+    y += 4;
+    doc.setDrawColor(241, 245, 249);
+    doc.line(15, y, pageWidth - 15, y);
+    y += 8;
+  });
+
+  // Footer
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  doc.text(`Exported from Assistance OS  *  ${new Date().toLocaleDateString()}`, 15, 290);
+
+  doc.save(`Assistance_Notes_Portfolio_${new Date().toISOString().split('T')[0]}.pdf`);
+}
+
+// ==========================================
 // DOCX EXPORT: SINGLE GOAL & STRATEGIC NOTE
 // ==========================================
 export async function exportGoalToDocx(goal: Goal): Promise<void> {

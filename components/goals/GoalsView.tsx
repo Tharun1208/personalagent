@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Target,
   Plus,
@@ -31,9 +31,6 @@ import {
   FileCode,
   Save,
   ChevronDown,
-  StickyNote,
-  Search,
-  BookOpen,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { Goal } from '@/types';
@@ -42,22 +39,7 @@ import {
   exportGoalToPdf,
   exportAllGoalsToDocx,
   exportAllGoalsToPdf,
-  exportNoteToDocx,
-  exportNoteToPdf,
-  StandaloneNote,
 } from '@/lib/utils/goalExport';
-
-const NOTES_STORAGE_KEY = 'recall_strategic_notes';
-
-function loadLocalNotes(): StandaloneNote[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(NOTES_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
 
 const CATEGORY_META: Record<
   string,
@@ -107,23 +89,10 @@ const CATEGORY_META: Record<
 
 export default function GoalsView() {
   const { goals, createGoal, updateGoal, toggleGoalMilestone, deleteGoal, sendMessage, setActiveTab, showConfirm } = useApp();
-  
-  // Top View Mode: 'objectives' | 'notes'
-  const [activeMainTab, setActiveMainTab] = useState<'objectives' | 'notes'>('objectives');
 
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
-
-  // Standalone Notes State
-  const [notesList, setNotesList] = useState<StandaloneNote[]>(loadLocalNotes);
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [editingNote, setEditingNote] = useState<StandaloneNote | null>(null);
-  const [noteFormTitle, setNoteFormTitle] = useState('');
-  const [noteFormContent, setNoteFormContent] = useState('');
-  const [noteFormCategory, setNoteFormCategory] = useState('general');
-  const [noteFormGoalId, setNoteFormGoalId] = useState('');
-  const [noteSearchQuery, setNoteSearchQuery] = useState('');
 
   // Global Export dropdown state
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
@@ -139,32 +108,9 @@ export default function GoalsView() {
   const [inlineMilestoneGoalId, setInlineMilestoneGoalId] = useState<string | null>(null);
   const [inlineMilestoneText, setInlineMilestoneText] = useState('');
 
-  // Hydrate & Persist notes
-  useEffect(() => {
-    const loaded = loadLocalNotes();
-    if (loaded && loaded.length > 0) {
-      setNotesList(loaded);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notesList));
-    } catch {}
-  }, [notesList]);
-
   const filteredGoals = goals.filter((g) => {
     if (categoryFilter !== 'all' && g.category !== categoryFilter) return false;
     return true;
-  });
-
-  const filteredNotes = notesList.filter((n) => {
-    const matchesCategory = categoryFilter === 'all' || n.category === categoryFilter;
-    const matchesSearch =
-      !noteSearchQuery.trim() ||
-      n.title.toLowerCase().includes(noteSearchQuery.toLowerCase()) ||
-      n.content.toLowerCase().includes(noteSearchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
   });
 
   const totalGoals = goals.length;
@@ -280,76 +226,6 @@ export default function GoalsView() {
     );
   };
 
-  // Note Modal handlers
-  const handleOpenAddNote = (goalId?: string) => {
-    setEditingNote(null);
-    setNoteFormTitle('');
-    setNoteFormContent('');
-    setNoteFormCategory('general');
-    setNoteFormGoalId(goalId || '');
-    setIsNoteModalOpen(true);
-  };
-
-  const handleOpenEditNote = (note: StandaloneNote) => {
-    setEditingNote(note);
-    setNoteFormTitle(note.title);
-    setNoteFormContent(note.content);
-    setNoteFormCategory(note.category || 'general');
-    setNoteFormGoalId(note.goalId || '');
-    setIsNoteModalOpen(true);
-  };
-
-  const handleSaveNote = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!noteFormTitle.trim()) return;
-
-    const matchedGoal = goals.find((g) => g.id === noteFormGoalId);
-
-    if (editingNote) {
-      setNotesList((prev) =>
-        prev.map((n) =>
-          n.id === editingNote.id
-            ? {
-                ...n,
-                title: noteFormTitle.trim(),
-                content: noteFormContent.trim(),
-                category: noteFormCategory,
-                goalId: noteFormGoalId || undefined,
-                goalTitle: matchedGoal ? matchedGoal.title : undefined,
-                updatedAt: new Date().toISOString(),
-              }
-            : n
-        )
-      );
-    } else {
-      const newNote: StandaloneNote = {
-        id: `note_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        title: noteFormTitle.trim(),
-        content: noteFormContent.trim(),
-        category: noteFormCategory,
-        goalId: noteFormGoalId || undefined,
-        goalTitle: matchedGoal ? matchedGoal.title : undefined,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setNotesList((prev) => [newNote, ...prev]);
-    }
-
-    setIsNoteModalOpen(false);
-  };
-
-  const handleDeleteNote = (id: string, noteTitle: string) => {
-    showConfirm({
-      title: 'Delete Note',
-      message: `Are you sure you want to delete note "${noteTitle}"? This cannot be undone.`,
-      confirmText: 'Delete',
-      type: 'danger',
-      onConfirm: () => {
-        setNotesList((prev) => prev.filter((n) => n.id !== id));
-      },
-    });
-  };
-
   // Export handlers
   const handleExportGoalDocx = async (goal: Goal) => {
     try {
@@ -365,22 +241,6 @@ export default function GoalsView() {
   const handleExportGoalPdf = (goal: Goal) => {
     try {
       exportGoalToPdf(goal);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleExportNoteDocx = async (note: StandaloneNote) => {
-    try {
-      await exportNoteToDocx(note);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleExportNotePdf = (note: StandaloneNote) => {
-    try {
-      exportNoteToPdf(note);
     } catch (e) {
       console.error(e);
     }
@@ -418,15 +278,15 @@ export default function GoalsView() {
             </div>
             <div className="space-y-0.5">
               <h1 className="app-page-title text-xl sm:text-2xl font-bold tracking-tight">
-                Goals, OKRs & Notes
+                Goals & Strategic OKRs
               </h1>
               <p className="app-page-subtitle text-xs sm:text-sm text-(--text-secondary)">
-                Set strategic objectives, track key milestones, draft notes, and export reports.
+                Set strategic objectives, track key milestones, monitor progress, and export reports.
               </p>
             </div>
           </div>
 
-          {/* Action Buttons: Export & Create Objective / Note */}
+          {/* Action Buttons: Export & Create Objective */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap sm:flex-nowrap">
             {/* Global Export Menu */}
             <div className="relative">
@@ -485,543 +345,351 @@ export default function GoalsView() {
               )}
             </div>
 
-            {/* Create Button depending on active main tab */}
-            {activeMainTab === 'objectives' ? (
-              <button
-                onClick={handleOpenAddGoal}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white font-semibold text-xs sm:text-sm shadow-md hover:opacity-95 transition-all cursor-pointer active:scale-95 shrink-0"
-              >
-                <Plus size={16} />
-                <span>Create Objective</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => handleOpenAddNote()}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white font-semibold text-xs sm:text-sm shadow-md hover:opacity-95 transition-all cursor-pointer active:scale-95 shrink-0"
-              >
-                <Plus size={16} />
-                <span>Make Note</span>
-              </button>
-            )}
+            <button
+              onClick={handleOpenAddGoal}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white font-semibold text-xs sm:text-sm shadow-md hover:opacity-95 transition-all cursor-pointer active:scale-95 shrink-0"
+            >
+              <Plus size={16} />
+              <span>Create Objective</span>
+            </button>
           </div>
         </div>
 
-        {/* Top Main Tabs: Objectives (OKRs) vs Strategic Notes */}
-        <div className="flex items-center gap-2 bg-(--bg-card) border border-(--border-subtle) rounded-2xl p-1.5 w-fit">
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('objectives')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-              activeMainTab === 'objectives'
-                ? 'bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] text-white shadow-sm font-bold'
-                : 'text-(--text-secondary) hover:text-(--text-primary)'
-            }`}
-          >
-            <Target size={15} />
-            <span>Objectives & OKRs</span>
-            <span className="text-[11px] opacity-80 px-1.5 py-0.2 rounded-md bg-black/15">
-              {goals.length}
-            </span>
-          </button>
+        {/* Executive Metric Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) p-5 shadow-xs flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">
+                Overall Progress
+              </span>
+              <div className="text-3xl font-extrabold text-(--text-primary)">{averageProgress}%</div>
+              <p className="text-[11px] text-(--text-muted)">
+                {completedMilestones} of {totalMilestones} milestones completed
+              </p>
+            </div>
+            <div className="relative w-14 h-14 shrink-0 flex items-center justify-center">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                <path
+                  className="text-(--border-subtle)"
+                  strokeWidth="3.5"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  className="text-[#4E82EE] transition-all duration-500 ease-out"
+                  strokeDasharray={`${averageProgress}, 100`}
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              </svg>
+              <TrendingUp size={16} className="absolute text-[#4E82EE]" />
+            </div>
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveMainTab('notes')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-              activeMainTab === 'notes'
-                ? 'bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] text-white shadow-sm font-bold'
-                : 'text-(--text-secondary) hover:text-(--text-primary)'
-            }`}
-          >
-            <StickyNote size={15} />
-            <span>Notes & Documents</span>
-            <span className="text-[11px] opacity-80 px-1.5 py-0.2 rounded-md bg-black/15">
-              {notesList.length}
-            </span>
-          </button>
+          <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) p-5 shadow-xs flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">
+                Objectives Achieved
+              </span>
+              <div className="text-3xl font-extrabold text-emerald-500">
+                {completedGoals} <span className="text-sm font-normal text-(--text-muted)">/ {totalGoals}</span>
+              </div>
+              <p className="text-[11px] text-(--text-muted)">
+                {totalGoals - completedGoals} active objectives in progress
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+              <Award size={24} />
+            </div>
+          </div>
+
+          <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) p-5 shadow-xs flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">
+                AI Goal Strategy
+              </span>
+              <div className="text-sm font-bold text-(--text-primary)">Actionable Coaching</div>
+              <p className="text-[11px] text-(--text-muted)">
+                1-tap AI strategy formulation for any objective
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#4E82EE]/20 to-[#9B72CF]/20 text-[#4E82EE] flex items-center justify-center shrink-0">
+              <Sparkles size={22} />
+            </div>
+          </div>
         </div>
 
-        {/* ─── TAB 1: OBJECTIVES & OKRS VIEW ─── */}
-        {activeMainTab === 'objectives' && (
-          <div className="space-y-6 animate-in fade-in">
-            {/* Executive Metric Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) p-5 shadow-xs flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">
-                    Overall Progress
-                  </span>
-                  <div className="text-3xl font-extrabold text-(--text-primary)">{averageProgress}%</div>
-                  <p className="text-[11px] text-(--text-muted)">
-                    {completedMilestones} of {totalMilestones} milestones completed
-                  </p>
-                </div>
-                <div className="relative w-14 h-14 shrink-0 flex items-center justify-center">
-                  <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                    <path
-                      className="text-(--border-subtle)"
-                      strokeWidth="3.5"
-                      stroke="currentColor"
-                      fill="none"
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    />
-                    <path
-                      className="text-[#4E82EE] transition-all duration-500 ease-out"
-                      strokeDasharray={`${averageProgress}, 100`}
-                      strokeWidth="3.5"
-                      strokeLinecap="round"
-                      stroke="currentColor"
-                      fill="none"
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    />
-                  </svg>
-                  <TrendingUp size={16} className="absolute text-[#4E82EE]" />
-                </div>
-              </div>
-
-              <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) p-5 shadow-xs flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">
-                    Objectives Achieved
-                  </span>
-                  <div className="text-3xl font-extrabold text-emerald-500">
-                    {completedGoals} <span className="text-sm font-normal text-(--text-muted)">/ {totalGoals}</span>
-                  </div>
-                  <p className="text-[11px] text-(--text-muted)">
-                    {totalGoals - completedGoals} active objectives in progress
-                  </p>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                  <Award size={24} />
-                </div>
-              </div>
-
-              <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) p-5 shadow-xs flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">
-                    AI Goal Strategy
-                  </span>
-                  <div className="text-sm font-bold text-(--text-primary)">Actionable Coaching</div>
-                  <p className="text-[11px] text-(--text-muted)">
-                    1-tap AI strategy formulation for any objective
-                  </p>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#4E82EE]/20 to-[#9B72CF]/20 text-[#4E82EE] flex items-center justify-center shrink-0">
-                  <Sparkles size={22} />
-                </div>
-              </div>
-            </div>
-
-            {/* Category Pills Filter */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        {/* Category Pills Filter */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          <button
+            onClick={() => setCategoryFilter('all')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+              categoryFilter === 'all'
+                ? 'bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] text-white shadow-xs'
+                : 'bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:bg-(--bg-elevated)'
+            }`}
+          >
+            All Objectives ({totalGoals})
+          </button>
+          {Object.entries(CATEGORY_META).map(([key, meta]) => {
+            const count = goals.filter((g) => g.category === key).length;
+            const Icon = meta.Icon;
+            return (
               <button
-                onClick={() => setCategoryFilter('all')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
-                  categoryFilter === 'all'
-                    ? 'bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] text-white shadow-xs'
+                key={key}
+                onClick={() => setCategoryFilter(key)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                  categoryFilter === key
+                    ? `${meta.bg} ${meta.color} border ${meta.border} shadow-xs font-bold`
                     : 'bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:bg-(--bg-elevated)'
                 }`}
               >
-                All Objectives ({totalGoals})
+                <Icon size={13} />
+                <span>{meta.label}</span>
+                <span className="opacity-70 text-[10px]">({count})</span>
               </button>
-              {Object.entries(CATEGORY_META).map(([key, meta]) => {
-                const count = goals.filter((g) => g.category === key).length;
-                const Icon = meta.Icon;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setCategoryFilter(key)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                      categoryFilter === key
-                        ? `${meta.bg} ${meta.color} border ${meta.border} shadow-xs font-bold`
-                        : 'bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:bg-(--bg-elevated)'
-                    }`}
-                  >
-                    <Icon size={13} />
-                    <span>{meta.label}</span>
-                    <span className="opacity-70 text-[10px]">({count})</span>
-                  </button>
-                );
-              })}
+            );
+          })}
+        </div>
+
+        {/* Goals Cards List */}
+        {filteredGoals.length === 0 ? (
+          <div className="text-center py-16 bg-(--bg-card) border border-(--border-subtle) rounded-3xl p-8 space-y-4">
+            <div className="w-14 h-14 rounded-3xl bg-(--bg-elevated) flex items-center justify-center mx-auto text-(--text-muted) shrink-0">
+              <Target size={28} />
             </div>
-
-            {/* Goals Cards List */}
-            {filteredGoals.length === 0 ? (
-              <div className="text-center py-16 bg-(--bg-card) border border-(--border-subtle) rounded-3xl p-8 space-y-4">
-                <div className="w-14 h-14 rounded-3xl bg-(--bg-elevated) flex items-center justify-center mx-auto text-(--text-muted) shrink-0">
-                  <Target size={28} />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="font-bold text-base text-(--text-primary)">No Objectives in this Category</h3>
-                  <p className="text-xs text-(--text-muted) max-w-sm mx-auto">
-                    Define measurable OKR objectives with key milestones to track your execution.
-                  </p>
-                </div>
-                <button
-                  onClick={handleOpenAddGoal}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-(--accent) text-(--accent-contrast) text-xs font-semibold hover:opacity-90 transition-all cursor-pointer"
-                >
-                  <Plus size={14} />
-                  <span>Create Your First Objective</span>
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredGoals.map((goal) => {
-                  const meta = CATEGORY_META[goal.category || 'personal'] || CATEGORY_META.personal;
-                  const Icon = meta.Icon;
-                  const isDone = goal.status === 'completed' || goal.progress === 100;
-                  const milestones = goal.milestones || [];
-                  const completedCount = milestones.filter((m) => m.completed).length;
-
-                  return (
-                    <div
-                      key={goal.id}
-                      className={`p-5 rounded-3xl bg-(--bg-card) border transition-all flex flex-col justify-between relative overflow-hidden group shadow-xs ${
-                        isDone
-                          ? 'border-emerald-500/30 bg-emerald-500/[0.02]'
-                          : 'border-(--border-subtle) hover:border-[#4E82EE]/40'
-                      }`}
-                    >
-                      <div>
-                        {/* Top Bar: Category Chip & Action Buttons */}
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${meta.bg} ${meta.color} ${meta.border}`}
-                          >
-                            <Icon size={12} />
-                            <span>{meta.label}</span>
-                          </span>
-
-                          <div className="flex items-center gap-1">
-                            {/* Ask AI Coach */}
-                            <button
-                              onClick={() => askAiCoach(goal)}
-                              className="px-2.5 py-1 rounded-lg bg-(--bg-elevated) hover:bg-[#4E82EE]/10 text-[#4E82EE] text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer border border-(--border-subtle)"
-                              title="Generate actionable strategy with AI"
-                            >
-                              <Sparkles size={12} />
-                              <span>AI Coach</span>
-                            </button>
-
-                            {/* Edit Button */}
-                            <button
-                              onClick={() => handleOpenEditGoal(goal)}
-                              className="p-1.5 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) transition-colors cursor-pointer"
-                              title="Edit Objective"
-                            >
-                              <Edit2 size={14} />
-                            </button>
-
-                            {/* Delete Button */}
-                            <button
-                              onClick={() => {
-                                showConfirm({
-                                  title: 'Delete Objective',
-                                  message: `Are you sure you want to delete "${goal.title}" and all its milestones? This cannot be undone.`,
-                                  confirmText: 'Delete',
-                                  type: 'danger',
-                                  onConfirm: () => deleteGoal(goal.id),
-                                });
-                              }}
-                              className="p-1.5 rounded-lg text-(--text-muted) hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                              title="Delete Objective"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Goal Title */}
-                        <div className="space-y-1 mb-4">
-                          <h3
-                            className={`font-bold text-base leading-snug ${
-                              isDone ? 'text-(--text-muted) line-through' : 'text-(--text-primary)'
-                            }`}
-                          >
-                            {goal.title}
-                          </h3>
-                        </div>
-
-                        {/* Linear Progress Indicator */}
-                        <div className="space-y-1.5 mb-5">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-semibold text-(--text-primary)">
-                              {goal.progress || 0}% Completed
-                            </span>
-                            <span className="text-[11px] text-(--text-muted)">
-                              {completedCount} / {milestones.length} Milestones
-                            </span>
-                          </div>
-                          <div className="w-full h-2 bg-(--bg-elevated) rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{
-                                width: `${goal.progress || 0}%`,
-                                background: isDone
-                                  ? '#10B981'
-                                  : 'linear-gradient(90deg, #4E82EE, #9B72CF)',
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Milestones Checklist Section */}
-                        {milestones.length > 0 && (
-                          <div className="space-y-2 mb-4 bg-(--bg-elevated)/60 p-3 rounded-2xl border border-(--border-subtle)/50">
-                            <div className="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider px-1">
-                              Key Milestones
-                            </div>
-                            <div className="space-y-1.5">
-                              {milestones.map((m) => (
-                                <button
-                                  key={m.id}
-                                  type="button"
-                                  onClick={() => toggleGoalMilestone(goal.id, m.id)}
-                                  className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left hover:bg-(--bg-card) transition-colors cursor-pointer group/item"
-                                >
-                                  <div
-                                    className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
-                                      m.completed
-                                        ? 'bg-emerald-500 border-emerald-500 text-white'
-                                        : 'border-(--border-subtle) group-hover/item:border-[#4E82EE]'
-                                    }`}
-                                  >
-                                    {m.completed && <Check size={11} strokeWidth={3} />}
-                                  </div>
-                                  <span
-                                    className={`text-xs flex-1 truncate ${
-                                      m.completed
-                                        ? 'line-through text-(--text-muted)'
-                                        : 'text-(--text-primary) font-medium'
-                                    }`}
-                                  >
-                                    {m.title}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Inline Add Milestone */}
-                        {inlineMilestoneGoalId === goal.id ? (
-                          <div className="flex items-center gap-2 mb-4 animate-in fade-in">
-                            <input
-                              type="text"
-                              autoFocus
-                              value={inlineMilestoneText}
-                              onChange={(e) => setInlineMilestoneText(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleAddInlineMilestone(goal);
-                                if (e.key === 'Escape') setInlineMilestoneGoalId(null);
-                              }}
-                              placeholder="New milestone title..."
-                              className="flex-1 px-3 py-1.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs focus:outline-none focus:ring-2 focus:ring-[#4E82EE]/30 text-(--text-primary)"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleAddInlineMilestone(goal)}
-                              className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold cursor-pointer"
-                            >
-                              Add
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setInlineMilestoneGoalId(null)}
-                              className="p-1.5 text-(--text-muted) hover:text-(--text-primary) cursor-pointer"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setInlineMilestoneGoalId(goal.id);
-                              setInlineMilestoneText('');
-                            }}
-                            className="text-[11px] font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 mb-4 cursor-pointer"
-                          >
-                            <Plus size={12} />
-                            <span>Add next milestone</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Bottom Footer: Target Date & Direct Export */}
-                      <div className="pt-3 border-t border-(--border-subtle) flex items-center justify-between text-[11px] text-(--text-muted)">
-                        <div className="flex items-center gap-1.5">
-                          <Clock size={13} className="text-[#4E82EE]" />
-                          {goal.targetDate ? (
-                            <span>Target: {new Date(goal.targetDate).toLocaleDateString()}</span>
-                          ) : (
-                            <span>No deadline set</span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleExportGoalDocx(goal)}
-                            className="hover:text-blue-500 transition-colors cursor-pointer p-1"
-                            title="Download as .docx"
-                          >
-                            <FileText size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleExportGoalPdf(goal)}
-                            className="hover:text-rose-500 transition-colors cursor-pointer p-1"
-                            title="Download as .pdf"
-                          >
-                            <Download size={13} />
-                          </button>
-
-                          {isDone ? (
-                            <span className="text-emerald-500 font-semibold ml-1">✓ Done</span>
-                          ) : (
-                            <span className="font-medium text-(--text-secondary) ml-1">Active</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            <div className="space-y-1">
+              <h3 className="font-bold text-base text-(--text-primary)">No Objectives Yet</h3>
+              <p className="text-xs text-(--text-muted) max-w-sm mx-auto">
+                Define your core priorities, break them into key milestones, and let the AI assistant guide you.
+              </p>
+            </div>
+            <button
+              onClick={handleOpenAddGoal}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-(--accent) text-(--accent-contrast) text-xs font-semibold hover:opacity-90 transition-all cursor-pointer"
+            >
+              <Plus size={14} />
+              <span>Create Your First Objective</span>
+            </button>
           </div>
-        )}
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {filteredGoals.map((goal) => {
+              const meta = CATEGORY_META[goal.category] || CATEGORY_META.career;
+              const Icon = meta.Icon;
+              const isDone = goal.progress === 100 || goal.status === 'completed';
+              const completedMilestoneCount =
+                goal.milestones?.filter((m) => m.completed).length || 0;
+              const totalMilestoneCount = goal.milestones?.length || 0;
 
-        {/* ─── TAB 2: STRATEGIC NOTES & JOURNAL VIEW ─── */}
-        {activeMainTab === 'notes' && (
-          <div className="space-y-5 animate-in fade-in">
-            {/* Top Bar for Notes: Search & New Note */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="relative flex-1 max-w-md">
-                <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-(--text-muted)" />
-                <input
-                  type="text"
-                  value={noteSearchQuery}
-                  onChange={(e) => setNoteSearchQuery(e.target.value)}
-                  placeholder="Search notes, reflections, action plans..."
-                  className="w-full pl-9 pr-4 py-2.5 rounded-2xl bg-(--bg-card) border border-(--border-subtle) text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#4E82EE]/30 text-(--text-primary)"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleOpenAddNote()}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white font-semibold text-xs sm:text-sm shadow-md hover:opacity-95 transition-all cursor-pointer active:scale-95 shrink-0"
-              >
-                <Plus size={16} />
-                <span>Create New Note</span>
-              </button>
-            </div>
-
-            {/* Notes Cards Grid */}
-            {filteredNotes.length === 0 ? (
-              <div className="text-center py-16 bg-(--bg-card) border border-(--border-subtle) rounded-3xl p-8 space-y-4">
-                <div className="w-14 h-14 rounded-3xl bg-(--bg-elevated) flex items-center justify-center mx-auto text-(--text-muted) shrink-0">
-                  <StickyNote size={28} />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="font-bold text-base text-(--text-primary)">No Notes Found</h3>
-                  <p className="text-xs text-(--text-muted) max-w-sm mx-auto">
-                    Type and save your strategic notes, brainstorms, meeting records, and export them as .docx or PDF anytime.
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleOpenAddNote()}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-(--accent) text-(--accent-contrast) text-xs font-semibold hover:opacity-90 transition-all cursor-pointer"
+              return (
+                <div
+                  key={goal.id}
+                  className={`p-5 sm:p-6 rounded-3xl bg-(--bg-card) border transition-all flex flex-col justify-between space-y-4 shadow-xs hover:shadow-md ${
+                    isDone
+                      ? 'border-emerald-500/30 bg-emerald-500/5'
+                      : 'border-(--border-subtle) hover:border-[#4E82EE]/40'
+                  }`}
                 >
-                  <Plus size={14} />
-                  <span>Write Your First Note</span>
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredNotes.map((note) => (
-                  <div
-                    key={note.id}
-                    className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/40 transition-all flex flex-col justify-between shadow-xs group"
-                  >
-                    <div>
-                      {/* Top Bar */}
-                      <div className="flex items-start justify-between gap-2 mb-2.5">
-                        <span className="text-[11px] font-semibold text-[#4E82EE] bg-[#4E82EE]/10 px-2.5 py-0.5 rounded-full capitalize">
-                          {note.category || 'General'}
+                  <div className="space-y-3">
+                    {/* Card Top: Category & Action icons */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-semibold ${meta.bg} ${meta.color} border ${meta.border}`}
+                        >
+                          <Icon size={12} />
+                          <span>{meta.label}</span>
                         </span>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditNote(note)}
-                            className="p-1.5 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) transition-colors cursor-pointer"
-                            title="Edit Note"
-                          >
-                            <Edit2 size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteNote(note.id, note.title)}
-                            className="p-1.5 rounded-lg text-(--text-muted) hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                            title="Delete Note"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
                       </div>
 
-                      {/* Note Title */}
-                      <h4 className="font-bold text-sm sm:text-base text-(--text-primary) mb-2 leading-snug">
-                        {note.title}
-                      </h4>
-
-                      {/* Note Content Preview */}
-                      <p className="text-xs text-(--text-secondary) line-clamp-5 leading-relaxed whitespace-pre-line mb-4 font-mono sm:font-sans">
-                        {note.content}
-                      </p>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => askAiCoach(goal)}
+                          className="p-1.5 rounded-lg text-(--text-muted) hover:text-[#4E82EE] hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
+                          title="Ask AI Coach for advice"
+                        >
+                          <Sparkles size={14} className="text-[#4E82EE]" />
+                          <span className="hidden sm:inline text-[11px] text-[#4E82EE]">Coach</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditGoal(goal)}
+                          className="p-1.5 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) transition-colors cursor-pointer"
+                          title="Edit Objective"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            showConfirm({
+                              title: 'Delete Objective',
+                              message: `Are you sure you want to delete "${goal.title}"?`,
+                              confirmText: 'Delete',
+                              type: 'danger',
+                              onConfirm: () => deleteGoal(goal.id),
+                            });
+                          }}
+                          className="p-1.5 rounded-lg text-(--text-muted) hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                          title="Delete Objective"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Bottom Action Footer */}
-                    <div className="pt-3 border-t border-(--border-subtle) flex items-center justify-between text-xs text-(--text-muted)">
-                      <span className="text-[10px]">
-                        {new Date(note.createdAt).toLocaleDateString()}
-                      </span>
+                    {/* Goal Title */}
+                    <div>
+                      <h3 className="font-bold text-base sm:text-lg text-(--text-primary) leading-snug">
+                        {goal.title}
+                      </h3>
+                    </div>
 
-                      {/* Download Buttons: DOCX and PDF */}
-                      <div className="flex items-center gap-1.5">
+                    {/* Progress Bar & percentage */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-(--text-muted) font-medium">
+                          {completedMilestoneCount} of {totalMilestoneCount} Key Results
+                        </span>
+                        <span className="font-bold text-(--text-primary)">{goal.progress}%</span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-(--bg-elevated) overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${goal.progress}%`,
+                            backgroundColor: isDone ? '#10B981' : meta.ringColor,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Milestones List */}
+                    {goal.milestones && goal.milestones.length > 0 && (
+                      <div className="space-y-2 pt-2">
+                        <div className="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+                          Key Results & Milestones
+                        </div>
+                        <div className="space-y-1.5">
+                          {goal.milestones.map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => toggleGoalMilestone(goal.id, m.id)}
+                              className={`w-full flex items-start gap-2.5 p-2 rounded-xl text-left text-xs transition-all cursor-pointer ${
+                                m.completed
+                                  ? 'bg-emerald-500/10 text-(--text-muted) line-through'
+                                  : 'bg-(--bg-elevated) hover:bg-(--border-subtle)/30 text-(--text-primary)'
+                              }`}
+                            >
+                              <div className="mt-0.5 shrink-0">
+                                {m.completed ? (
+                                  <CheckCircle2 size={14} className="text-emerald-500" />
+                                ) : (
+                                  <Circle size={14} className="text-(--text-muted)" />
+                                )}
+                              </div>
+                              <span className="leading-snug">{m.title}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Inline Add Milestone */}
+                    {inlineMilestoneGoalId === goal.id ? (
+                      <div className="pt-2 flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={inlineMilestoneText}
+                          onChange={(e) => setInlineMilestoneText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleAddInlineMilestone(goal);
+                            if (e.key === 'Escape') setInlineMilestoneGoalId(null);
+                          }}
+                          placeholder="New milestone..."
+                          autoFocus
+                          className="flex-1 px-3 py-1.5 text-xs rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) focus:outline-none focus:ring-1 focus:ring-[#4E82EE]"
+                        />
                         <button
                           type="button"
-                          onClick={() => handleExportNoteDocx(note)}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-(--bg-elevated) hover:bg-blue-500/10 hover:text-blue-500 text-[11px] font-semibold text-(--text-secondary) transition-colors cursor-pointer"
-                          title="Download as .docx"
+                          onClick={() => handleAddInlineMilestone(goal)}
+                          className="px-2.5 py-1.5 rounded-xl bg-[#4E82EE] text-white text-xs font-semibold cursor-pointer"
                         >
-                          <FileText size={12} className="text-blue-500" />
-                          <span>.docx</span>
+                          Add
                         </button>
-
                         <button
                           type="button"
-                          onClick={() => handleExportNotePdf(note)}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-(--bg-elevated) hover:bg-rose-500/10 hover:text-rose-500 text-[11px] font-semibold text-(--text-secondary) transition-colors cursor-pointer"
-                          title="Download as .pdf"
+                          onClick={() => setInlineMilestoneGoalId(null)}
+                          className="p-1.5 text-(--text-muted) hover:text-(--text-primary) cursor-pointer"
                         >
-                          <FileCode size={12} className="text-rose-500" />
-                          <span>.pdf</span>
+                          <X size={14} />
                         </button>
                       </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInlineMilestoneGoalId(goal.id);
+                          setInlineMilestoneText('');
+                        }}
+                        className="text-[11px] text-[#4E82EE] hover:underline flex items-center gap-1 font-semibold cursor-pointer pt-1"
+                      >
+                        <Plus size={12} /> Add Key Result
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Bottom Footer: Target Date & Direct Export */}
+                  <div className="pt-3 border-t border-(--border-subtle) flex items-center justify-between text-[11px] text-(--text-muted)">
+                    <div className="flex items-center gap-1.5">
+                      <Clock size={13} className="text-[#4E82EE]" />
+                      {goal.targetDate ? (
+                        <span>Target: {new Date(goal.targetDate).toLocaleDateString()}</span>
+                      ) : (
+                        <span>No deadline set</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleExportGoalDocx(goal)}
+                        className="hover:text-blue-500 transition-colors cursor-pointer p-1"
+                        title="Download as .docx"
+                      >
+                        <FileText size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExportGoalPdf(goal)}
+                        className="hover:text-rose-500 transition-colors cursor-pointer p-1"
+                        title="Download as .pdf"
+                      >
+                        <Download size={13} />
+                      </button>
+
+                      {isDone ? (
+                        <span className="text-emerald-500 font-semibold ml-1">✓ Done</span>
+                      ) : (
+                        <span className="font-medium text-(--text-secondary) ml-1">Active</span>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* Create / Edit Objective Modal (Cleaned: No 'Why is this important' or 'Strategic notes') */}
+      {/* Create / Edit Objective Modal */}
       {isGoalModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-lg shadow-2xl p-6 sm:p-7 relative overflow-hidden animate-in zoom-in-95 max-h-[90vh] flex flex-col">
@@ -1152,159 +820,6 @@ export default function GoalsView() {
                   className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-semibold shadow-md hover:opacity-95 transition-all cursor-pointer"
                 >
                   {editingGoal ? 'Update Objective' : 'Create Objective'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Standalone Note Creation & Edit Modal with .DOCX and .PDF Export */}
-      {isNoteModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-xl shadow-2xl p-6 sm:p-7 relative overflow-hidden animate-in zoom-in-95 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between pb-4 border-b border-(--border-subtle) shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/20">
-                  <StickyNote size={20} />
-                </div>
-                <div>
-                  <h2 className="app-modal-title">
-                    {editingNote ? 'Edit Note' : 'New Note'}
-                  </h2>
-                  <p className="app-card-subtitle">
-                    Type strategic notes and export as .docx or .pdf
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsNoteModalOpen(false)}
-                className="p-2 rounded-full text-(--text-muted) hover:bg-(--bg-elevated) transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveNote} className="flex-1 overflow-y-auto custom-scrollbar py-4 space-y-4">
-              <div>
-                <label className="block text-[11px] font-semibold text-(--text-muted) uppercase mb-1">
-                  Note Title *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={noteFormTitle}
-                  onChange={(e) => setNoteFormTitle(e.target.value)}
-                  placeholder="e.g. Q4 Growth Strategy & Action Items"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#4E82EE]/30 text-(--text-primary)"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-(--text-muted) uppercase mb-1">
-                    Category Tag
-                  </label>
-                  <select
-                    value={noteFormCategory}
-                    onChange={(e) => setNoteFormCategory(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs focus:outline-none text-(--text-primary) cursor-pointer"
-                  >
-                    <option value="general">General Strategy</option>
-                    <option value="career">Career & Work</option>
-                    <option value="health">Health & Fitness</option>
-                    <option value="finance">Financial Wealth</option>
-                    <option value="learning">Learning & Skills</option>
-                    <option value="personal">Personal Growth</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-(--text-muted) uppercase mb-1">
-                    Link to Objective (Optional)
-                  </label>
-                  <select
-                    value={noteFormGoalId}
-                    onChange={(e) => setNoteFormGoalId(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs focus:outline-none text-(--text-primary) cursor-pointer truncate"
-                  >
-                    <option value="">No linked objective</option>
-                    {goals.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-(--text-muted) uppercase mb-1">
-                  Note Content & Body
-                </label>
-                <textarea
-                  rows={8}
-                  value={noteFormContent}
-                  onChange={(e) => setNoteFormContent(e.target.value)}
-                  placeholder="Record strategic insights, decisions made, obstacles encountered, tactical next steps, or meeting notes..."
-                  className="w-full p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-xs sm:text-sm text-(--text-primary) focus:outline-none focus:ring-2 focus:ring-[#4E82EE]/30 resize-none font-mono sm:font-sans leading-relaxed"
-                />
-              </div>
-
-              {/* Direct Export Options inside Note Modal */}
-              <div className="p-3.5 rounded-2xl bg-(--bg-elevated)/60 border border-(--border-subtle) space-y-2">
-                <div className="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
-                  Quick Export Document
-                </div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      exportNoteToDocx({
-                        title: noteFormTitle || 'Note',
-                        content: noteFormContent,
-                        category: noteFormCategory,
-                      })
-                    }
-                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-blue-500/40 text-xs font-semibold text-(--text-primary) shadow-xs transition-all cursor-pointer"
-                  >
-                    <FileText size={14} className="text-blue-500" />
-                    <span>Download .docx</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      exportNoteToPdf({
-                        title: noteFormTitle || 'Note',
-                        content: noteFormContent,
-                        category: noteFormCategory,
-                      })
-                    }
-                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-rose-500/40 text-xs font-semibold text-(--text-primary) shadow-xs transition-all cursor-pointer"
-                  >
-                    <FileCode size={14} className="text-rose-500" />
-                    <span>Download .pdf</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-4 border-t border-(--border-subtle) flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setIsNoteModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-xs font-semibold cursor-pointer transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-semibold shadow-md hover:opacity-95 transition-all cursor-pointer"
-                >
-                  <Save size={14} />
-                  <span>{editingNote ? 'Save Changes' : 'Save Note'}</span>
                 </button>
               </div>
             </form>

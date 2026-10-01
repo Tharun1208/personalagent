@@ -14,6 +14,7 @@ import {
   Sparkles,
   CheckSquare,
   Target,
+  FileText,
   Wallet,
   Boxes,
   Calendar,
@@ -73,10 +74,18 @@ const NAV_ITEMS: NavItem[] = [
   {
     key: 'goals',
     title: 'Goals & Strategic OKRs',
-    subtitle: 'Objectives, milestones & notes',
+    subtitle: 'Objectives & milestones',
     icon: Target,
     gradient: 'from-cyan-500 to-blue-600',
     glow: 'shadow-cyan-500/25',
+  },
+  {
+    key: 'notes',
+    title: 'Notes & Documents',
+    subtitle: 'Drafts, research & exports',
+    icon: FileText,
+    gradient: 'from-amber-500 to-orange-500',
+    glow: 'shadow-amber-500/25',
   },
   {
     key: 'ledger',
