@@ -1432,7 +1432,7 @@ export default function CalendarView() {
                 className="flex-1 py-2.5 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold hover:opacity-95 shadow-xs transition-opacity cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <Plus size={15} />
-                <span>+ Schedule on This Day</span>
+                <span>Schedule on This Day</span>
               </button>
               <button
                 onClick={() => {

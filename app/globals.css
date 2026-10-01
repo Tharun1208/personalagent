@@ -131,10 +131,12 @@
 
   .ibm-plex-sans,
   .font-ibm {
-    font-family: var(--font-ibm-plex-sans), "IBM Plex Sans", sans-serif;
+    font-family: "IBM Plex Sans", sans-serif;
     font-optical-sizing: auto;
-    font-weight: 400;
+    font-weight: 500;
     font-style: normal;
+    font-variation-settings:
+      "wdth" 100;
   }
 
   /* ── Unified Heading Hierarchy ── */
