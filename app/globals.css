@@ -4,6 +4,7 @@
   --font-sans: var(--font-montserrat), "Montserrat", sans-serif;
   --font-serif: var(--font-cormorant), "Cormorant Garamond", serif;
   --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
+  --font-cutive: var(--font-cutive-mono), "Cutive Mono", monospace;
 }
 
 @layer base {
@@ -119,6 +120,13 @@
   .font-serif {
     font-family: var(--font-cormorant), "Cormorant Garamond", serif;
     font-optical-sizing: auto;
+  }
+
+  .cutive-mono-regular,
+  .font-cutive {
+    font-family: var(--font-cutive-mono), "Cutive Mono", monospace;
+    font-weight: 400;
+    font-style: normal;
   }
 }
 
