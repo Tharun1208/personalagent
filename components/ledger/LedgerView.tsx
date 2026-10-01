@@ -24,6 +24,7 @@ import {
   Zap,
   Heart,
   MoreHorizontal,
+  MoreVertical,
   TrendingDown,
   TrendingUp,
   CalendarDays,
@@ -1192,6 +1193,13 @@ export default function LedgerView() {
   const [isModalOpen, setIsModalOpen]   = useState(false);
   const [editingEntry, setEditingEntry] = useState<LedgerEntry | null>(null);
   const [showSimplifiedGraph, setShowSimplifiedGraph] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleCloseMenu = () => setOpenMenuId(null);
+    window.addEventListener('click', handleCloseMenu);
+    return () => window.removeEventListener('click', handleCloseMenu);
+  }, []);
 
   // Modal Form State
   const [personName, setPersonName] = useState('');
@@ -1455,7 +1463,7 @@ export default function LedgerView() {
                   return (
                     <div
                       key={entry.id}
-                      className={`rounded-3xl bg-(--bg-card) border p-5 shadow-xs flex flex-col justify-between gap-4 relative overflow-hidden transition-all card-lift animate-fade-in-up ${
+                      className={`rounded-3xl bg-(--bg-card) border p-5 shadow-xs flex flex-col justify-between gap-4 relative transition-all card-lift animate-fade-in-up ${
                         isSettled
                           ? 'border-(--border-subtle) opacity-65 bg-(--bg-card)/60'
                           : isGive
@@ -1464,38 +1472,27 @@ export default function LedgerView() {
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div
-                            className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs font-cutive ${
-                              isSettled
-                                ? 'bg-(--bg-elevated) text-(--text-muted)'
-                                : isGive
-                                ? 'bg-gradient-to-tr from-rose-500/20 to-orange-500/20 text-rose-500 border border-rose-500/20'
-                                : 'bg-gradient-to-tr from-emerald-500/20 to-teal-500/20 text-emerald-500 border border-emerald-500/20'
-                            }`}
-                          >
-                            {entry.personName.substring(0, 2).toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <h3 className="app-card-title truncate">{entry.personName}</h3>
-                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                                  isSettled
-                                    ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                                    : isGive
-                                    ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                    : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                                }`}
-                              >
-                                {isSettled ? '✓ Settled' : isGive ? 'You Owe' : 'Owed to You'}
+                        <div className="min-w-0">
+                          <h3 className="app-card-title truncate text-base font-bold text-(--text-primary)">
+                            {entry.personName}
+                          </h3>
+                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            <span
+                              className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                                isSettled
+                                  ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                                  : isGive
+                                  ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                  : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                              }`}
+                            >
+                              {isSettled ? '✓ Settled' : isGive ? 'You Owe' : 'Owed to You'}
+                            </span>
+                            {entry.category && (
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-(--bg-elevated) text-(--text-muted) capitalize border border-(--border-subtle)">
+                                {entry.category}
                               </span>
-                              {entry.category && (
-                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-(--bg-elevated) text-(--text-muted) capitalize border border-(--border-subtle)">
-                                  {entry.category}
-                                </span>
-                              )}
-                            </div>
+                            )}
                           </div>
                         </div>
 
@@ -1505,24 +1502,17 @@ export default function LedgerView() {
                               isSettled
                                 ? 'text-(--text-muted) line-through'
                                 : isGive
-                                ? 'text-rose-500'
-                                : 'text-emerald-500'
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : 'text-emerald-600 dark:text-emerald-400'
                             }`}
                           >
-                            <span>{isGive ? '-' : '+'}</span>
-                            <span className="text-lg opacity-85">{entry.currency}</span>
+                            <span className="text-base sm:text-lg opacity-85">{entry.currency}</span>
                             <span>{entry.amount.toLocaleString('en-IN')}</span>
                           </div>
                         </div>
                       </div>
 
-                      {entry.description && (
-                        <p className="text-xs text-(--text-secondary) bg-(--bg-elevated) p-3 rounded-2xl break-words leading-relaxed border border-(--border-subtle)/50">
-                          {entry.description}
-                        </p>
-                      )}
-
-                      <div className="pt-3 border-t border-(--border-subtle) flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="pt-3 border-t border-(--border-subtle) flex items-center justify-between gap-2 text-xs">
                         <div className="flex items-center gap-1.5 text-(--text-muted) text-[11px] font-cutive">
                           {entry.dueDate ? (
                             <>
@@ -1534,47 +1524,81 @@ export default function LedgerView() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-1.5">
-                          {!isSettled && (
-                            <>
-                              <button
-                                onClick={() => settleLedgerEntry(entry.id)}
-                                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
-                              >
-                                <CheckCircle2 size={13} />
-                                <span>Settle</span>
-                              </button>
-                              <button
-                                onClick={() => handleSetReminderForDue(entry)}
-                                className="p-2 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-[#4E82EE] transition-all cursor-pointer active:scale-95"
-                                title="Set reminder notification"
-                              >
-                                <BellRing size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleOpenEdit(entry)}
-                                className="p-2 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-[#4E82EE] transition-all cursor-pointer active:scale-95"
-                                title="Edit due entry"
-                              >
-                                <Edit2 size={14} />
-                              </button>
-                            </>
-                          )}
+                        {/* 3-Dots Options Menu */}
+                        <div className="relative">
                           <button
-                            onClick={() =>
-                              showConfirm({
-                                title: 'Remove Record',
-                                message: `Remove ${entry.personName} (${entry.currency}${entry.amount}) from dues ledger?`,
-                                confirmText: 'Remove',
-                                type: 'danger',
-                                onConfirm: () => deleteLedgerEntry(entry.id),
-                              })
-                            }
-                            className="p-2 rounded-xl bg-(--bg-elevated) hover:bg-rose-500/15 border border-(--border-subtle) text-(--text-muted) hover:text-rose-500 transition-all cursor-pointer active:scale-95"
-                            title="Delete entry"
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(openMenuId === entry.id ? null : entry.id);
+                            }}
+                            className="p-1.5 sm:p-2 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary) transition-all cursor-pointer active:scale-95 shadow-2xs"
+                            title="More options"
                           >
-                            <Trash2 size={14} />
+                            <MoreVertical size={16} />
                           </button>
+
+                          {openMenuId === entry.id && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="absolute right-0 bottom-full mb-1.5 sm:bottom-auto sm:top-full sm:mt-1.5 w-44 rounded-2xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-1.5 z-40 space-y-0.5 animate-in fade-in zoom-in-95 duration-150"
+                            >
+                              {!isSettled && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenMenuId(null);
+                                      settleLedgerEntry(entry.id);
+                                    }}
+                                    className="w-full px-3 py-2 rounded-xl hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
+                                  >
+                                    <CheckCircle2 size={15} className="text-emerald-500" />
+                                    <span>Settle Due</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenMenuId(null);
+                                      handleSetReminderForDue(entry);
+                                    }}
+                                    className="w-full px-3 py-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-primary) font-semibold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
+                                  >
+                                    <BellRing size={15} className="text-[#4E82EE]" />
+                                    <span>Set Reminder</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenMenuId(null);
+                                      handleOpenEdit(entry);
+                                    }}
+                                    className="w-full px-3 py-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-primary) font-semibold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
+                                  >
+                                    <Edit2 size={15} className="text-amber-500" />
+                                    <span>Edit Due</span>
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuId(null);
+                                  showConfirm({
+                                    title: 'Remove Record',
+                                    message: `Remove ${entry.personName} (${entry.currency}${entry.amount}) from dues ledger?`,
+                                    confirmText: 'Remove',
+                                    type: 'danger',
+                                    onConfirm: () => deleteLedgerEntry(entry.id),
+                                  });
+                                }}
+                                className="w-full px-3 py-2 rounded-xl hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
+                              >
+                                <Trash2 size={15} className="text-rose-500" />
+                                <span>Delete Record</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1637,10 +1661,6 @@ export default function LedgerView() {
                   <label className="block text-xs font-semibold text-(--text-secondary) mb-1">Due Date</label>
                   <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) focus:outline-none" />
                 </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-(--text-secondary) mb-1">Note</label>
-                <textarea rows={2} placeholder="e.g. Dinner split, taxi fare..." value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) focus:outline-none resize-none" />
               </div>
               <div className="pt-3 border-t border-(--border-subtle) flex items-center justify-end gap-2">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) font-semibold cursor-pointer hover:bg-(--bg-card) transition-colors">Cancel</button>
