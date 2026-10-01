@@ -26,19 +26,19 @@ export async function callGroqAI({
     };
   }
 
-  // Verified ultra-fast Groq LPU models (200-400ms inference)
+  // Verified ultra-fast Groq LPU models (sub-second inference)
   const KNOWN_GROQ_MODELS = [
-    'llama-3.3-70b-versatile',
-    'llama-3.1-8b-instant',
-    'llama-3.1-70b-versatile',
-    'mixtral-8x7b-32768',
-    'gemma2-9b-it',
+    'qwen/qwen3.8-27b',
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'allam-2-7b',
   ];
 
-  const preferredModel = (model && KNOWN_GROQ_MODELS.includes(model)) ? model : 'llama-3.3-70b-versatile';
+  const preferredModel = (model && KNOWN_GROQ_MODELS.includes(model)) ? model : 'qwen/qwen3.8-27b';
   const modelsToTry = [
     preferredModel,
-    'llama-3.1-8b-instant',
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
   ];
 
   const uniqueModels = Array.from(new Set(modelsToTry));
@@ -55,7 +55,7 @@ export async function callGroqAI({
       });
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
 
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -80,7 +80,12 @@ export async function callGroqAI({
 
       const data = await response.json();
       const choiceMsg = data?.choices?.[0]?.message;
-      const reply = choiceMsg?.content || (choiceMsg?.reasoning ? choiceMsg.reasoning : '') || '';
+      let reply = choiceMsg?.content || '';
+      
+      // If reasoning-only output (e.g. from gpt-oss models when max_tokens is constrained)
+      if (!reply && choiceMsg?.reasoning) {
+        reply = choiceMsg.reasoning;
+      }
 
       if (reply && reply.trim().length > 0) {
         return {

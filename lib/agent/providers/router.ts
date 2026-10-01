@@ -89,13 +89,15 @@ export async function routeLLMRequest({
     try {
       const res = await callGeminiAI({
         apiKey: geminiKey,
-        model: 'gemini-flash-latest',
+        model: 'gemini-3.5-flash-lite',
         systemInstruction,
         messages: augmentedMessages,
         inlineAttachments: geminiInlineAttachments,
       });
       if (res.success && res.content) {
-        return { success: true, content: res.content, provider: 'Google Gemini Flash (Vision & Multimodal Intelligence)', model: 'gemini-flash-latest' };
+        const out: RouteLLMResult = { success: true, content: res.content, provider: 'Google Gemini Flash Lite (Vision & Multimodal Intelligence)', model: 'gemini-3.5-flash-lite' };
+        if (cacheKey) llmResponseCache.put(cacheKey, out);
+        return out;
       }
     } catch (e) {
       console.warn('Gemini vision/document analysis error, trying fallback:', e);
@@ -105,9 +107,9 @@ export async function routeLLMRequest({
   // 2. Groq High-Speed LPU (Ultra-fast ~200-400ms inference for text)
   if (groqKey) {
     try {
-      const targetGroqModel = (configuredModel && (configuredModel.startsWith('llama') || configuredModel.startsWith('mixtral') || configuredModel.startsWith('gemma')))
+      const targetGroqModel = (configuredModel && (configuredModel.startsWith('qwen') || configuredModel.startsWith('openai/') || configuredModel.startsWith('allam')))
         ? configuredModel
-        : 'llama-3.3-70b-versatile';
+        : 'qwen/qwen3.8-27b';
 
       const res = await callGroqAI({
         apiKey: groqKey,
@@ -115,41 +117,48 @@ export async function routeLLMRequest({
         messages: systemInstruction ? [{ role: 'system', content: systemInstruction }, ...augmentedMessages] : augmentedMessages,
       });
       if (res.success && res.content) {
-        return { success: true, content: res.content, provider: 'Groq High-Speed LPU', model: targetGroqModel };
+        const out: RouteLLMResult = { success: true, content: res.content, provider: 'Groq High-Speed LPU', model: targetGroqModel };
+        if (cacheKey) llmResponseCache.put(cacheKey, out);
+        return out;
       }
     } catch (e) {
       console.warn('Groq provider error, trying fallback:', e);
     }
   }
 
-  // 3. Gemini Standard/Text
+  // 3. Gemini Standard / Text
   if (geminiKey) {
     try {
+      const targetGeminiModel = configuredModel?.startsWith('gemini') ? configuredModel : 'gemini-3.5-flash-lite';
       const res = await callGeminiAI({
         apiKey: geminiKey,
-        model: configuredModel?.startsWith('gemini') ? configuredModel : 'gemini-2.5-flash',
+        model: targetGeminiModel,
         systemInstruction,
         messages: augmentedMessages,
         inlineAttachments: geminiInlineAttachments,
       });
       if (res.success && res.content) {
-        return { success: true, content: res.content, provider: 'Google Gemini Flash', model: configuredModel || 'gemini-2.5-flash' };
+        const out: RouteLLMResult = { success: true, content: res.content, provider: 'Google Gemini Flash Lite', model: targetGeminiModel };
+        if (cacheKey) llmResponseCache.put(cacheKey, out);
+        return out;
       }
     } catch (e) {
       console.warn('Gemini provider error, trying fallback:', e);
     }
   }
 
-  // 4. Groq Fallback (Instant 8B)
+  // 4. Groq Fallback (GPT-OSS LPU)
   if (groqKey) {
     try {
       const res = await callGroqAI({
         apiKey: groqKey,
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-120b',
         messages: systemInstruction ? [{ role: 'system', content: systemInstruction }, ...augmentedMessages] : augmentedMessages,
       });
       if (res.success && res.content) {
-        return { success: true, content: res.content, provider: 'Groq High-Speed LPU', model: 'llama-3.1-8b-instant' };
+        const out: RouteLLMResult = { success: true, content: res.content, provider: 'Groq High-Speed LPU', model: 'openai/gpt-oss-120b' };
+        if (cacheKey) llmResponseCache.put(cacheKey, out);
+        return out;
       }
     } catch (e) {
       console.warn('Groq fallback error:', e);
