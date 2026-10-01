@@ -343,7 +343,7 @@ function DailySpendingPanel({ currency }: { currency: string }) {
           <p className="text-xs text-(--text-muted) font-semibold uppercase tracking-wider">
             {spendingView === 'monthly' ? `${MONTH_NAMES[reportMonth]} ${reportYear} Total` : "Today's Spending"}
           </p>
-          <p className="text-3xl font-extrabold text-(--text-primary) tracking-tight">
+          <p className="text-3xl font-bold text-(--text-primary) tracking-tight font-cutive">
             {currency}
             {(spendingView === 'monthly' ? monthTotal : todayTotal).toLocaleString('en-IN')}
           </p>

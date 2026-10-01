@@ -69,7 +69,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className={`${montserrat.className} antialiased select-none`} suppressHydrationWarning>
+      <body className={`${cutiveMono.className} cutive-mono-regular antialiased select-none font-cutive`} suppressHydrationWarning>
         <AppProvider>{children}</AppProvider>
       </body>
     </html>

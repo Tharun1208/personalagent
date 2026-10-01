@@ -145,12 +145,12 @@ export default function Sidebar({ onClose }: SidebarProps) {
                 <span className="font-extrabold text-[15px] tracking-tight text-(--text-primary) group-hover:text-[#4E82EE] transition-colors">
                   Assistance
                 </span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-[#4E82EE]/15 text-[#4E82EE]">
-                  Pro
+                <span className="text-[9px] uppercase font-mono font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-[#4E82EE]/15 text-[#4E82EE]">
+                  v3.0 OS
                 </span>
               </div>
-              <p className="text-[11px] text-(--text-muted) font-medium">
-                Personal Life OS
+              <p className="text-[11px] text-(--text-muted) font-medium font-cutive">
+                Personal Executive OS
               </p>
             </div>
           </div>
@@ -224,7 +224,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
               {/* Counter Badge */}
               {badge > 0 && (
                 <span
-                  className={`text-[11px] font-mono px-2 py-0.5 rounded-full font-extrabold shrink-0 shadow-xs ${
+                  className={`text-[11px] font-cutive px-2 py-0.5 rounded-full font-bold shrink-0 shadow-xs ${
                     isActive
                       ? 'bg-white text-slate-900'
                       : 'bg-(--bg-elevated) text-[#4E82EE] border border-[#4E82EE]/30'

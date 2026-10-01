@@ -452,7 +452,7 @@ export default function TasksView() {
                     </div>
                   </div>
 
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-(--bg-elevated) text-(--text-muted) border border-(--border-subtle)">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-(--bg-elevated) text-(--text-muted) border border-(--border-subtle) font-cutive">
                     {group.tasks.length} {group.tasks.length === 1 ? 'task' : 'tasks'}
                   </span>
                 </div>
@@ -507,12 +507,12 @@ export default function TasksView() {
 
                               <div className="flex items-center gap-3 text-[11px] text-(--text-muted) pt-1">
                                 {task.dueDate && (
-                                  <span className="flex items-center gap-1 text-amber-500 font-medium">
+                                  <span className="flex items-center gap-1 text-amber-500 font-bold font-cutive">
                                     <Calendar size={12} />
                                     Due: {new Date(task.dueDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                                   </span>
                                 )}
-                                <span>Created {new Date(task.createdAt).toLocaleDateString()}</span>
+                                <span className="font-cutive">Created {new Date(task.createdAt).toLocaleDateString()}</span>
                               </div>
                             </div>
                           </div>

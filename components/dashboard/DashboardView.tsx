@@ -196,18 +196,18 @@ export default function DashboardView() {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-(--bg-primary) text-(--text-primary)">
       
-      {/* ── Top Header Bar ── */}
-      <div className="px-4 py-3 sm:px-6 sm:h-16 border-b border-(--border-subtle) flex items-center justify-between shrink-0 bg-(--bg-primary)/95 backdrop-blur-md">
+      {/* ── Top Header Bar (v3.0 Next-Gen OS) ── */}
+      <div className="px-4 py-3 sm:px-6 sm:h-16 border-b border-(--border-subtle)/50 flex items-center justify-between shrink-0 bg-(--bg-primary)/90 backdrop-blur-xl">
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-xs shrink-0 select-none">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-md shadow-blue-500/20 shrink-0 select-none">
             <Sun size={18} />
           </div>
           <div className="min-w-0">
             <h1 className="font-extrabold text-xs sm:text-base text-(--text-primary) truncate">
               {getGreeting()}, {user?.name || 'User'}
             </h1>
-            <p className="text-[10px] sm:text-[11px] text-(--text-muted) truncate">
-              {formattedDate} · <span className="font-mono font-semibold">{timeStr}</span>
+            <p className="text-[10px] sm:text-[11px] text-(--text-muted) truncate font-medium">
+              {formattedDate} · <span className="font-cutive font-bold text-[#4E82EE]">{timeStr}</span>
             </p>
           </div>
         </div>
@@ -215,7 +215,7 @@ export default function DashboardView() {
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={() => setBriefingOpen(true)}
-            className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#4E82EE] text-white text-[11px] sm:text-xs font-semibold hover:opacity-95 shadow-xs transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shrink-0"
+            className="px-3.5 py-2 rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#4E82EE] text-white text-[11px] sm:text-xs font-bold hover:opacity-95 shadow-md shadow-blue-500/25 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shrink-0"
           >
             <Volume2 size={13} />
             <span>AI Briefing</span>
@@ -224,21 +224,21 @@ export default function DashboardView() {
       </div>
 
       {/* ── Main Executive Command Canvas ── */}
-      <div className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-6 max-w-6xl mx-auto w-full space-y-4 sm:space-y-6 custom-scrollbar pb-24 md:pb-8">
+      <div className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-6 max-w-6xl mx-auto w-full space-y-4 sm:space-y-6 custom-scrollbar pb-28 md:pb-8">
 
         {/* ── 1. Executive Intelligence Hero Card ── */}
-        <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#4E82EE]/10 via-(--bg-card) to-[#9B72CF]/10 border border-[#4E82EE]/25 shadow-xs space-y-3 sm:space-y-4 relative overflow-hidden">
+        <div className="p-4 sm:p-6 rounded-3xl bg-gradient-to-br from-[#4E82EE]/12 via-(--bg-card) to-[#9B72CF]/10 border border-[#4E82EE]/25 shadow-lg shadow-blue-500/5 space-y-3 sm:space-y-4 relative overflow-hidden backdrop-blur-md">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-bold text-[#4E82EE] uppercase tracking-wider">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-extrabold text-[#4E82EE] uppercase tracking-wider">
               <Sparkles size={14} className="text-[#4E82EE]" />
-              <span>Executive Daily Intelligence</span>
+              <span>Assistance OS v3.0 Intelligence</span>
             </div>
             <button
               onClick={() => {
                 setActiveTab('chat');
                 sendMessage('Analyze my tasks, goals, financial dues, and today\'s schedule. Give me a 3-point action plan.');
               }}
-              className="text-[11px] sm:text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
+              className="text-[11px] sm:text-xs font-bold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
             >
               <span>Generate AI Plan</span>
               <ArrowUpRight size={13} />
@@ -246,10 +246,10 @@ export default function DashboardView() {
           </div>
 
           <p className="text-xs sm:text-sm font-medium text-(--text-primary) leading-relaxed">
-            You have <strong className="text-[#4E82EE]">{pendingTasks.length} pending action items</strong>, today&apos;s spending stands at{' '}
-            <strong className="text-emerald-500">₹{todaySpendingTotal.toLocaleString('en-IN')}</strong>, and you have{' '}
-            <strong className="text-indigo-500">{activeGoals.length} active OKR goals</strong> with{' '}
-            <strong className="text-amber-500">{habitsCompletedToday}/{habits.length || 1} habits completed</strong> today.
+            You have <strong className="text-[#4E82EE] font-cutive">{pendingTasks.length} pending action items</strong>, today&apos;s spending stands at{' '}
+            <strong className="text-emerald-500 font-cutive">₹{todaySpendingTotal.toLocaleString('en-IN')}</strong>, and you have{' '}
+            <strong className="text-indigo-500 font-cutive">{activeGoals.length} active OKR goals</strong> with{' '}
+            <strong className="text-amber-500 font-cutive">{habitsCompletedToday}/{habits.length || 1} habits completed</strong> today.
             {highPriorityTasks.length > 0 && (
               <span> Top priority: <strong className="text-(--text-primary)">&ldquo;{highPriorityTasks[0].title}&rdquo;</strong>.</span>
             )}
@@ -259,30 +259,30 @@ export default function DashboardView() {
           <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-1">
             <button
               onClick={() => setActiveTab('tasks')}
-              className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
+              className="px-3.5 py-2.5 rounded-2xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 text-xs font-bold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 group"
             >
-              <CheckSquare size={13} className="text-[#4E82EE]" />
+              <CheckSquare size={14} className="text-[#4E82EE] group-hover:scale-110 transition-transform" />
               <span>New Task</span>
             </button>
             <button
               onClick={() => setActiveTab('ledger')}
-              className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-emerald-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
+              className="px-3.5 py-2.5 rounded-2xl bg-(--bg-card) border border-(--border-subtle) hover:border-emerald-500/50 text-xs font-bold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 group"
             >
-              <CreditCard size={13} className="text-emerald-500" />
+              <CreditCard size={14} className="text-emerald-500 group-hover:scale-110 transition-transform" />
               <span>Log Expense</span>
             </button>
             <button
               onClick={() => setActiveTab('goals')}
-              className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-purple-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
+              className="px-3.5 py-2.5 rounded-2xl bg-(--bg-card) border border-(--border-subtle) hover:border-purple-500/50 text-xs font-bold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 group"
             >
-              <Target size={13} className="text-purple-500" />
+              <Target size={14} className="text-purple-500 group-hover:scale-110 transition-transform" />
               <span>Track Goals</span>
             </button>
             <button
               onClick={() => setFocusTimerOpen(true)}
-              className="px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/50 text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95"
+              className="px-3.5 py-2.5 rounded-2xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/50 text-xs font-bold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 group"
             >
-              <Flame size={13} className="text-amber-500" />
+              <Flame size={14} className="text-amber-500 group-hover:scale-110 transition-transform" />
               <span>Focus 25m</span>
             </button>
           </div>
@@ -299,87 +299,87 @@ export default function DashboardView() {
             {/* KPI 1: Task Completion Rate */}
             <div
               onClick={() => setActiveTab('tasks')}
-              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
+              className="p-3.5 sm:p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-semibold text-[11px] sm:text-xs truncate">Tasks</span>
-                <ListTodo size={14} className="text-[#4E82EE]" />
+                <span className="font-bold text-[11px] sm:text-xs truncate">Tasks</span>
+                <ListTodo size={15} className="text-[#4E82EE]" />
               </div>
               <div>
-                <p className="text-xl sm:text-2xl font-black text-(--text-primary) font-mono">{taskCompletionRate}%</p>
+                <p className="text-xl sm:text-2xl font-black text-(--text-primary) font-cutive">{taskCompletionRate}%</p>
                 <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-1.5 overflow-hidden">
                   <div className="h-full rounded-full bg-[#4E82EE]" style={{ width: `${taskCompletionRate}%` }} />
                 </div>
               </div>
-              <p className="text-[10px] text-(--text-muted) truncate">{completedTasks.length}/{totalTasks} completed</p>
+              <p className="text-[10px] text-(--text-muted) truncate font-medium">{completedTasks.length}/{totalTasks} completed</p>
             </div>
 
             {/* KPI 2: Today's Spending */}
             <div
               onClick={() => setActiveTab('ledger')}
-              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-emerald-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
+              className="p-3.5 sm:p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-emerald-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-semibold text-[11px] sm:text-xs truncate">Today Spend</span>
-                <DollarSign size={14} className="text-emerald-500" />
+                <span className="font-bold text-[11px] sm:text-xs truncate">Today Spend</span>
+                <DollarSign size={15} className="text-emerald-500" />
               </div>
               <div>
-                <p className="text-xl sm:text-2xl font-black text-emerald-500 font-mono truncate">₹{todaySpendingTotal.toLocaleString('en-IN')}</p>
+                <p className="text-xl sm:text-2xl font-black text-emerald-500 font-cutive truncate">₹{todaySpendingTotal.toLocaleString('en-IN')}</p>
               </div>
-              <p className="text-[10px] text-(--text-muted) truncate">Month: ₹{monthSpendingTotal.toLocaleString('en-IN')}</p>
+              <p className="text-[10px] text-(--text-muted) truncate font-medium">Month: ₹{monthSpendingTotal.toLocaleString('en-IN')}</p>
             </div>
 
             {/* KPI 3: Net Ledger Due Balance */}
             <div
               onClick={() => setActiveTab('ledger')}
-              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-indigo-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
+              className="p-3.5 sm:p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-indigo-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-semibold text-[11px] sm:text-xs truncate">Net Dues</span>
-                <HandCoins size={14} className="text-indigo-500" />
+                <span className="font-bold text-[11px] sm:text-xs truncate">Net Dues</span>
+                <HandCoins size={15} className="text-indigo-500" />
               </div>
               <div>
-                <p className={`text-xl sm:text-2xl font-black font-mono truncate ${duesStats.net >= 0 ? 'text-[#4E82EE]' : 'text-rose-500'}`}>
+                <p className={`text-xl sm:text-2xl font-black font-cutive truncate ${duesStats.net >= 0 ? 'text-[#4E82EE]' : 'text-rose-500'}`}>
                   {duesStats.net >= 0 ? '+' : ''}₹{duesStats.net.toLocaleString('en-IN')}
                 </p>
               </div>
-              <p className="text-[10px] text-(--text-muted) truncate">{duesStats.pendingCount} active dues</p>
+              <p className="text-[10px] text-(--text-muted) truncate font-medium">{duesStats.pendingCount} active dues</p>
             </div>
 
             {/* KPI 4: Goal Milestones */}
             <div
               onClick={() => setActiveTab('goals')}
-              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-purple-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
+              className="p-3.5 sm:p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-purple-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-semibold text-[11px] sm:text-xs truncate">Goals</span>
-                <Target size={14} className="text-purple-500" />
+                <span className="font-bold text-[11px] sm:text-xs truncate">Goals</span>
+                <Target size={15} className="text-purple-500" />
               </div>
               <div>
-                <p className="text-xl sm:text-2xl font-black text-purple-500 font-mono">{activeGoals.length}</p>
+                <p className="text-xl sm:text-2xl font-black text-purple-500 font-cutive">{activeGoals.length}</p>
                 <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-1.5 overflow-hidden">
                   <div className="h-full rounded-full bg-purple-500" style={{ width: `${goalsMilestonesCompleted.pct}%` }} />
                 </div>
               </div>
-              <p className="text-[10px] text-(--text-muted) truncate">{goalsMilestonesCompleted.compM}/{goalsMilestonesCompleted.totalM || 1} milestones</p>
+              <p className="text-[10px] text-(--text-muted) truncate font-medium">{goalsMilestonesCompleted.compM}/{goalsMilestonesCompleted.totalM || 1} milestones</p>
             </div>
 
             {/* KPI 5: Habits & Daily Streak */}
             <div
               onClick={() => setActiveTab('habits')}
-              className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98 col-span-2 md:col-span-1"
+              className="p-3.5 sm:p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98 col-span-2 md:col-span-1"
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-semibold text-[11px] sm:text-xs truncate">Habit Streak</span>
-                <Flame size={14} className="text-amber-500" />
+                <span className="font-bold text-[11px] sm:text-xs truncate">Habit Streak</span>
+                <Flame size={15} className="text-amber-500" />
               </div>
               <div>
-                <p className="text-xl sm:text-2xl font-black text-amber-500 font-mono">{habitCompletionRate}%</p>
+                <p className="text-xl sm:text-2xl font-black text-amber-500 font-cutive">{habitCompletionRate}%</p>
                 <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-1.5 overflow-hidden">
                   <div className="h-full rounded-full bg-amber-500" style={{ width: `${habitCompletionRate}%` }} />
                 </div>
               </div>
-              <p className="text-[10px] text-(--text-muted) truncate">{habitsCompletedToday}/{habits.length || 1} done today</p>
+              <p className="text-[10px] text-(--text-muted) truncate font-medium">{habitsCompletedToday}/{habits.length || 1} done today</p>
             </div>
           </div>
         </div>
@@ -399,7 +399,7 @@ export default function DashboardView() {
               </div>
               <button
                 onClick={() => setActiveTab('ledger')}
-                className="text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs font-bold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>Full Ledger</span>
                 <ArrowRight size={13} />
@@ -415,18 +415,18 @@ export default function DashboardView() {
 
                 return (
                   <div key={d} className="flex-1 flex flex-col items-center gap-1 group">
-                    <span className="text-[9px] text-(--text-muted) font-mono">
+                    <span className="text-[9px] text-(--text-muted) font-cutive font-bold">
                       {val > 0 ? `₹${val.toLocaleString('en-IN')}` : ''}
                     </span>
-                    <div className="w-full rounded-t-lg relative flex items-end" style={{ height: '64px' }}>
+                    <div className="w-full rounded-t-xl relative flex items-end" style={{ height: '64px' }}>
                       <div
-                        className={`w-full rounded-t-lg transition-all duration-300 ${
+                        className={`w-full rounded-t-xl transition-all duration-300 ${
                           isToday ? 'bg-[#4E82EE]' : 'bg-(--bg-elevated) group-hover:bg-[#4E82EE]/50'
                         }`}
-                        style={{ height: `${Math.max(pct, 6)}%` }}
+                        style={{ height: `${Math.max(pct, 8)}%` }}
                       />
                     </div>
-                    <span className={`text-[10px] font-semibold ${isToday ? 'text-[#4E82EE]' : 'text-(--text-muted)'}`}>
+                    <span className={`text-[10px] font-bold ${isToday ? 'text-[#4E82EE]' : 'text-(--text-muted)'}`}>
                       {isToday ? 'Today' : new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' })}
                     </span>
                   </div>
@@ -447,28 +447,28 @@ export default function DashboardView() {
               </div>
               <button
                 onClick={() => setActiveTab('ledger')}
-                className="text-xs font-semibold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-xs font-bold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>View Dues</span>
                 <ArrowRight size={13} />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <div className="p-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-1">
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <div className="p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-1">
                 <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                  <span>You Need to Give</span>
-                  <ArrowUpRight size={13} className="text-rose-500" />
+                  <span className="font-medium">You Need to Give</span>
+                  <ArrowUpRight size={14} className="text-rose-500" />
                 </div>
-                <p className="text-xl font-bold text-rose-500 font-mono">₹{duesStats.give.toLocaleString('en-IN')}</p>
+                <p className="text-xl font-bold text-rose-500 font-cutive">₹{duesStats.give.toLocaleString('en-IN')}</p>
               </div>
 
-              <div className="p-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-1">
+              <div className="p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-1">
                 <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                  <span>Owed to You</span>
-                  <ArrowDownLeft size={13} className="text-emerald-500" />
+                  <span className="font-medium">Owed to You</span>
+                  <ArrowDownLeft size={14} className="text-emerald-500" />
                 </div>
-                <p className="text-xl font-bold text-emerald-500 font-mono">₹{duesStats.receive.toLocaleString('en-IN')}</p>
+                <p className="text-xl font-bold text-emerald-500 font-cutive">₹{duesStats.receive.toLocaleString('en-IN')}</p>
               </div>
             </div>
 
@@ -479,7 +479,7 @@ export default function DashboardView() {
                 </div>
                 <span className="text-xs font-semibold text-(--text-primary)">Optimal Smart Settlements Active</span>
               </div>
-              <span className="text-xs font-mono font-bold text-[#4E82EE]">DSA O(V log V)</span>
+              <span className="text-xs font-cutive font-bold text-[#4E82EE]">DSA O(V log V)</span>
             </div>
           </div>
         </div>
@@ -491,12 +491,12 @@ export default function DashboardView() {
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
-                <CheckCircle2 size={14} className="text-emerald-500" />
+                <CheckCircle2 size={15} className="text-emerald-500" />
                 Priority Tasks Queue ({pendingTasks.length})
               </span>
               <button
                 onClick={() => setActiveTab('tasks')}
-                className="text-xs text-[#4E82EE] font-semibold hover:underline cursor-pointer"
+                className="text-xs text-[#4E82EE] font-bold hover:underline cursor-pointer"
               >
                 View All
               </button>
@@ -504,7 +504,7 @@ export default function DashboardView() {
 
             <div className="space-y-2">
               {pendingTasks.length === 0 ? (
-                <div className="py-8 text-center text-xs text-(--text-muted)">
+                <div className="py-8 text-center text-xs text-(--text-muted) font-medium">
                   All tasks completed for today!
                 </div>
               ) : (
@@ -512,17 +512,17 @@ export default function DashboardView() {
                   <div
                     key={t.id}
                     onClick={() => toggleTask(t.id, t.status)}
-                    className="p-3 rounded-2xl bg-(--bg-elevated) hover:bg-(--bg-elevated)/80 border border-(--border-subtle) transition-all cursor-pointer flex items-center justify-between gap-2.5"
+                    className="p-3.5 rounded-2xl bg-(--bg-elevated) hover:bg-(--bg-elevated)/80 border border-(--border-subtle) transition-all cursor-pointer flex items-center justify-between gap-2.5 active:scale-98"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-5 h-5 rounded-lg border border-(--border-subtle) flex items-center justify-center shrink-0">
-                        {t.status === 'completed' && <span className="text-xs text-emerald-500">✓</span>}
+                        {t.status === 'completed' && <span className="text-xs text-emerald-500 font-bold">✓</span>}
                       </div>
-                      <span className="text-xs font-medium text-(--text-primary) truncate">
+                      <span className="text-xs font-semibold text-(--text-primary) truncate">
                         {t.title}
                       </span>
                     </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold uppercase bg-(--bg-card) text-(--text-secondary) shrink-0 font-mono">
+                    <span className="text-[10px] px-2 py-0.5 rounded-md font-bold uppercase bg-(--bg-card) text-(--text-secondary) shrink-0 font-cutive">
                       {t.priority}
                     </span>
                   </div>
@@ -535,12 +535,12 @@ export default function DashboardView() {
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
-                <Target size={14} className="text-purple-500" />
+                <Target size={15} className="text-purple-500" />
                 Active Goals & OKRs ({activeGoals.length})
               </span>
               <button
                 onClick={() => setActiveTab('goals')}
-                className="text-xs text-purple-500 font-semibold hover:underline cursor-pointer"
+                className="text-xs text-purple-500 font-bold hover:underline cursor-pointer"
               >
                 View Goals
               </button>
@@ -548,7 +548,7 @@ export default function DashboardView() {
 
             <div className="space-y-2">
               {activeGoals.length === 0 ? (
-                <div className="py-8 text-center text-xs text-(--text-muted)">
+                <div className="py-8 text-center text-xs text-(--text-muted) font-medium">
                   No active goals created yet. Set a strategic goal!
                 </div>
               ) : (
@@ -560,13 +560,13 @@ export default function DashboardView() {
                     <div
                       key={g.id}
                       onClick={() => setActiveTab('goals')}
-                      className="p-3 rounded-2xl bg-(--bg-elevated) hover:bg-(--bg-elevated)/80 border border-(--border-subtle) transition-all cursor-pointer space-y-2"
+                      className="p-3.5 rounded-2xl bg-(--bg-elevated) hover:bg-(--bg-elevated)/80 border border-(--border-subtle) transition-all cursor-pointer space-y-2 active:scale-98"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-(--text-primary) truncate">
+                        <span className="text-xs font-bold text-(--text-primary) truncate">
                           {g.title}
                         </span>
-                        <span className="text-[10px] font-mono font-bold text-purple-500 shrink-0">
+                        <span className="text-[11px] font-cutive font-bold text-purple-500 shrink-0">
                           {pct}%
                         </span>
                       </div>
@@ -586,12 +586,12 @@ export default function DashboardView() {
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
-                <Trophy size={14} className="text-amber-500" />
+                <Trophy size={15} className="text-amber-500" />
                 Habit Streak & Daily Progress
               </span>
               <button
                 onClick={() => setActiveTab('habits')}
-                className="text-xs text-amber-500 font-semibold hover:underline cursor-pointer"
+                className="text-xs text-amber-500 font-bold hover:underline cursor-pointer"
               >
                 Manage Habits
               </button>
@@ -604,22 +604,22 @@ export default function DashboardView() {
                   <div
                     key={habit.id}
                     onClick={() => handleToggleHabit(habit.id)}
-                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between active:scale-98 ${
                       isCompletedToday
-                        ? 'border-emerald-500/50 bg-emerald-500/10'
+                        ? 'border-emerald-500/50 bg-emerald-500/10 shadow-xs shadow-emerald-500/10'
                         : 'border-(--border-subtle) bg-(--bg-elevated) hover:border-(--border-medium)'
                     }`}
                   >
                     <div className="min-w-0 pr-2">
-                      <div className="font-semibold text-xs text-(--text-primary) truncate">
+                      <div className="font-bold text-xs text-(--text-primary) truncate">
                         {habit.title}
                       </div>
-                      <div className="text-[10px] text-(--text-muted)">
+                      <div className="text-[10px] text-(--text-muted) font-cutive">
                         {habit.streak || 0} day streak
                       </div>
                     </div>
                     <div
-                      className={`w-6 h-6 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                      className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
                         isCompletedToday
                           ? 'bg-emerald-500 text-white shadow-xs'
                           : 'bg-(--bg-card) border border-(--border-subtle) text-transparent'
