@@ -9,7 +9,6 @@ import ChatView from '@/components/chat/ChatView';
 import CalendarView from '@/components/calendar/CalendarView';
 import HabitsView from '@/components/habits/HabitsView';
 import TasksView from '@/components/tasks/TasksView';
-import RemindersView from '@/components/reminders/RemindersView';
 import GoalsView from '@/components/goals/GoalsView';
 import ActivityLogView from '@/components/activity/ActivityLogView';
 import DashboardView from '@/components/dashboard/DashboardView';
@@ -69,14 +68,13 @@ export default function AppLayout() {
       case 'calendar':  return <CalendarView />;
       case 'habits':    return <HabitsView />;
       case 'tasks':     return <TasksView />;
-      case 'reminders': return <RemindersView />;
       case 'goals':     return <GoalsView />;
       case 'ledger':    return <LedgerView />;
       case 'actions':   return <ActivityLogView />;
       case 'dashboard': return <DashboardView />;
       case 'apps':      return <DynamicAppsView />;
       case 'settings':  return <SettingsView />;
-      default:          return <ChatView />;
+      default:          return <DashboardView />;
     }
   };
 
