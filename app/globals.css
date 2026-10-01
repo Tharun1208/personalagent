@@ -141,7 +141,7 @@
 
   /* ── Unified Heading Hierarchy ── */
   h1, .app-page-title {
-    font-family: var(--font-cutive-mono), "Cutive Mono", monospace !important;
+    font-family: var(--font-ibm-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     font-size: 1.125rem; /* 18px */
     font-weight: 700 !important;
     letter-spacing: -0.015em;
@@ -156,7 +156,7 @@
   }
 
   h2, .app-section-title {
-    font-family: var(--font-cutive-mono), "Cutive Mono", monospace !important;
+    font-family: var(--font-ibm-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     font-size: 0.75rem; /* 12px */
     font-weight: 700 !important;
     letter-spacing: 0.05em;
@@ -172,7 +172,7 @@
   }
 
   h3, .app-card-title {
-    font-family: var(--font-cutive-mono), "Cutive Mono", monospace !important;
+    font-family: var(--font-ibm-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     font-size: 0.9375rem; /* 15px */
     font-weight: 700 !important;
     letter-spacing: -0.01em;
@@ -181,14 +181,14 @@
   }
 
   h4, .app-subcard-title {
-    font-family: var(--font-cutive-mono), "Cutive Mono", monospace !important;
+    font-family: var(--font-ibm-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     font-size: 0.8125rem; /* 13px */
     font-weight: 600 !important;
     color: var(--text-primary);
   }
 
   .app-page-subtitle {
-    font-family: var(--font-cutive-mono), "Cutive Mono", monospace;
+    font-family: var(--font-ibm-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 0.6875rem; /* 11px */
     font-weight: 500;
     color: var(--text-muted);
@@ -207,7 +207,7 @@
   }
 
   .app-modal-title {
-    font-family: var(--font-cutive-mono), "Cutive Mono", monospace !important;
+    font-family: var(--font-ibm-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     font-size: 1.0625rem; /* 17px */
     font-weight: 700 !important;
     letter-spacing: -0.015em;
