@@ -444,155 +444,195 @@ export default function CalendarView() {
     <div className="flex-1 flex flex-col h-screen overflow-hidden bg-(--bg-primary) text-(--text-primary) font-sans">
       
       {/* ── 1. Google Calendar Style Main Top Header Bar ── */}
-      <header className="h-16 px-3 sm:px-6 border-b border-(--border-subtle) flex items-center justify-between shrink-0 bg-(--bg-card)/70 backdrop-blur-md z-20">
+      <header className="py-2.5 px-3 sm:px-6 border-b border-(--border-subtle) bg-(--bg-card)/80 backdrop-blur-md z-20 shrink-0">
         
-        {/* Left: Branding, Today Button, Navigation & Current Month Display */}
-        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-          <div className="flex items-center gap-2.5 shrink-0">
-            <div className="w-9 h-9 rounded-2xl bg-[#4E82EE] text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/20 shrink-0">
-              <CalendarIcon size={18} />
-            </div>
-            <span className="font-bold text-base sm:text-lg tracking-tight hidden md:inline text-(--text-primary)">
-              Calendar
-            </span>
-          </div>
-
-          {/* Today Button (Google Calendar style outlined pill) */}
-          <button
-            onClick={handleToday}
-            className={`px-3.5 py-1.5 rounded-full border text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
-              isToday
-                ? 'border-[#4E82EE]/50 bg-[#4E82EE]/10 text-[#4E82EE]'
-                : 'border-(--border-subtle) bg-(--bg-card) hover:bg-(--bg-elevated) text-(--text-primary)'
-            }`}
-          >
-            Today
-          </button>
-
-          {/* Arrows (< >) */}
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={handlePrev}
-              className="p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
-              title="Previous"
-            >
-              <ChevronLeft size={19} />
-            </button>
-            <button
-              onClick={handleNext}
-              className="p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
-              title="Next"
-            >
-              <ChevronRight size={19} />
-            </button>
-          </div>
-
-          {/* Large Month & Year Title with Popover Selector */}
-          <div className="relative" ref={datePickerAnchorRef}>
-            <button
-              onClick={() => setDatePickerOpen((o) => !o)}
-              className="flex items-center gap-1.5 py-1 px-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-primary) text-base sm:text-lg font-bold transition-all cursor-pointer group"
-            >
-              <span className="tracking-tight">
-                {viewMode === 'day'
-                  ? `${MONTH_NAMES[selectedDate.getMonth()]} ${selectedDate.getDate()}, ${selectedDate.getFullYear()}`
-                  : viewMode === 'week'
-                  ? `${MONTH_NAMES[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`
-                  : viewMode === 'year'
-                  ? `${selectedDate.getFullYear()}`
-                  : `${MONTH_NAMES[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`}
+        {/* Main Header Bar Row */}
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
+          {/* Left: Branding, Navigation & Current Month Display */}
+          <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+            <div className="items-center gap-2.5 shrink-0 hidden sm:flex">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-[#4E82EE] text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/20 shrink-0">
+                <CalendarIcon size={18} />
+              </div>
+              <span className="font-bold text-base sm:text-lg tracking-tight hidden md:inline text-(--text-primary)">
+                Calendar
               </span>
-              <ChevronDown size={15} className={`text-(--text-muted) group-hover:text-[#4E82EE] transition-transform duration-200 ${datePickerOpen ? 'rotate-180 text-[#4E82EE]' : ''}`} />
+            </div>
+
+            {/* Arrows (< >) */}
+            <div className="flex items-center">
+              <button
+                onClick={handlePrev}
+                className="p-1 sm:p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
+                title="Previous"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                onClick={handleNext}
+                className="p-1 sm:p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
+                title="Next"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+
+            {/* Month & Year Title with Popover Selector */}
+            <div className="relative" ref={datePickerAnchorRef}>
+              <button
+                onClick={() => setDatePickerOpen((o) => !o)}
+                className="flex items-center gap-1 py-1 px-1.5 sm:px-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-primary) text-sm sm:text-base md:text-lg font-bold transition-all cursor-pointer group"
+              >
+                <span className="tracking-tight whitespace-nowrap">
+                  {viewMode === 'day'
+                    ? `${MONTH_NAMES[selectedDate.getMonth()].slice(0, 3)} ${selectedDate.getDate()}, ${selectedDate.getFullYear()}`
+                    : viewMode === 'week'
+                    ? `${MONTH_NAMES[selectedDate.getMonth()].slice(0, 3)} ${selectedDate.getFullYear()}`
+                    : viewMode === 'year'
+                    ? `${selectedDate.getFullYear()}`
+                    : `${MONTH_NAMES[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`}
+                </span>
+                <ChevronDown size={14} className={`text-(--text-muted) group-hover:text-[#4E82EE] transition-transform duration-200 ${datePickerOpen ? 'rotate-180 text-[#4E82EE]' : ''}`} />
+              </button>
+
+              {/* Quick Month / Year Picker Popover */}
+              {datePickerOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setDatePickerOpen(false)} />
+                  <div className="absolute top-full left-0 mt-2 z-40 w-64 p-3.5 rounded-3xl border border-(--border-subtle) bg-(--bg-card) shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-(--border-subtle)">
+                      <button
+                        onClick={() => {
+                          const d = new Date(selectedDate);
+                          d.setFullYear(d.getFullYear() - 1);
+                          setSelectedDate(d);
+                        }}
+                        className="p-1 rounded-xl hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <span className="text-sm font-bold font-mono text-(--text-primary)">
+                        {selectedDate.getFullYear()}
+                      </span>
+                      <button
+                        onClick={() => {
+                          const d = new Date(selectedDate);
+                          d.setFullYear(d.getFullYear() + 1);
+                          setSelectedDate(d);
+                        }}
+                        className="p-1 rounded-xl hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {MONTH_NAMES.map((m, idx) => {
+                        const isSelected = idx === selectedDate.getMonth();
+                        return (
+                          <button
+                            key={m}
+                            onClick={() => {
+                              const d = new Date(selectedDate);
+                              d.setDate(1);
+                              d.setMonth(idx);
+                              setSelectedDate(d);
+                              setDatePickerOpen(false);
+                            }}
+                            className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#4E82EE] text-white shadow-xs font-bold'
+                                : 'text-(--text-secondary) hover:bg-(--bg-elevated) hover:text-(--text-primary)'
+                            }`}
+                          >
+                            {m.slice(0, 3)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Actions, View Switcher & Create Button */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Today Button */}
+            <button
+              onClick={handleToday}
+              className={`px-2.5 sm:px-3.5 py-1.5 rounded-full border text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
+                isToday
+                  ? 'border-[#4E82EE]/50 bg-[#4E82EE]/10 text-[#4E82EE]'
+                  : 'border-(--border-subtle) bg-(--bg-card) hover:bg-(--bg-elevated) text-(--text-primary)'
+              }`}
+            >
+              Today
             </button>
 
-            {/* Quick Month / Year Picker Popover */}
-            {datePickerOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setDatePickerOpen(false)} />
-                <div className="absolute top-full left-0 mt-2 z-40 w-64 p-3.5 rounded-3xl border border-(--border-subtle) bg-(--bg-card) shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-(--border-subtle)">
-                    <button
-                      onClick={() => {
-                        const d = new Date(selectedDate);
-                        d.setFullYear(d.getFullYear() - 1);
-                        setSelectedDate(d);
-                      }}
-                      className="p-1 rounded-xl hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-                    <span className="text-sm font-bold font-mono text-(--text-primary)">
-                      {selectedDate.getFullYear()}
-                    </span>
-                    <button
-                      onClick={() => {
-                        const d = new Date(selectedDate);
-                        d.setFullYear(d.getFullYear() + 1);
-                        setSelectedDate(d);
-                      }}
-                      className="p-1 rounded-xl hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
+            {/* Quick NL Input (compact, Desktop only) */}
+            <form onSubmit={handleQuickSchedule} className="hidden xl:flex items-center relative w-60">
+              <input
+                type="text"
+                value={quickInput}
+                onChange={(e) => setQuickInput(e.target.value)}
+                placeholder="Quick add: e.g. Sync tomorrow 3pm..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-full bg-(--bg-elevated) border border-(--border-subtle) text-xs text-(--text-primary) placeholder:text-(--text-muted) focus:outline-hidden focus:border-[#4E82EE]"
+              />
+              <Zap size={13} className="absolute left-2.5 top-2.5 text-amber-500" />
+            </form>
 
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {MONTH_NAMES.map((m, idx) => {
-                      const isSelected = idx === selectedDate.getMonth();
-                      return (
-                        <button
-                          key={m}
-                          onClick={() => {
-                            const d = new Date(selectedDate);
-                            d.setDate(1);
-                            d.setMonth(idx);
-                            setSelectedDate(d);
-                            setDatePickerOpen(false);
-                          }}
-                          className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-[#4E82EE] text-white shadow-xs font-bold'
-                              : 'text-(--text-secondary) hover:bg-(--bg-elevated) hover:text-(--text-primary)'
-                          }`}
-                        >
-                          {m.slice(0, 3)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
+            {/* Export ICS (Desktop only) */}
+            <button
+              onClick={exportIcsCalendar}
+              title="Export Calendar (.ics)"
+              className="p-1.5 sm:p-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) transition-all cursor-pointer hidden md:flex items-center gap-1 text-xs font-medium"
+            >
+              <Download size={14} />
+              <span className="hidden lg:inline">.ics</span>
+            </button>
+
+            {/* View Mode Segmented Control on Desktop / Tablet */}
+            <div className="hidden sm:flex items-center p-0.5 sm:p-1 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) shadow-2xs">
+              {(
+                [
+                  { mode: 'day',   label: 'Day' },
+                  { mode: 'week',  label: 'Week' },
+                  { mode: 'month', label: 'Month' },
+                  { mode: 'year',  label: 'Year' },
+                ] as const
+              ).map(({ mode, label }) => {
+                const isActive = viewMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => setViewMode(mode)}
+                    className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-(--bg-card) text-[#4E82EE] shadow-xs font-bold'
+                        : 'text-(--text-muted) hover:text-(--text-primary)'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Google Calendar Style + Create Event Button */}
+            <button
+              onClick={() => openScheduleModal()}
+              className="px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-2xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold hover:opacity-95 active:scale-95 transition-all cursor-pointer shadow-md shadow-blue-500/20 flex items-center gap-1.5 shrink-0"
+            >
+              <Plus size={16} strokeWidth={2.5} />
+              <span className="hidden sm:inline">Create</span>
+            </button>
           </div>
         </div>
 
-        {/* Right: Quick Search + View Mode Selector + Google-Style Create Button */}
-        <div className="flex items-center gap-2 shrink-0">
-          
-          {/* Quick NL Input (compact) */}
-          <form onSubmit={handleQuickSchedule} className="hidden xl:flex items-center relative w-64">
-            <input
-              type="text"
-              value={quickInput}
-              onChange={(e) => setQuickInput(e.target.value)}
-              placeholder="Quick add: e.g. Sync tomorrow 3pm..."
-              className="w-full pl-8 pr-3 py-1.5 rounded-full bg-(--bg-elevated) border border-(--border-subtle) text-xs text-(--text-primary) placeholder:text-(--text-muted) focus:outline-hidden focus:border-[#4E82EE]"
-            />
-            <Zap size={13} className="absolute left-2.5 top-2.5 text-amber-500" />
-          </form>
-
-          {/* Export ICS */}
-          <button
-            onClick={exportIcsCalendar}
-            title="Export Calendar (.ics)"
-            className="p-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) transition-all cursor-pointer hidden sm:flex items-center gap-1.5 text-xs font-medium"
-          >
-            <Download size={14} />
-            <span className="hidden lg:inline">.ics</span>
-          </button>
-
-          {/* View Mode Segmented Control (Google Calendar Dropdown / Tab style) */}
-          <div className="flex items-center p-1 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) shadow-2xs">
+        {/* Mobile View Mode Switcher Strip (Only visible on small mobile screens) */}
+        <div className="sm:hidden mt-2 pt-2 border-t border-(--border-subtle)/50 flex items-center justify-between gap-1">
+          <div className="grid grid-cols-4 w-full p-0.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) shadow-2xs">
             {(
               [
                 { mode: 'day',   label: 'Day' },
@@ -606,7 +646,7 @@ export default function CalendarView() {
                 <button
                   key={mode}
                   onClick={() => setViewMode(mode)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  className={`py-1 text-center rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     isActive
                       ? 'bg-(--bg-card) text-[#4E82EE] shadow-xs font-bold'
                       : 'text-(--text-muted) hover:text-(--text-primary)'
@@ -617,15 +657,6 @@ export default function CalendarView() {
               );
             })}
           </div>
-
-          {/* Google Calendar Style + Create Event Button */}
-          <button
-            onClick={() => openScheduleModal()}
-            className="px-4 py-2 rounded-2xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold hover:opacity-95 active:scale-95 transition-all cursor-pointer shadow-md shadow-blue-500/20 flex items-center gap-1.5 shrink-0"
-          >
-            <Plus size={16} strokeWidth={2.5} />
-            <span className="hidden sm:inline">Create</span>
-          </button>
         </div>
       </header>
 
@@ -698,10 +729,15 @@ export default function CalendarView() {
                     }`}
                   >
                     {/* Top Row: Date Number & Holiday Indicator */}
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-1">
+                    <div className="flex items-center justify-between mb-1 min-h-[24px]">
+                      <div className="flex items-center gap-1 min-w-0">
+                        {isFirstDayOfMonth && (
+                          <span className="text-[10px] sm:text-[11px] font-bold text-(--text-muted) uppercase">
+                            {MONTH_NAMES[day.date.getMonth()].slice(0, 3)}
+                          </span>
+                        )}
                         <span
-                          className={`text-xs font-bold rounded-full flex items-center justify-center transition-all ${
+                          className={`text-xs font-bold rounded-full flex items-center justify-center transition-all shrink-0 ${
                             day.isToday
                               ? 'w-6 h-6 bg-[#4E82EE] text-white shadow-xs'
                               : isSelected
@@ -713,7 +749,7 @@ export default function CalendarView() {
                               : 'text-(--text-muted) px-1'
                           }`}
                         >
-                          {isFirstDayOfMonth ? `${MONTH_NAMES[day.date.getMonth()].slice(0, 3)} ${dayNum}` : dayNum}
+                          {dayNum}
                         </span>
                       </div>
 
