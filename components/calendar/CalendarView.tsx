@@ -57,9 +57,6 @@ export default function CalendarView() {
   const datePickerAnchorRef = useRef<HTMLDivElement>(null);
   const viewModeAnchorRef = useRef<HTMLDivElement>(null);
   
-  // Quick natural language input / search
-  const [quickInput, setQuickInput] = useState('');
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // Day Details Modal state
   const [isDayDetailsModalOpen, setIsDayDetailsModalOpen] = useState(false);
@@ -185,50 +182,6 @@ export default function CalendarView() {
     setIsDayDetailsModalOpen(true);
   };
 
-  // Quick NL scheduler
-  const handleQuickSchedule = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickInput.trim()) return;
-
-    const lower = quickInput.toLowerCase();
-    let scheduledDate = new Date(selectedDate);
-    let timeHours = 10;
-    let timeMins = 0;
-
-    if (lower.includes('tomorrow')) {
-      scheduledDate.setDate(scheduledDate.getDate() + 1);
-    }
-
-    const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/);
-    if (timeMatch) {
-      let h = parseInt(timeMatch[1], 10);
-      const m = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-      const meridiem = timeMatch[3];
-      if (meridiem === 'pm' && h < 12) h += 12;
-      if (meridiem === 'am' && h === 12) h = 0;
-      timeHours = h;
-      timeMins = m;
-    }
-
-    scheduledDate.setHours(timeHours, timeMins, 0, 0);
-
-    const cleanTitle = quickInput
-      .replace(/tomorrow/gi, '')
-      .replace(/today/gi, '')
-      .replace(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/gi, '')
-      .replace(/at\s*$/i, '')
-      .trim() || 'Quick Event';
-
-    await createReminder(
-      cleanTitle,
-      scheduledDate.toISOString(),
-      'none',
-      'Scheduled via quick add'
-    );
-
-    setQuickInput('');
-    setIsSearchOpen(false);
-  };
 
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -577,39 +530,9 @@ export default function CalendarView() {
           </div>
         </div>
 
-        {/* Right: Quick Search, Settings/Export, Google-Style View Switcher Dropdown & Create Button */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        {/* Right: Export .ics, Google-Style View Switcher Dropdown & Create Button */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           
-          {/* Quick Search toggle / input */}
-          {isSearchOpen ? (
-            <form onSubmit={handleQuickSchedule} className="flex items-center relative w-48 sm:w-60 animate-in fade-in duration-150">
-              <input
-                type="text"
-                value={quickInput}
-                onChange={(e) => setQuickInput(e.target.value)}
-                placeholder="Quick add: sync tomorrow 3pm..."
-                autoFocus
-                className="w-full pl-7 pr-7 py-1.5 rounded-full bg-(--bg-elevated) border border-(--border-subtle) text-xs text-(--text-primary) placeholder:text-(--text-muted) focus:outline-hidden focus:border-[#1a73e8]"
-              />
-              <Zap size={13} className="absolute left-2.5 top-2 text-amber-500" />
-              <button
-                type="button"
-                onClick={() => setIsSearchOpen(false)}
-                className="absolute right-2 top-2 text-(--text-muted) hover:text-(--text-primary)"
-              >
-                <X size={13} />
-              </button>
-            </form>
-          ) : (
-            <button
-              onClick={() => setIsSearchOpen(true)}
-              className="p-1.5 sm:p-2 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
-              title="Search / Quick Add"
-            >
-              <Search size={18} />
-            </button>
-          )}
-
           {/* Export ICS */}
           <button
             onClick={exportIcsCalendar}
@@ -948,16 +871,15 @@ export default function CalendarView() {
                           {hourItems.map((item) => (
                             <div
                               key={item.id}
-                              className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 shadow-2xs ${
-                                item.status === 'completed'
-                                  ? 'bg-(--bg-elevated) text-(--text-muted) line-through border-(--border-subtle)'
-                                  : item.type === 'task'
-                                  ? 'bg-[#8e24aa]/15 border-[#8e24aa]/30 text-[#8e24aa] dark:text-[#d1b8f0]'
-                                  : 'bg-[#1a73e8]/15 border-[#1a73e8]/30 text-[#1a73e8] dark:text-[#a8c7fa]'
+                              className={`p-2.5 rounded-xl border border-(--border-subtle) bg-(--bg-elevated) flex items-center justify-between gap-3 shadow-2xs ${
+                                item.status === 'completed' ? 'opacity-60' : ''
                               }`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="font-bold text-xs sm:text-sm truncate">
+                                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                                  item.type === 'task' ? 'bg-[#8e24aa]' : 'bg-[#1a73e8]'
+                                }`} />
+                                <div className={`font-semibold text-xs sm:text-sm text-(--text-primary) truncate ${item.status === 'completed' ? 'line-through text-(--text-muted)' : ''}`}>
                                   {item.title}
                                 </div>
                               </div>
@@ -966,9 +888,9 @@ export default function CalendarView() {
                                 {item.type === 'task' && (
                                   <button
                                     onClick={() => toggleTask(item.id, item.status)}
-                                    className="px-3 py-1 rounded-full bg-(--bg-card) border border-(--border-subtle) text-xs font-bold hover:border-emerald-500 transition-colors cursor-pointer"
+                                    className="px-3 py-1 rounded-full bg-(--bg-card) border border-(--border-subtle) text-xs font-semibold text-(--text-primary) hover:border-emerald-500 transition-colors cursor-pointer"
                                   >
-                                    {item.status === 'completed' ? '✓ Completed' : 'Mark Done'}
+                                    {item.status === 'completed' ? '✓ Done' : 'Mark Done'}
                                   </button>
                                 )}
                                 {item.type === 'reminder' && (
@@ -1117,14 +1039,18 @@ export default function CalendarView() {
 
             {/* Govt Holidays List Banner */}
             {getAllHolidaysForDate(selectedDate).map((h, i) => (
-              <div key={i} className="p-3.5 rounded-2xl bg-[#0b8043]/15 border border-[#0b8043]/30 flex items-center gap-3 shrink-0">
-                <span className="text-2xl shrink-0">{h.emoji || '🏛️'}</span>
-                <div>
-                  <div className="font-bold text-xs sm:text-sm text-[#0b8043] dark:text-emerald-400 flex items-center gap-1.5">
-                    <span>{h.name}</span>
-                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-[#0b8043]/20 uppercase font-bold">Holiday / Festival</span>
+              <div key={i} className="p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center gap-3.5 shrink-0 shadow-2xs">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl shrink-0">
+                  {h.emoji || '🏛️'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-sm text-(--text-primary) truncate">{h.name}</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#0b8043] text-white shrink-0">
+                      Holiday
+                    </span>
                   </div>
-                  <p className="text-[11px] text-(--text-muted) mt-0.5">
+                  <p className="text-xs text-(--text-muted) mt-0.5 truncate">
                     {h.description || 'Public Holiday & Observance'}
                   </p>
                 </div>
@@ -1150,24 +1076,26 @@ export default function CalendarView() {
                   return (
                     <div
                       key={item.id}
-                      className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-all ${
-                        isCompleted
-                          ? 'bg-(--bg-elevated)/40 border-(--border-subtle) opacity-60'
-                          : item.type === 'task'
-                          ? 'bg-[#8e24aa]/15 border-[#8e24aa]/30 text-[#8e24aa] dark:text-[#d1b8f0]'
-                          : 'bg-[#1a73e8]/15 border-[#1a73e8]/30 text-[#1a73e8] dark:text-[#a8c7fa]'
+                      className={`p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center justify-between gap-3 transition-all shadow-2xs ${
+                        isCompleted ? 'opacity-60' : ''
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-xl bg-(--bg-elevated) flex items-center justify-center shrink-0">
-                          {item.type === 'task' ? <ListTodo size={16} /> : <AlarmClock size={16} />}
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                          item.type === 'task'
+                            ? 'bg-[#8e24aa]/15 text-[#8e24aa] dark:text-[#ce93d8]'
+                            : 'bg-[#1a73e8]/15 text-[#1a73e8] dark:text-[#90caf9]'
+                        }`}>
+                          {item.type === 'task' ? <ListTodo size={17} /> : <AlarmClock size={17} />}
                         </div>
                         <div className="min-w-0">
-                          <div className={`font-semibold text-xs sm:text-sm truncate ${isCompleted ? 'line-through' : ''}`}>
+                          <div className={`font-semibold text-xs sm:text-sm text-(--text-primary) truncate ${isCompleted ? 'line-through text-(--text-muted)' : ''}`}>
                             {item.title}
                           </div>
-                          <div className="text-[11px] text-(--text-muted) font-mono">
-                            {timeStr} • {item.priority} priority
+                          <div className="text-[11px] text-(--text-muted) font-mono mt-0.5 flex items-center gap-2">
+                            <span>{timeStr}</span>
+                            <span>•</span>
+                            <span className="capitalize">{item.priority} priority</span>
                           </div>
                         </div>
                       </div>
@@ -1176,7 +1104,7 @@ export default function CalendarView() {
                         {item.type === 'task' && (
                           <button
                             onClick={() => toggleTask(item.id, item.status)}
-                            className="px-3 py-1 rounded-full bg-(--bg-card) border border-(--border-subtle) text-xs font-semibold hover:border-emerald-500 transition-all cursor-pointer"
+                            className="px-3 py-1 rounded-full bg-(--bg-card) border border-(--border-subtle) text-xs font-semibold text-(--text-primary) hover:border-emerald-500 transition-all cursor-pointer shadow-2xs"
                           >
                             {isCompleted ? '✓ Done' : 'Mark Done'}
                           </button>
