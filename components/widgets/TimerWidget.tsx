@@ -6,16 +6,11 @@ import {
   Play,
   Pause,
   RotateCcw,
-  Sparkles,
   Flame,
-  CheckCircle2,
   X,
   Volume2,
   VolumeX,
-  Plus,
-  Minus,
   Sliders,
-  Bell,
 } from 'lucide-react';
 import { startAlarmSound, stopAlarmSound } from '@/lib/audio/alarmPlayer';
 
@@ -35,10 +30,8 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
 
   // Quick preset options
   const PRESETS = [
-    { label: '10m', mins: 10 },
     { label: '15m', mins: 15 },
     { label: '25m', mins: 25 },
-    { label: '30m', mins: 30 },
     { label: '45m', mins: 45 },
     { label: '60m', mins: 60 },
   ];
@@ -102,17 +95,17 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
   const strokeDashoffset = 283 - (283 * progress) / 100;
 
   return (
-    <div className="w-full max-w-sm rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-5 sm:p-6 space-y-5 text-(--text-primary) backdrop-blur-2xl animate-in zoom-in-95 duration-200">
+    <div className="w-full max-w-[340px] sm:max-w-sm rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-4 sm:p-5 space-y-3.5 sm:space-y-4 text-(--text-primary) backdrop-blur-2xl animate-in zoom-in-95 duration-200">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-(--border-subtle)/60 pb-3">
+      <div className="flex items-center justify-between border-b border-(--border-subtle)/60 pb-2.5 sm:pb-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white flex items-center justify-center font-bold text-xs shadow-sm">
-            <TimerIcon size={18} />
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white flex items-center justify-center font-bold text-xs shadow-sm">
+            <TimerIcon size={16} />
           </div>
           <div>
-            <h3 className="app-modal-title text-sm sm:text-base font-bold">Custom Focus Timer</h3>
-            <p className="app-card-subtitle text-[11px] text-(--text-muted)">
-              {isRunning ? 'Timer Running' : 'Create & execute focus sessions'}
+            <h3 className="app-modal-title text-sm sm:text-base font-bold">Focus Timer</h3>
+            <p className="app-card-subtitle text-[10px] sm:text-[11px] text-(--text-muted)">
+              {isRunning ? 'Timer Running' : 'Execute focus sessions'}
             </p>
           </div>
         </div>
@@ -128,7 +121,7 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
             }`}
             title={soundEnabled ? 'Alarm sound enabled' : 'Alarm sound muted'}
           >
-            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
           </button>
 
           {onClose && (
@@ -144,7 +137,7 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
 
       {isConfiguring ? (
         /* Custom Timer Creator View */
-        <div className="space-y-4 animate-in fade-in">
+        <div className="space-y-3.5 animate-in fade-in">
           <div>
             <label className="block text-[11px] font-semibold text-(--text-muted) uppercase mb-1">
               Focus Session Title
@@ -153,7 +146,7 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
               type="text"
               value={timerTitle}
               onChange={(e) => setTimerTitle(e.target.value)}
-              placeholder="e.g. Deep Work, Code Review, Reading"
+              placeholder="e.g. Deep Work, Study"
               className="w-full px-3.5 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#4E82EE]/30 text-(--text-primary)"
             />
           </div>
@@ -162,7 +155,7 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
             <label className="block text-[11px] font-semibold text-(--text-muted) uppercase mb-1.5">
               Set Duration (Minutes & Seconds)
             </label>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 gap-2">
               <div className="flex items-center bg-(--bg-elevated) border border-(--border-subtle) rounded-xl px-3 py-1.5">
                 <input
                   type="number"
@@ -194,7 +187,7 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
             <label className="block text-[10px] font-semibold text-(--text-muted) uppercase mb-1">
               Quick Presets
             </label>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-4 gap-1.5">
               {PRESETS.map((p) => (
                 <button
                   key={p.mins}
@@ -203,7 +196,7 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
                     setInputMinutes(p.mins);
                     setInputSeconds(0);
                   }}
-                  className={`py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  className={`py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer text-center ${
                     inputMinutes === p.mins && inputSeconds === 0
                       ? 'bg-[#4E82EE] text-white border-[#4E82EE] shadow-xs'
                       : 'bg-(--bg-elevated) border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary)'
@@ -227,7 +220,7 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
             <button
               type="button"
               onClick={handleStartCustomTimer}
-              className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold shadow-md hover:opacity-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold shadow-md hover:opacity-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
             >
               <Play size={14} fill="currentColor" />
               <span>Start Timer</span>
@@ -236,15 +229,15 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
         </div>
       ) : (
         /* Running / Standby Timer Display */
-        <div className="space-y-4">
-          {/* Quick Presets Bar */}
-          <div className="flex items-center gap-1 bg-(--bg-elevated) p-1 rounded-2xl border border-(--border-subtle) overflow-x-auto scrollbar-none">
+        <div className="space-y-3 sm:space-y-3.5">
+          {/* Quick Presets Bar (Grid layout - never overflows or cuts off) */}
+          <div className="grid grid-cols-5 gap-1 bg-(--bg-elevated) p-1 rounded-2xl border border-(--border-subtle)">
             {PRESETS.map((p) => (
               <button
                 key={p.mins}
                 type="button"
                 onClick={() => handleApplyPreset(p.mins)}
-                className={`flex-1 min-w-[42px] py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                className={`py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center ${
                   totalSeconds === p.mins * 60 && !isRunning
                     ? 'bg-(--bg-card) text-[#4E82EE] shadow-xs font-bold'
                     : 'text-(--text-muted) hover:text-(--text-primary)'
@@ -256,17 +249,17 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
             <button
               type="button"
               onClick={() => setIsConfiguring(true)}
-              className="px-2 py-1 rounded-xl text-[11px] font-semibold text-[#4E82EE] hover:bg-(--bg-card) transition-colors cursor-pointer flex items-center gap-0.5 shrink-0"
+              className="py-1 rounded-xl text-xs font-semibold text-[#4E82EE] hover:bg-(--bg-card) transition-colors cursor-pointer flex items-center justify-center gap-0.5"
               title="Configure custom timer"
             >
-              <Sliders size={12} />
+              <Sliders size={11} />
               <span>Custom</span>
             </button>
           </div>
 
           {/* Circular Countdown Ring */}
-          <div className="relative flex flex-col items-center justify-center py-3">
-            <div className="relative w-44 h-44 flex items-center justify-center">
+          <div className="relative flex flex-col items-center justify-center py-1 sm:py-2">
+            <div className="relative w-36 h-36 sm:w-40 sm:h-40 flex items-center justify-center">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                 {/* Background Ring */}
                 <circle
@@ -295,7 +288,7 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
 
               {/* Centered Timer Content */}
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2">
-                <span className="text-3xl sm:text-4xl font-black font-mono tracking-tighter text-(--text-primary)">
+                <span className="text-2xl sm:text-3xl font-black font-mono tracking-tighter text-(--text-primary)">
                   {formattedTime}
                 </span>
                 <span className="text-[11px] font-semibold text-[#4E82EE] truncate max-w-[110px] mt-0.5">
@@ -335,33 +328,33 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
           </div>
 
           {/* Primary Controls */}
-          <div className="flex items-center justify-center gap-3 pt-1">
+          <div className="flex items-center justify-center gap-2.5 pt-1">
             <button
               type="button"
               onClick={toggleTimer}
-              className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white font-bold text-sm shadow-md hover:opacity-95 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+              className="flex-1 py-2.5 sm:py-3 rounded-2xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white font-bold text-xs sm:text-sm shadow-md hover:opacity-95 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95"
             >
-              {isRunning ? <Pause size={17} /> : <Play size={17} fill="currentColor" />}
+              {isRunning ? <Pause size={16} /> : <Play size={16} fill="currentColor" />}
               <span>{isRunning ? 'Pause Timer' : timeLeft === 0 ? 'Restart Session' : 'Start Focus'}</span>
             </button>
 
             <button
               type="button"
               onClick={handleReset}
-              className="p-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card) transition-all cursor-pointer active:scale-95"
+              className="p-2.5 sm:p-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-card) transition-all cursor-pointer active:scale-95"
               title="Reset Timer"
             >
-              <RotateCcw size={16} />
+              <RotateCcw size={15} />
             </button>
           </div>
 
           {/* Footer Stats */}
-          <div className="pt-3 border-t border-(--border-subtle)/50 flex items-center justify-between text-xs text-(--text-muted)">
-            <span className="flex items-center gap-1.5">
-              <Flame size={14} className="text-amber-500" />
+          <div className="pt-2 sm:pt-2.5 border-t border-(--border-subtle)/50 flex items-center justify-between text-xs text-(--text-muted)">
+            <span className="flex items-center gap-1.5 text-[11px]">
+              <Flame size={13} className="text-amber-500" />
               <span>Sessions Completed:</span>
             </span>
-            <span className="font-bold text-(--text-primary) font-mono">
+            <span className="font-bold text-(--text-primary) font-mono text-xs">
               {sessionsCompleted}
             </span>
           </div>

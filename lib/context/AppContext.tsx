@@ -850,10 +850,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // real accounts. The 5-prompt limit is tracked client-side AND server-side.
   const continueAsGuest = useCallback(async () => {
     try {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        const storedUser = localStorage.getItem('recall_user');
+        if (storedUser) {
+          try { setUser(JSON.parse(storedUser)); } catch {}
+        }
+        return;
+      }
       const res = await apiFetch('/api/auth/guest', { method: 'POST' });
       const data = await safeJson(res);
       if (!res.ok || !data?.user) {
-        showToast('Could not start a guest session. Please try again.', 'error');
+        const storedUser = typeof window !== 'undefined' ? localStorage.getItem('recall_user') : null;
+        if (storedUser) {
+          try { setUser(JSON.parse(storedUser)); } catch {}
+        }
         return;
       }
       localStorage.setItem('recall_user', JSON.stringify(data.user));
@@ -865,9 +875,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await updateUser(data.user);
       await refreshAll();
     } catch {
-      showToast('Could not start a guest session. Please try again.', 'error');
+      // Offline / Network disconnect: gracefully use local cached user
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem('recall_user') : null;
+      if (storedUser) {
+        try { setUser(JSON.parse(storedUser)); } catch {}
+      }
     }
-  }, [updateUser, refreshAll, showToast]);
+  }, [updateUser, refreshAll]);
 
   // ── Sign out: clear session AND wipe locally cached data so the next
   //    viewer (guest or another account) starts from a clean slate.

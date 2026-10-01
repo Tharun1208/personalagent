@@ -171,8 +171,10 @@ export default function AppLayout() {
       <CustomToastAlert toasts={toasts} onDismiss={dismissToast} />
 
       {focusTimerOpen && (
-        <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-40 shadow-2xl animate-in slide-in-from-bottom-5 duration-200">
-          <TimerWidget onClose={() => setFocusTimerOpen(false)} />
+        <div className="fixed inset-x-3 bottom-20 sm:inset-auto sm:bottom-6 sm:right-6 z-40 flex justify-center pointer-events-none">
+          <div className="w-full max-w-[340px] sm:max-w-sm pointer-events-auto shadow-2xl animate-in slide-in-from-bottom-5 duration-200">
+            <TimerWidget onClose={() => setFocusTimerOpen(false)} />
+          </div>
         </div>
       )}
 
