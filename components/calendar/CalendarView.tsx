@@ -18,10 +18,14 @@ import {
   Zap,
   Download,
   Check,
+  Search,
+  HelpCircle,
+  Settings,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import {
   getHolidayForDate,
+  getAllHolidaysForDate,
   getHolidaysForYear,
   getHolidaysForMonth,
   isGovernmentHoliday,
@@ -49,11 +53,13 @@ export default function CalendarView() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<CalendarViewMode>('month');
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [viewModeDropdownOpen, setViewModeDropdownOpen] = useState(false);
   const datePickerAnchorRef = useRef<HTMLDivElement>(null);
-  const [filterType, setFilterType] = useState<'all' | 'events' | 'tasks' | 'holidays' | 'completed'>('all');
+  const viewModeAnchorRef = useRef<HTMLDivElement>(null);
   
-  // Quick natural language input
+  // Quick natural language input / search
   const [quickInput, setQuickInput] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // Day Details Modal state
   const [isDayDetailsModalOpen, setIsDayDetailsModalOpen] = useState(false);
@@ -114,15 +120,8 @@ export default function CalendarView() {
       });
     });
 
-    return items
-      .filter((item) => {
-        if (filterType === 'tasks') return item.type === 'task' && item.status !== 'completed';
-        if (filterType === 'events') return item.type === 'reminder' || item.type === 'task';
-        if (filterType === 'completed') return item.status === 'completed';
-        return true;
-      })
-      .sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime());
-  }, [tasks, reminders, filterType]);
+    return items.sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime());
+  }, [tasks, reminders]);
 
   // Selected Day Items
   const selectedDayItems = useMemo(() => {
@@ -200,7 +199,7 @@ export default function CalendarView() {
       scheduledDate.setDate(scheduledDate.getDate() + 1);
     }
 
-    const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+    const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/);
     if (timeMatch) {
       let h = parseInt(timeMatch[1], 10);
       const m = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
@@ -213,39 +212,50 @@ export default function CalendarView() {
 
     scheduledDate.setHours(timeHours, timeMins, 0, 0);
 
-    const isTask = lower.includes('task') || lower.includes('todo') || lower.includes('finish') || lower.includes('submit');
-    
-    if (isTask) {
-      await createTask(quickInput.trim(), 'medium', scheduledDate.toISOString());
-    } else {
-      await createReminder(quickInput.trim(), scheduledDate.toISOString(), 'none');
-    }
+    const cleanTitle = quickInput
+      .replace(/tomorrow/gi, '')
+      .replace(/today/gi, '')
+      .replace(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/gi, '')
+      .replace(/at\s*$/i, '')
+      .trim() || 'Quick Event';
+
+    await createReminder(
+      cleanTitle,
+      scheduledDate.toISOString(),
+      'none',
+      'Scheduled via quick add'
+    );
 
     setQuickInput('');
+    setIsSearchOpen(false);
   };
 
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!modalTitle.trim()) return;
 
-    const [year, month, day] = modalDate.split('-').map(Number);
-    const [hours, minutes] = modalTime.split(':').map(Number);
-    const dueTime = new Date(year, month - 1, day, hours, minutes, 0, 0);
-
-    let fullTitle = modalTitle.trim();
-    if (modalLocation.trim()) {
-      fullTitle += ` 📍 ${modalLocation.trim()}`;
-    }
+    const [h, m] = modalTime.split(':').map(Number);
+    const eventDateTime = new Date(modalDate);
+    eventDateTime.setHours(h || 10, m || 0, 0, 0);
 
     if (modalType === 'task') {
-      await createTask(fullTitle, modalPriority, dueTime.toISOString());
+      await createTask(
+        modalTitle,
+        modalPriority,
+        eventDateTime.toISOString()
+      );
     } else {
-      await createReminder(fullTitle, dueTime.toISOString(), modalRecurrence);
+      await createReminder(
+        modalTitle,
+        eventDateTime.toISOString(),
+        modalRecurrence,
+        modalLocation ? `📍 Location: ${modalLocation}` : undefined
+      );
     }
 
+    setIsAddModalOpen(false);
     setModalTitle('');
     setModalLocation('');
-    setIsAddModalOpen(false);
   };
 
   // Month Grid Calculator
@@ -264,6 +274,7 @@ export default function CalendarView() {
       isCurrentMonth: boolean;
       isToday: boolean;
       items: typeof timelineItems;
+      holidays: ReturnType<typeof getAllHolidaysForDate>;
     }> = [];
 
     // Previous month padding
@@ -280,6 +291,7 @@ export default function CalendarView() {
         isCurrentMonth: false,
         isToday: d.toDateString() === new Date().toDateString(),
         items: dayItems,
+        holidays: getAllHolidaysForDate(d),
       });
     }
 
@@ -296,6 +308,7 @@ export default function CalendarView() {
         isCurrentMonth: true,
         isToday: d.toDateString() === new Date().toDateString(),
         items: dayItems,
+        holidays: getAllHolidaysForDate(d),
       });
     }
 
@@ -313,6 +326,7 @@ export default function CalendarView() {
         isCurrentMonth: false,
         isToday: d.toDateString() === new Date().toDateString(),
         items: dayItems,
+        holidays: getAllHolidaysForDate(d),
       });
     }
 
@@ -326,7 +340,6 @@ export default function CalendarView() {
     const day = selectedDate.getDate();
     const dayOfWeek = selectedDate.getDay(); // 0 = Sun, 6 = Sat
 
-    // Start of the current week (Sunday)
     const startOfWeek = new Date(year, month, day - dayOfWeek);
     startOfWeek.setHours(0, 0, 0, 0);
 
@@ -347,6 +360,7 @@ export default function CalendarView() {
         date: dayDate,
         isToday: dayDate.toDateString() === new Date().toDateString(),
         items: dayItems,
+        holidays: getAllHolidaysForDate(dayDate),
       });
     }
     return days;
@@ -441,349 +455,320 @@ export default function CalendarView() {
   const isToday = selectedDate.toDateString() === new Date().toDateString();
 
   return (
-    <div className="flex-1 flex flex-col h-screen overflow-hidden bg-(--bg-primary) text-(--text-primary) font-sans">
+    <div className="flex-1 flex flex-col h-screen overflow-hidden bg-(--bg-primary) text-(--text-primary) font-sans select-none">
       
-      {/* ── 1. Google Calendar Style Main Top Header Bar ── */}
-      <header className="py-2.5 px-3 sm:px-6 border-b border-(--border-subtle) bg-(--bg-card)/80 backdrop-blur-md z-20 shrink-0">
+      {/* ── Google Calendar Header Bar (Single Clean Header Row) ── */}
+      <header className="h-14 px-2 sm:px-4 border-b border-(--border-subtle) bg-(--bg-card) flex items-center justify-between shrink-0 z-30">
         
-        {/* Main Header Bar Row */}
-        <div className="flex items-center justify-between gap-2 sm:gap-4">
-          {/* Left: Branding, Navigation & Current Month Display */}
-          <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
-            <div className="items-center gap-2.5 shrink-0 hidden sm:flex">
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-[#4E82EE] text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/20 shrink-0">
-                <CalendarIcon size={18} />
-              </div>
-              <span className="font-bold text-base sm:text-lg tracking-tight hidden md:inline text-(--text-primary)">
-                Calendar
-              </span>
+        {/* Left: Google Calendar Brand Icon, Title, Today Button, Arrows, Month/Year */}
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
+          {/* Google Calendar Blue Logo Tile */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-[#1a73e8] text-white flex items-center justify-center font-bold text-sm shadow-xs select-none">
+              {new Date().getDate()}
             </div>
-
-            {/* Arrows (< >) */}
-            <div className="flex items-center">
-              <button
-                onClick={handlePrev}
-                className="p-1 sm:p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
-                title="Previous"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <button
-                onClick={handleNext}
-                className="p-1 sm:p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
-                title="Next"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-
-            {/* Month & Year Title with Popover Selector */}
-            <div className="relative" ref={datePickerAnchorRef}>
-              <button
-                onClick={() => setDatePickerOpen((o) => !o)}
-                className="flex items-center gap-1 py-1 px-1.5 sm:px-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-primary) text-sm sm:text-base md:text-lg font-bold transition-all cursor-pointer group"
-              >
-                <span className="tracking-tight whitespace-nowrap">
-                  {viewMode === 'day'
-                    ? `${MONTH_NAMES[selectedDate.getMonth()].slice(0, 3)} ${selectedDate.getDate()}, ${selectedDate.getFullYear()}`
-                    : viewMode === 'week'
-                    ? `${MONTH_NAMES[selectedDate.getMonth()].slice(0, 3)} ${selectedDate.getFullYear()}`
-                    : viewMode === 'year'
-                    ? `${selectedDate.getFullYear()}`
-                    : `${MONTH_NAMES[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`}
-                </span>
-                <ChevronDown size={14} className={`text-(--text-muted) group-hover:text-[#4E82EE] transition-transform duration-200 ${datePickerOpen ? 'rotate-180 text-[#4E82EE]' : ''}`} />
-              </button>
-
-              {/* Quick Month / Year Picker Popover */}
-              {datePickerOpen && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setDatePickerOpen(false)} />
-                  <div className="absolute top-full left-0 mt-2 z-40 w-64 p-3.5 rounded-3xl border border-(--border-subtle) bg-(--bg-card) shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-(--border-subtle)">
-                      <button
-                        onClick={() => {
-                          const d = new Date(selectedDate);
-                          d.setFullYear(d.getFullYear() - 1);
-                          setSelectedDate(d);
-                        }}
-                        className="p-1 rounded-xl hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
-                      >
-                        <ChevronLeft size={16} />
-                      </button>
-                      <span className="text-sm font-bold font-mono text-(--text-primary)">
-                        {selectedDate.getFullYear()}
-                      </span>
-                      <button
-                        onClick={() => {
-                          const d = new Date(selectedDate);
-                          d.setFullYear(d.getFullYear() + 1);
-                          setSelectedDate(d);
-                        }}
-                        className="p-1 rounded-xl hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
-                      >
-                        <ChevronRight size={16} />
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {MONTH_NAMES.map((m, idx) => {
-                        const isSelected = idx === selectedDate.getMonth();
-                        return (
-                          <button
-                            key={m}
-                            onClick={() => {
-                              const d = new Date(selectedDate);
-                              d.setDate(1);
-                              d.setMonth(idx);
-                              setSelectedDate(d);
-                              setDatePickerOpen(false);
-                            }}
-                            className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-[#4E82EE] text-white shadow-xs font-bold'
-                                : 'text-(--text-secondary) hover:bg-(--bg-elevated) hover:text-(--text-primary)'
-                            }`}
-                          >
-                            {m.slice(0, 3)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+            <span className="font-semibold text-base sm:text-lg tracking-tight hidden md:inline text-(--text-primary)">
+              Calendar
+            </span>
           </div>
 
-          {/* Right: Actions, View Switcher & Create Button */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Today Button */}
+          {/* Today Button (Google Calendar style outlined pill) */}
+          <button
+            onClick={handleToday}
+            className={`px-3 py-1 sm:py-1.5 rounded-full border text-xs sm:text-sm font-medium transition-colors cursor-pointer shadow-2xs ${
+              isToday
+                ? 'border-[#1a73e8] text-[#1a73e8] bg-[#1a73e8]/10 font-semibold'
+                : 'border-(--border-subtle) text-(--text-primary) hover:bg-(--bg-elevated)'
+            }`}
+          >
+            Today
+          </button>
+
+          {/* Previous / Next Arrows (< >) */}
+          <div className="flex items-center">
             <button
-              onClick={handleToday}
-              className={`px-2.5 sm:px-3.5 py-1.5 rounded-full border text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
-                isToday
-                  ? 'border-[#4E82EE]/50 bg-[#4E82EE]/10 text-[#4E82EE]'
-                  : 'border-(--border-subtle) bg-(--bg-card) hover:bg-(--bg-elevated) text-(--text-primary)'
-              }`}
+              onClick={handlePrev}
+              className="p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
+              title="Previous"
             >
-              Today
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              onClick={handleNext}
+              className="p-1.5 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
+              title="Next"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+
+          {/* Month & Year Title Dropdown */}
+          <div className="relative" ref={datePickerAnchorRef}>
+            <button
+              onClick={() => setDatePickerOpen((o) => !o)}
+              className="flex items-center gap-1 py-1 px-1.5 sm:px-2 rounded-lg hover:bg-(--bg-elevated) text-(--text-primary) text-sm sm:text-base md:text-lg font-bold transition-colors cursor-pointer group"
+            >
+              <span className="tracking-tight whitespace-nowrap">
+                {viewMode === 'day'
+                  ? `${MONTH_NAMES[selectedDate.getMonth()]} ${selectedDate.getDate()}, ${selectedDate.getFullYear()}`
+                  : `${MONTH_NAMES[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`}
+              </span>
+              <ChevronDown size={14} className={`text-(--text-muted) transition-transform duration-200 ${datePickerOpen ? 'rotate-180 text-[#1a73e8]' : ''}`} />
             </button>
 
-            {/* Quick NL Input (compact, Desktop only) */}
-            <form onSubmit={handleQuickSchedule} className="hidden xl:flex items-center relative w-60">
+            {/* Google Month / Year Selector Popover */}
+            {datePickerOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setDatePickerOpen(false)} />
+                <div className="absolute top-full left-0 mt-2 z-40 w-64 p-3.5 rounded-2xl border border-(--border-subtle) bg-(--bg-card) shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-(--border-subtle)">
+                    <button
+                      onClick={() => {
+                        const d = new Date(selectedDate);
+                        d.setFullYear(d.getFullYear() - 1);
+                        setSelectedDate(d);
+                      }}
+                      className="p-1 rounded-lg hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span className="text-sm font-bold font-mono text-(--text-primary)">
+                      {selectedDate.getFullYear()}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const d = new Date(selectedDate);
+                        d.setFullYear(d.getFullYear() + 1);
+                        setSelectedDate(d);
+                      }}
+                      className="p-1 rounded-lg hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {MONTH_NAMES.map((m, idx) => {
+                      const isSelected = idx === selectedDate.getMonth();
+                      return (
+                        <button
+                          key={m}
+                          onClick={() => {
+                            const d = new Date(selectedDate);
+                            d.setDate(1);
+                            d.setMonth(idx);
+                            setSelectedDate(d);
+                            setDatePickerOpen(false);
+                          }}
+                          className={`py-2 px-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#1a73e8] text-white shadow-xs font-bold'
+                              : 'text-(--text-secondary) hover:bg-(--bg-elevated) hover:text-(--text-primary)'
+                          }`}
+                        >
+                          {m.slice(0, 3)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Quick Search, Settings/Export, Google-Style View Switcher Dropdown & Create Button */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          
+          {/* Quick Search toggle / input */}
+          {isSearchOpen ? (
+            <form onSubmit={handleQuickSchedule} className="flex items-center relative w-48 sm:w-60 animate-in fade-in duration-150">
               <input
                 type="text"
                 value={quickInput}
                 onChange={(e) => setQuickInput(e.target.value)}
-                placeholder="Quick add: e.g. Sync tomorrow 3pm..."
-                className="w-full pl-8 pr-3 py-1.5 rounded-full bg-(--bg-elevated) border border-(--border-subtle) text-xs text-(--text-primary) placeholder:text-(--text-muted) focus:outline-hidden focus:border-[#4E82EE]"
+                placeholder="Quick add: sync tomorrow 3pm..."
+                autoFocus
+                className="w-full pl-7 pr-7 py-1.5 rounded-full bg-(--bg-elevated) border border-(--border-subtle) text-xs text-(--text-primary) placeholder:text-(--text-muted) focus:outline-hidden focus:border-[#1a73e8]"
               />
-              <Zap size={13} className="absolute left-2.5 top-2.5 text-amber-500" />
+              <Zap size={13} className="absolute left-2.5 top-2 text-amber-500" />
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(false)}
+                className="absolute right-2 top-2 text-(--text-muted) hover:text-(--text-primary)"
+              >
+                <X size={13} />
+              </button>
             </form>
-
-            {/* Export ICS (Desktop only) */}
+          ) : (
             <button
-              onClick={exportIcsCalendar}
-              title="Export Calendar (.ics)"
-              className="p-1.5 sm:p-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:bg-(--bg-card) text-(--text-secondary) hover:text-(--text-primary) transition-all cursor-pointer hidden md:flex items-center gap-1 text-xs font-medium"
+              onClick={() => setIsSearchOpen(true)}
+              className="p-1.5 sm:p-2 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
+              title="Search / Quick Add"
             >
-              <Download size={14} />
-              <span className="hidden lg:inline">.ics</span>
+              <Search size={18} />
+            </button>
+          )}
+
+          {/* Export ICS */}
+          <button
+            onClick={exportIcsCalendar}
+            title="Export Calendar (.ics)"
+            className="p-1.5 sm:p-2 rounded-full hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer hidden sm:block"
+          >
+            <Download size={18} />
+          </button>
+
+          {/* Google Calendar Style View Selector Dropdown [Month ▾] */}
+          <div className="relative" ref={viewModeAnchorRef}>
+            <button
+              onClick={() => setViewModeDropdownOpen((o) => !o)}
+              className="flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-lg border border-(--border-subtle) bg-(--bg-card) hover:bg-(--bg-elevated) text-xs sm:text-sm font-medium text-(--text-primary) transition-colors cursor-pointer shadow-2xs capitalize"
+            >
+              <span>{viewMode}</span>
+              <ChevronDown size={14} className={`text-(--text-muted) transition-transform duration-200 ${viewModeDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {/* View Mode Segmented Control on Desktop / Tablet */}
-            <div className="hidden sm:flex items-center p-0.5 sm:p-1 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) shadow-2xs">
-              {(
-                [
-                  { mode: 'day',   label: 'Day' },
-                  { mode: 'week',  label: 'Week' },
-                  { mode: 'month', label: 'Month' },
-                  { mode: 'year',  label: 'Year' },
-                ] as const
-              ).map(({ mode, label }) => {
-                const isActive = viewMode === mode;
-                return (
-                  <button
-                    key={mode}
-                    onClick={() => setViewMode(mode)}
-                    className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                      isActive
-                        ? 'bg-(--bg-card) text-[#4E82EE] shadow-xs font-bold'
-                        : 'text-(--text-muted) hover:text-(--text-primary)'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Google Calendar Style + Create Event Button */}
-            <button
-              onClick={() => openScheduleModal()}
-              className="px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-2xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold hover:opacity-95 active:scale-95 transition-all cursor-pointer shadow-md shadow-blue-500/20 flex items-center gap-1.5 shrink-0"
-            >
-              <Plus size={16} strokeWidth={2.5} />
-              <span className="hidden sm:inline">Create</span>
-            </button>
+            {viewModeDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setViewModeDropdownOpen(false)} />
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-36 py-1.5 rounded-xl border border-(--border-subtle) bg-(--bg-card) shadow-2xl animate-in fade-in zoom-in-95 duration-100 divide-y divide-(--border-subtle)/40">
+                  {(
+                    [
+                      { mode: 'day', label: 'Day', shortcut: 'D' },
+                      { mode: 'week', label: 'Week', shortcut: 'W' },
+                      { mode: 'month', label: 'Month', shortcut: 'M' },
+                      { mode: 'year', label: 'Year', shortcut: 'Y' },
+                    ] as const
+                  ).map(({ mode, label, shortcut }) => {
+                    const isActive = viewMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        onClick={() => {
+                          setViewMode(mode);
+                          setViewModeDropdownOpen(false);
+                        }}
+                        className={`w-full px-3 py-2 text-left text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
+                          isActive
+                            ? 'bg-[#1a73e8]/10 text-[#1a73e8] font-bold'
+                            : 'text-(--text-primary) hover:bg-(--bg-elevated)'
+                        }`}
+                      >
+                        <span>{label}</span>
+                        <span className="text-[10px] text-(--text-muted) font-mono">{shortcut}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
-        </div>
 
-        {/* Mobile View Mode Switcher Strip (Only visible on small mobile screens) */}
-        <div className="sm:hidden mt-2 pt-2 border-t border-(--border-subtle)/50 flex items-center justify-between gap-1">
-          <div className="grid grid-cols-4 w-full p-0.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) shadow-2xs">
-            {(
-              [
-                { mode: 'day',   label: 'Day' },
-                { mode: 'week',  label: 'Week' },
-                { mode: 'month', label: 'Month' },
-                { mode: 'year',  label: 'Year' },
-              ] as const
-            ).map(({ mode, label }) => {
-              const isActive = viewMode === mode;
-              return (
-                <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={`py-1 text-center rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-(--bg-card) text-[#4E82EE] shadow-xs font-bold'
-                      : 'text-(--text-muted) hover:text-(--text-primary)'
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+          {/* Google Calendar Style + Create Event Button */}
+          <button
+            onClick={() => openScheduleModal()}
+            className="px-2.5 sm:px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs sm:text-sm font-semibold hover:opacity-95 active:scale-95 transition-all cursor-pointer shadow-md shadow-blue-500/20 flex items-center gap-1 shrink-0"
+          >
+            <Plus size={16} strokeWidth={2.5} />
+            <span className="hidden sm:inline">Create</span>
+          </button>
         </div>
       </header>
 
-      {/* ── Filter Bar (Govt Holidays, Events, Tasks, Completed) ── */}
-      <div className="px-3 sm:px-6 py-2 border-b border-(--border-subtle) bg-(--bg-sidebar)/30 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
-        <div className="flex items-center gap-1.5">
-          {(['all', 'events', 'tasks', 'holidays', 'completed'] as const).map((ft) => (
-            <button
-              key={ft}
-              onClick={() => setFilterType(ft)}
-              className={`px-3 py-1 rounded-full text-[11px] font-semibold capitalize transition-all cursor-pointer whitespace-nowrap flex items-center gap-1 ${
-                filterType === ft
-                  ? 'bg-[#4E82EE]/15 text-[#4E82EE] dark:text-[#a8c7fa] font-bold border border-[#4E82EE]/30'
-                  : 'text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
-              }`}
-            >
-              {ft === 'holidays' ? <span>🏛️ Govt Holidays</span> : ft}
-            </button>
-          ))}
-        </div>
-
-        <span className="text-[11px] text-(--text-muted) font-medium hidden md:inline shrink-0">
-          {timelineItems.length} items scheduled
-        </span>
-      </div>
-
-      {/* ── Main Google Calendar Viewport ── */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pb-32 sm:pb-36 md:pb-12 flex flex-col">
+      {/* ── Main Google Calendar Viewport (Full Screen Height, No Extra Filter Bar) ── */}
+      <div className="flex-1 overflow-hidden flex flex-col pb-16 sm:pb-4">
         
         {/* ───────────────────────────────────────────────────────────── */}
-        {/* 1. GOOGLE CALENDAR MONTH VIEW                                 */}
+        {/* 1. GOOGLE CALENDAR MONTH VIEW (Exact Replica)                 */}
         {/* ───────────────────────────────────────────────────────────── */}
         {viewMode === 'month' && (
-          <div className="flex-1 flex flex-col min-h-[580px] p-2 sm:p-4 md:p-6 max-w-7xl mx-auto w-full">
+          <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-(--bg-primary)">
             
-            {/* Weekday Header Row (SUN, MON, TUE, WED, THU, FRI, SAT) */}
-            <div className="grid grid-cols-7 border-b border-(--border-subtle) text-center py-2 shrink-0">
+            {/* Weekday Columns Header Row (SUN, MON, TUE, WED, THU, FRI, SAT) */}
+            <div className="grid grid-cols-7 border-b border-(--border-subtle) text-center py-1.5 shrink-0 bg-(--bg-card)">
               {SHORT_WEEKDAYS.map((day, dIdx) => (
                 <div
                   key={day}
-                  className={`text-[11px] font-bold uppercase tracking-wider ${
-                    dIdx === 0 || dIdx === 6 ? 'text-(--text-muted)' : 'text-(--text-secondary)'
-                  }`}
+                  className="text-[11px] font-semibold text-(--text-muted) tracking-wider uppercase"
                 >
                   {day}
                 </div>
               ))}
             </div>
 
-            {/* Continuous Clean Google Calendar Grid Cells */}
-            <div className="flex-1 grid grid-cols-7 grid-rows-5 sm:grid-rows-6 border-l border-t border-(--border-subtle) bg-(--bg-card) rounded-2xl overflow-hidden shadow-xs mt-1">
+            {/* Full Screen Continuous Google Calendar Grid */}
+            <div className="flex-1 grid grid-cols-7 grid-rows-5 sm:grid-rows-6 divide-x divide-y divide-(--border-subtle) border-b border-(--border-subtle) bg-(--bg-card) overflow-y-auto">
               {monthDays.map((day, idx) => {
                 const dayNum = day.date.getDate();
                 const isSelected = day.date.toDateString() === selectedDate.toDateString();
-                const holiday = getHolidayForDate(day.date);
-                const isFirstDayOfMonth = dayNum === 1;
 
                 return (
                   <div
                     key={idx}
                     onClick={() => handleDayClick(day.date)}
-                    className={`min-h-[85px] sm:min-h-[115px] p-1 sm:p-1.5 border-r border-b border-(--border-subtle) transition-all cursor-pointer flex flex-col justify-between group relative select-none hover:bg-(--bg-elevated)/60 ${
+                    className={`min-h-[80px] sm:min-h-[105px] p-1 sm:p-1.5 transition-colors cursor-pointer flex flex-col justify-start relative group select-none hover:bg-(--bg-elevated)/40 ${
                       isSelected
-                        ? 'bg-[#4E82EE]/8'
-                        : holiday
-                        ? 'bg-rose-500/8 dark:bg-rose-950/20'
+                        ? 'bg-[#1a73e8]/5'
                         : day.isCurrentMonth
                         ? 'bg-(--bg-card)'
-                        : 'bg-(--bg-sidebar)/30 opacity-45'
+                        : 'bg-(--bg-sidebar)/20 opacity-40'
                     }`}
                   >
-                    {/* Top Row: Date Number & Holiday Indicator */}
-                    <div className="flex items-center justify-between mb-1 min-h-[24px]">
-                      <div className="flex items-center gap-1 min-w-0">
-                        {isFirstDayOfMonth && (
-                          <span className="text-[10px] sm:text-[11px] font-bold text-(--text-muted) uppercase">
-                            {MONTH_NAMES[day.date.getMonth()].slice(0, 3)}
-                          </span>
-                        )}
+                    {/* Centered Date Number Header */}
+                    <div className="flex items-center justify-center mb-1 shrink-0">
+                      {day.isToday ? (
+                        <span className="w-6 h-6 rounded-full bg-[#1a73e8] text-white flex items-center justify-center text-xs font-bold shadow-xs">
+                          {dayNum}
+                        </span>
+                      ) : (
                         <span
-                          className={`text-xs font-bold rounded-full flex items-center justify-center transition-all shrink-0 ${
-                            day.isToday
-                              ? 'w-6 h-6 bg-[#4E82EE] text-white shadow-xs'
-                              : isSelected
-                              ? 'w-6 h-6 bg-(--bg-elevated) text-[#4E82EE] font-black border border-[#4E82EE]/40'
-                              : holiday
-                              ? 'text-rose-600 dark:text-rose-400 font-bold px-1'
-                              : day.isCurrentMonth
-                              ? 'text-(--text-primary) px-1'
-                              : 'text-(--text-muted) px-1'
+                          className={`text-xs font-medium text-center ${
+                            day.isCurrentMonth
+                              ? 'text-(--text-primary)'
+                              : 'text-(--text-muted)'
                           }`}
                         >
                           {dayNum}
                         </span>
-                      </div>
-
-                      {holiday && (
-                        <span className="text-xs shrink-0 select-none" title={holiday.name}>
-                          {holiday.emoji || '🏛️'}
-                        </span>
                       )}
                     </div>
 
-                    {/* Google Calendar Style Event Chips / Strips */}
-                    <div className="flex-1 space-y-1 overflow-hidden pointer-events-none">
-                      {/* Government Holiday Strip (Top priority) */}
-                      {holiday && (
+                    {/* Google Calendar Solid Event & Holiday Strips */}
+                    <div className="flex-1 space-y-1 overflow-hidden w-full">
+                      {/* 1. Indian Government Holidays & Festivals (Solid High-Contrast Green Strips) */}
+                      {day.holidays.map((h, hIdx) => (
                         <div
-                          className="text-[10px] sm:text-[11px] font-bold px-1.5 py-0.5 rounded-md truncate bg-rose-500/20 text-rose-700 dark:text-rose-300 border-l-[3px] border-rose-500 flex items-center gap-1 shadow-2xs"
-                          title={`🏛️ Govt Holiday: ${holiday.name}`}
+                          key={`h_${hIdx}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDayClick(day.date);
+                          }}
+                          className="bg-[#0b8043] dark:bg-[#137333] hover:bg-[#188038] text-white text-[10.5px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-[3px] truncate block w-full leading-tight cursor-pointer transition-colors shadow-none"
+                          title={`🏛️ ${h.name}`}
                         >
-                          <span className="truncate">{holiday.name}</span>
+                          <span className="truncate">{h.name}</span>
                         </div>
-                      )}
+                      ))}
 
-                      {/* Day Scheduled Events */}
-                      {day.items.slice(0, holiday ? 2 : 3).map((item) => {
+                      {/* 2. Scheduled Events & Tasks (Solid High-Contrast Strips) */}
+                      {day.items.slice(0, Math.max(1, 3 - day.holidays.length)).map((item) => {
                         const isCompleted = item.status === 'completed';
+                        const isTask = item.type === 'task';
+
                         return (
                           <div
                             key={item.id}
-                            className={`text-[10px] sm:text-[11px] font-semibold px-1.5 py-0.5 rounded-md truncate flex items-center gap-1 shadow-2xs ${
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDayClick(day.date);
+                            }}
+                            className={`text-[10.5px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-[3px] truncate block w-full leading-tight cursor-pointer transition-colors shadow-none text-white ${
                               isCompleted
-                                ? 'bg-(--bg-elevated) text-(--text-muted) line-through border-l-[3px] border-gray-400'
-                                : item.type === 'task'
-                                ? 'bg-[#9B72CF]/15 text-[#9B72CF] dark:text-[#d1b8f0] border-l-[3px] border-[#9B72CF]'
-                                : 'bg-[#4E82EE]/15 text-[#4E82EE] dark:text-[#a8c7fa] border-l-[3px] border-[#4E82EE]'
+                                ? 'bg-neutral-600 text-neutral-300 line-through opacity-70'
+                                : isTask
+                                ? 'bg-[#8e24aa] dark:bg-[#8e24aa] hover:bg-[#7b1fa2]'
+                                : 'bg-[#1a73e8] dark:bg-[#1a73e8] hover:bg-[#1557b0]'
                             }`}
                             title={item.title}
                           >
@@ -792,10 +777,16 @@ export default function CalendarView() {
                         );
                       })}
 
-                      {/* +N more indicator */}
-                      {day.items.length > (holiday ? 2 : 3) && (
-                        <div className="text-[10px] text-(--text-muted) font-semibold pl-1">
-                          +{day.items.length - (holiday ? 2 : 3)} more
+                      {/* +N more Indicator */}
+                      {day.items.length + day.holidays.length > 3 && (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDayClick(day.date);
+                          }}
+                          className="text-[10px] font-semibold text-(--text-muted) hover:text-[#1a73e8] pl-1 cursor-pointer leading-tight truncate"
+                        >
+                          +{day.items.length + day.holidays.length - 3} more
                         </div>
                       )}
                     </div>
@@ -810,13 +801,12 @@ export default function CalendarView() {
         {/* 2. GOOGLE CALENDAR WEEK VIEW (Time-Grid Column Layout)        */}
         {/* ───────────────────────────────────────────────────────────── */}
         {viewMode === 'week' && (
-          <div className="flex-1 flex flex-col p-2 sm:p-4 md:p-6 max-w-7xl mx-auto w-full">
+          <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-(--bg-primary)">
             
             {/* Week Columns Header (7 Days) */}
-            <div className="grid grid-cols-8 border-b border-(--border-subtle) pb-2 text-center shrink-0">
-              <div className="w-14 sm:w-16" /> {/* Time gutter spacer */}
+            <div className="grid grid-cols-8 border-b border-(--border-subtle) py-2 text-center shrink-0 bg-(--bg-card)">
+              <div className="w-12 sm:w-16" /> {/* Time gutter spacer */}
               {weekDays.map((w, wIdx) => {
-                const holiday = getHolidayForDate(w.date);
                 const isSelected = w.date.toDateString() === selectedDate.toDateString();
                 return (
                   <div
@@ -827,25 +817,23 @@ export default function CalendarView() {
                     }}
                     className="flex flex-col items-center cursor-pointer group"
                   >
-                    <span className="text-[10px] sm:text-xs font-bold text-(--text-muted) uppercase">
+                    <span className="text-[10px] sm:text-xs font-semibold text-(--text-muted) uppercase">
                       {SHORT_WEEKDAYS[w.date.getDay()]}
                     </span>
                     <div
-                      className={`w-8 h-8 sm:w-9 sm:h-9 mt-0.5 rounded-full flex items-center justify-center font-bold text-sm sm:text-base transition-all ${
+                      className={`w-7 h-7 sm:w-8 sm:h-8 mt-0.5 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-colors ${
                         w.isToday
-                          ? 'bg-[#4E82EE] text-white shadow-sm'
+                          ? 'bg-[#1a73e8] text-white shadow-xs'
                           : isSelected
-                          ? 'bg-(--bg-elevated) text-[#4E82EE] border border-[#4E82EE]'
-                          : holiday
-                          ? 'text-rose-600 dark:text-rose-400'
+                          ? 'bg-(--bg-elevated) text-[#1a73e8] border border-[#1a73e8]'
                           : 'text-(--text-primary) group-hover:bg-(--bg-elevated)'
                       }`}
                     >
                       {w.date.getDate()}
                     </div>
-                    {holiday && (
-                      <span className="text-[10px] text-rose-500 font-bold truncate max-w-[80px]" title={holiday.name}>
-                        {holiday.emoji || '🏛️'}
+                    {w.holidays.length > 0 && (
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold truncate max-w-[80px]" title={w.holidays[0].name}>
+                        {w.holidays[0].name}
                       </span>
                     )}
                   </div>
@@ -854,13 +842,13 @@ export default function CalendarView() {
             </div>
 
             {/* Time Grid Rows */}
-            <div className="flex-1 overflow-y-auto divide-y divide-(--border-subtle)/50 border-t border-(--border-subtle)">
+            <div className="flex-1 overflow-y-auto divide-y divide-(--border-subtle)/50 border-t border-(--border-subtle) bg-(--bg-card)">
               {hoursGrid.map((hour) => {
                 const hourLabel = `${hour === 0 ? 12 : hour > 12 ? hour - 12 : hour} ${hour >= 12 ? 'PM' : 'AM'}`;
                 return (
-                  <div key={hour} className="grid grid-cols-8 min-h-[56px] group relative">
+                  <div key={hour} className="grid grid-cols-8 min-h-[52px] group relative">
                     {/* Time Gutter Label */}
-                    <div className="w-14 sm:w-16 pr-2 text-right text-[11px] font-mono text-(--text-muted) -mt-2 select-none shrink-0">
+                    <div className="w-12 sm:w-16 pr-2 text-right text-[10px] sm:text-[11px] font-mono text-(--text-muted) -mt-2 select-none shrink-0">
                       {hourLabel}
                     </div>
 
@@ -871,7 +859,7 @@ export default function CalendarView() {
                         <div
                           key={wIdx}
                           onClick={() => openScheduleModal(w.date, hour)}
-                          className="border-l border-(--border-subtle)/50 p-1 hover:bg-[#4E82EE]/5 transition-colors cursor-pointer relative min-h-[56px]"
+                          className="border-l border-(--border-subtle)/50 p-1 hover:bg-[#1a73e8]/5 transition-colors cursor-pointer relative min-h-[52px]"
                         >
                           {hourItems.map((item) => (
                             <div
@@ -880,15 +868,15 @@ export default function CalendarView() {
                                 e.stopPropagation();
                                 handleDayClick(w.date);
                               }}
-                              className={`p-1.5 rounded-lg text-xs font-semibold shadow-2xs mb-1 truncate ${
+                              className={`p-1 rounded text-[11px] font-medium shadow-2xs mb-1 truncate text-white ${
                                 item.status === 'completed'
-                                  ? 'bg-(--bg-elevated) text-(--text-muted) line-through'
+                                  ? 'bg-neutral-600 text-neutral-300 line-through'
                                   : item.type === 'task'
-                                  ? 'bg-[#9B72CF]/20 text-[#9B72CF] dark:text-[#d1b8f0] border-l-2 border-[#9B72CF]'
-                                  : 'bg-[#4E82EE]/20 text-[#4E82EE] dark:text-[#a8c7fa] border-l-2 border-[#4E82EE]'
+                                  ? 'bg-[#8e24aa]'
+                                  : 'bg-[#1a73e8]'
                               }`}
                             >
-                              <div className="truncate font-bold">{item.title}</div>
+                              <div className="truncate font-semibold">{item.title}</div>
                             </div>
                           ))}
                         </div>
@@ -905,13 +893,13 @@ export default function CalendarView() {
         {/* 3. GOOGLE CALENDAR DAY VIEW (Hourly Schedule)                 */}
         {/* ───────────────────────────────────────────────────────────── */}
         {viewMode === 'day' && (
-          <div className="flex-1 flex flex-col p-2 sm:p-4 md:p-6 max-w-4xl mx-auto w-full space-y-4">
+          <div className="flex-1 flex flex-col p-2 sm:p-4 md:p-6 max-w-4xl mx-auto w-full space-y-4 overflow-y-auto">
             
             {/* Day Header Banner with Holiday */}
-            <div className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs flex items-center justify-between gap-3">
+            <div className="p-4 rounded-2xl bg-(--bg-card) border border-(--border-subtle) shadow-xs flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg shadow-sm ${
-                  isToday ? 'bg-[#4E82EE] text-white' : 'bg-(--bg-elevated) text-(--text-primary)'
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg shadow-sm ${
+                  isToday ? 'bg-[#1a73e8] text-white' : 'bg-(--bg-elevated) text-(--text-primary)'
                 }`}>
                   {selectedDate.getDate()}
                 </div>
@@ -925,22 +913,22 @@ export default function CalendarView() {
                 </div>
               </div>
 
-              {getHolidayForDate(selectedDate) && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 font-bold text-xs shrink-0">
-                  <span>{getHolidayForDate(selectedDate)?.emoji || '🏛️'}</span>
-                  <span>{getHolidayForDate(selectedDate)?.name}</span>
+              {getAllHolidaysForDate(selectedDate).length > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0b8043]/15 border border-[#0b8043]/30 text-[#0b8043] dark:text-emerald-400 font-bold text-xs shrink-0">
+                  <span>🏛️</span>
+                  <span>{getAllHolidaysForDate(selectedDate)[0].name}</span>
                 </div>
               )}
             </div>
 
             {/* Time Grid (12 AM - 11 PM) */}
-            <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) divide-y divide-(--border-subtle)/50 overflow-hidden shadow-xs">
+            <div className="rounded-2xl bg-(--bg-card) border border-(--border-subtle) divide-y divide-(--border-subtle)/50 overflow-hidden shadow-xs">
               {hoursGrid.map((hour) => {
                 const hourItems = selectedDayItems.filter((item) => item.dateTime.getHours() === hour);
                 const hourLabel = `${hour === 0 ? 12 : hour > 12 ? hour - 12 : hour}:00 ${hour >= 12 ? 'PM' : 'AM'}`;
 
                 return (
-                  <div key={hour} className="flex min-h-[60px] group hover:bg-(--bg-elevated)/40 transition-colors">
+                  <div key={hour} className="flex min-h-[56px] group hover:bg-(--bg-elevated)/40 transition-colors">
                     {/* Time Label Gutter */}
                     <div className="w-20 text-xs font-mono text-(--text-muted) shrink-0 p-3 text-right border-r border-(--border-subtle)/50 select-none">
                       {hourLabel}
@@ -951,7 +939,7 @@ export default function CalendarView() {
                       {hourItems.length === 0 ? (
                         <button
                           onClick={() => openScheduleModal(selectedDate, hour)}
-                          className="opacity-0 group-hover:opacity-100 text-[11px] text-[#4E82EE] font-semibold flex items-center gap-1 hover:underline transition-opacity cursor-pointer"
+                          className="opacity-0 group-hover:opacity-100 text-[11px] text-[#1a73e8] font-semibold flex items-center gap-1 hover:underline transition-opacity cursor-pointer"
                         >
                           <Plus size={12} /> Schedule at {hourLabel}
                         </button>
@@ -960,12 +948,12 @@ export default function CalendarView() {
                           {hourItems.map((item) => (
                             <div
                               key={item.id}
-                              className={`p-3 rounded-2xl border flex items-center justify-between gap-3 shadow-2xs ${
+                              className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 shadow-2xs ${
                                 item.status === 'completed'
                                   ? 'bg-(--bg-elevated) text-(--text-muted) line-through border-(--border-subtle)'
                                   : item.type === 'task'
-                                  ? 'bg-[#9B72CF]/15 border-[#9B72CF]/30 text-[#9B72CF] dark:text-[#d1b8f0]'
-                                  : 'bg-[#4E82EE]/15 border-[#4E82EE]/30 text-[#4E82EE] dark:text-[#a8c7fa]'
+                                  ? 'bg-[#8e24aa]/15 border-[#8e24aa]/30 text-[#8e24aa] dark:text-[#d1b8f0]'
+                                  : 'bg-[#1a73e8]/15 border-[#1a73e8]/30 text-[#1a73e8] dark:text-[#a8c7fa]'
                               }`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
@@ -1008,17 +996,17 @@ export default function CalendarView() {
         {/* 4. GOOGLE CALENDAR YEAR VIEW (12-Month Matrix)                */}
         {/* ───────────────────────────────────────────────────────────── */}
         {viewMode === 'year' && (
-          <div className="flex-1 p-2 sm:p-4 md:p-6 max-w-7xl mx-auto w-full space-y-6">
+          <div className="flex-1 p-2 sm:p-4 md:p-6 max-w-7xl mx-auto w-full space-y-6 overflow-y-auto">
             
             {/* Year Header Overview */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-(--bg-card) border border-(--border-subtle) shadow-xs">
               <div className="p-3">
                 <span className="text-[11px] font-semibold text-(--text-muted) uppercase">Scheduled Events</span>
                 <p className="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">{yearMetrics.total}</p>
               </div>
               <div className="p-3">
-                <span className="text-[11px] font-semibold text-[#4E82EE] uppercase">Tasks Due</span>
-                <p className="text-2xl font-bold text-[#4E82EE] font-mono mt-0.5">{yearMetrics.tasks}</p>
+                <span className="text-[11px] font-semibold text-[#1a73e8] uppercase">Tasks Due</span>
+                <p className="text-2xl font-bold text-[#1a73e8] font-mono mt-0.5">{yearMetrics.tasks}</p>
               </div>
               <div className="p-3">
                 <span className="text-[11px] font-semibold text-amber-500 uppercase">Reminders</span>
@@ -1044,18 +1032,18 @@ export default function CalendarView() {
                       setSelectedDate(newD);
                       setViewMode('month');
                     }}
-                    className="p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 hover:shadow-md transition-all cursor-pointer"
+                    className="p-4 rounded-2xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#1a73e8]/50 hover:shadow-md transition-all cursor-pointer"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="font-bold text-sm text-(--text-primary)">{m.monthName}</h3>
                       <div className="flex items-center gap-1">
                         {monthHolidays.length > 0 && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-semibold">
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold">
                             🏛️ {monthHolidays.length}
                           </span>
                         )}
                         {m.itemsCount > 0 && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-[#4E82EE]/15 text-[#4E82EE] font-semibold">
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-[#1a73e8]/15 text-[#1a73e8] font-semibold">
                             {m.itemsCount}
                           </span>
                         )}
@@ -1086,9 +1074,9 @@ export default function CalendarView() {
                             key={`d_${dayNum}`}
                             className={`w-6 h-6 mx-auto rounded-full flex items-center justify-center text-[10px] font-mono ${
                               isDayToday
-                                ? 'bg-[#4E82EE] text-white font-bold'
+                                ? 'bg-[#1a73e8] text-white font-bold'
                                 : isCellHoliday
-                                ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold'
+                                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold'
                                 : 'text-(--text-muted) hover:bg-(--bg-elevated)'
                             }`}
                           >
@@ -1106,13 +1094,13 @@ export default function CalendarView() {
 
       </div>
 
-      {/* ── 5. Google Calendar Style Day Details Modal ────────────── */}
+      {/* ── Day Details Modal (Google Calendar View Details) ────────────── */}
       {isDayDetailsModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
           <div className="w-full max-w-lg rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150 max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3 shrink-0">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[#4E82EE]">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#1a73e8]">
                   {SHORT_WEEKDAYS[selectedDate.getDay()]}
                 </span>
                 <h2 className="app-modal-title">
@@ -1127,21 +1115,21 @@ export default function CalendarView() {
               </button>
             </div>
 
-            {/* Govt Holiday Banner */}
-            {getHolidayForDate(selectedDate) && (
-              <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center gap-3 shrink-0">
-                <span className="text-2xl shrink-0">{getHolidayForDate(selectedDate)?.emoji || '🏛️'}</span>
+            {/* Govt Holidays List Banner */}
+            {getAllHolidaysForDate(selectedDate).map((h, i) => (
+              <div key={i} className="p-3.5 rounded-2xl bg-[#0b8043]/15 border border-[#0b8043]/30 flex items-center gap-3 shrink-0">
+                <span className="text-2xl shrink-0">{h.emoji || '🏛️'}</span>
                 <div>
-                  <div className="font-bold text-xs sm:text-sm text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
-                    <span>{getHolidayForDate(selectedDate)?.name}</span>
-                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-rose-500/20 uppercase font-bold">Govt Holiday</span>
+                  <div className="font-bold text-xs sm:text-sm text-[#0b8043] dark:text-emerald-400 flex items-center gap-1.5">
+                    <span>{h.name}</span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-[#0b8043]/20 uppercase font-bold">Holiday / Festival</span>
                   </div>
                   <p className="text-[11px] text-(--text-muted) mt-0.5">
-                    {getHolidayForDate(selectedDate)?.description || 'Official Public Holiday'}
+                    {h.description || 'Public Holiday & Observance'}
                   </p>
                 </div>
               </div>
-            )}
+            ))}
 
             {/* Event List */}
             <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar py-1">
@@ -1151,7 +1139,7 @@ export default function CalendarView() {
                     <CalendarIcon size={22} />
                   </div>
                   <p className="text-xs text-(--text-muted) font-medium">
-                    No events scheduled for this day.
+                    No tasks or appointments scheduled for this day.
                   </p>
                 </div>
               ) : (
@@ -1166,8 +1154,8 @@ export default function CalendarView() {
                         isCompleted
                           ? 'bg-(--bg-elevated)/40 border-(--border-subtle) opacity-60'
                           : item.type === 'task'
-                          ? 'bg-[#9B72CF]/15 border-[#9B72CF]/30 text-[#9B72CF] dark:text-[#d1b8f0]'
-                          : 'bg-[#4E82EE]/15 border-[#4E82EE]/30 text-[#4E82EE] dark:text-[#a8c7fa]'
+                          ? 'bg-[#8e24aa]/15 border-[#8e24aa]/30 text-[#8e24aa] dark:text-[#d1b8f0]'
+                          : 'bg-[#1a73e8]/15 border-[#1a73e8]/30 text-[#1a73e8] dark:text-[#a8c7fa]'
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
@@ -1225,13 +1213,13 @@ export default function CalendarView() {
         </div>
       )}
 
-      {/* ── 6. Google Calendar Style Event Creation Modal ─────────── */}
+      {/* ── Event Creation Modal (Google Calendar Style) ─────────── */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
           <div className="w-full max-w-lg rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-[#4E82EE]/15 text-[#4E82EE] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-[#1a73e8]/15 text-[#1a73e8] flex items-center justify-center">
                   <CalendarIcon size={16} />
                 </div>
                 <div>
@@ -1255,7 +1243,7 @@ export default function CalendarView() {
                   onClick={() => setModalType('event')}
                   className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     modalType === 'event'
-                      ? 'bg-[#4E82EE]/15 border-[#4E82EE] text-[#4E82EE] dark:text-[#a8c7fa] shadow-2xs font-bold'
+                      ? 'bg-[#1a73e8]/15 border-[#1a73e8] text-[#1a73e8] dark:text-[#a8c7fa] shadow-2xs font-bold'
                       : 'bg-(--bg-elevated) border-(--border-subtle) text-(--text-muted)'
                   }`}
                 >
@@ -1267,7 +1255,7 @@ export default function CalendarView() {
                   onClick={() => setModalType('task')}
                   className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                     modalType === 'task'
-                      ? 'bg-[#9B72CF]/15 border-[#9B72CF] text-[#9B72CF] dark:text-[#d1b8f0] shadow-2xs font-bold'
+                      ? 'bg-[#8e24aa]/15 border-[#8e24aa] text-[#8e24aa] dark:text-[#d1b8f0] shadow-2xs font-bold'
                       : 'bg-(--bg-elevated) border-(--border-subtle) text-(--text-muted)'
                   }`}
                 >
@@ -1288,7 +1276,7 @@ export default function CalendarView() {
                   placeholder="e.g. Project Review, Lunch with Team..."
                   autoFocus
                   required
-                  className="w-full px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-sm text-(--text-primary) focus:outline-hidden focus:border-[#4E82EE]"
+                  className="w-full px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-sm text-(--text-primary) focus:outline-hidden focus:border-[#1a73e8]"
                 />
               </div>
 

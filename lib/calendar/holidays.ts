@@ -51,7 +51,13 @@ export const GOVT_HOLIDAYS: GovtHoliday[] = [
   { date: '2026-09-14', name: 'Ganesh Chaturthi', type: 'gazetted', emoji: '🐘', description: 'Vinayaka Chaturthi festival of Lord Ganesha' },
   { date: '2026-09-25', name: 'Milad-un-Nabi (Id-e-Milad)', type: 'gazetted', emoji: '✨', description: 'Birthday of the Prophet' },
   { date: '2026-10-02', name: 'Mahatma Gandhi Jayanti', type: 'national', emoji: '🇮🇳', description: 'National Holiday celebrating Mahatma Gandhi’s birth anniversary' },
-  { date: '2026-10-20', name: 'Dussehra (Maha Navami / Vijayadashami)', type: 'gazetted', emoji: '🏹', description: 'Triumph of righteousness and Vijayadashami' },
+  { date: '2026-10-11', name: 'First Day of Sharad Navratri', type: 'festival', emoji: '🪔', description: 'Beginning of Navratri festival' },
+  { date: '2026-10-17', name: 'First Day of Durga Puja', type: 'festival', emoji: '🙏', description: 'Start of Durga Puja celebrations' },
+  { date: '2026-10-18', name: 'Maha Saptami', type: 'restricted', emoji: '🪔', description: 'Seventh day of Durga Puja / Navratri' },
+  { date: '2026-10-19', name: 'Maha Ashtami', type: 'restricted', emoji: '🪔', description: 'Eighth day of Durga Puja / Durga Ashtami' },
+  { date: '2026-10-20', name: 'Dussehra (Vijayadashami)', type: 'gazetted', emoji: '🏹', description: 'Triumph of righteousness and Vijayadashami' },
+  { date: '2026-10-26', name: 'Maharishi Valmiki Jayanti', type: 'restricted', emoji: '📜', description: 'Birth anniversary of sage Valmiki' },
+  { date: '2026-10-29', name: 'Karaka Chaturthi (Karwa Chauth)', type: 'restricted', emoji: '🌙', description: 'Karwa Chauth festival' },
   { date: '2026-11-08', name: 'Diwali (Deepavali / Lakshmi Puja)', type: 'gazetted', emoji: '🪔', description: 'Grand Festival of Lights across the nation' },
   { date: '2026-11-09', name: 'Govardhan Puja / Nutan Varsh', type: 'restricted', emoji: '🕯️', description: 'New year & Govardhan worship' },
   { date: '2026-11-10', name: 'Bhai Dooj (Yama Dwitiya)', type: 'restricted', emoji: '🌸', description: 'Celebration of sister-brother relationship' },
@@ -74,7 +80,7 @@ export const GOVT_HOLIDAYS: GovtHoliday[] = [
 ];
 
 /**
- * Returns the holiday for a given Date or YYYY-MM-DD string, or undefined if none.
+ * Returns the primary holiday for a given Date or YYYY-MM-DD string, or undefined if none.
  */
 export function getHolidayForDate(date: Date | string): GovtHoliday | undefined {
   let dateStr: string;
@@ -87,6 +93,22 @@ export function getHolidayForDate(date: Date | string): GovtHoliday | undefined 
     dateStr = `${y}-${m}-${d}`;
   }
   return GOVT_HOLIDAYS.find((h) => h.date === dateStr);
+}
+
+/**
+ * Returns all holidays on a given Date or YYYY-MM-DD string.
+ */
+export function getAllHolidaysForDate(date: Date | string): GovtHoliday[] {
+  let dateStr: string;
+  if (typeof date === 'string') {
+    dateStr = date.split('T')[0];
+  } else {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    dateStr = `${y}-${m}-${d}`;
+  }
+  return GOVT_HOLIDAYS.filter((h) => h.date === dateStr);
 }
 
 /**
