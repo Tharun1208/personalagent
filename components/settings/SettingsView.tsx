@@ -19,18 +19,24 @@ import {
   CloudUpload,
   RefreshCw,
   FileJson,
+  User,
+  Volume2,
+  Bell,
+  HardDrive,
+  Info,
+  Layers,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { apiFetch } from '@/lib/api';
 
 export default function SettingsView() {
   const appCtx = useApp();
-  const { user, updateUser, refreshAll, theme, setTheme, showToast, showConfirm } = appCtx;
-  
-  // 'main' (system settings list), 'profile', 'data', 'backup'
-  const [currentView, setCurrentView] = useState<'main' | 'profile' | 'data' | 'backup'>('main');
+  const { user, updateUser, updateUserPreferences, refreshAll, theme, setTheme, showToast, showConfirm } = appCtx;
 
-  // WhatsApp-style Backup states (Local Vault & Google Drive)
+  // View routing: 'main' | 'profile' | 'backup' | 'data' | 'voice'
+  const [currentView, setCurrentView] = useState<'main' | 'profile' | 'backup' | 'data' | 'voice'>('main');
+
+  // Backup states
   const [googleToken, setGoogleToken] = useState<string>('');
   const [lastLocalBackup, setLastLocalBackup] = useState<string>('Today, 2:00 AM');
   const [lastDriveBackup, setLastDriveBackup] = useState<string>('');
@@ -43,34 +49,24 @@ export default function SettingsView() {
   const [backupStatusText, setBackupStatusText] = useState<string>('');
   const [isRestoring, setIsRestoring] = useState<boolean>(false);
 
-  // Profile Form states
+  // Profile states
   const [name, setName] = useState(user?.name || '');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Voice & Preferences
+  const [voiceAutoRead, setVoiceAutoRead] = useState(user?.preferences?.voiceAutoRead ?? true);
+  const [soundEffects, setSoundEffects] = useState(user?.preferences?.soundEffects ?? true);
+
   useEffect(() => {
     if (user) {
       setName(user.name || '');
+      if (user.preferences) {
+        setVoiceAutoRead(user.preferences.voiceAutoRead ?? true);
+        setSoundEffects(user.preferences.soundEffects ?? true);
+      }
     }
   }, [user]);
-
-  const handleSaveSettings = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setIsSaving(true);
-    try {
-      await updateUser({ name: name.trim() });
-      setSavedSuccess(true);
-      showToast(`✓ Name updated to "${name.trim()}"`, 'success');
-      setTimeout(() => setSavedSuccess(false), 3000);
-      refreshAll();
-    } catch (err) {
-      console.error('Failed to save settings', err);
-      showToast('Failed to update name. Please try again.', 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -92,6 +88,28 @@ export default function SettingsView() {
       if (storedGToken) setGoogleToken(storedGToken);
     }
   }, [user]);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setIsSaving(true);
+    try {
+      await updateUser({ name: name.trim() });
+      await updateUserPreferences({
+        voiceAutoRead,
+        soundEffects,
+      });
+      setSavedSuccess(true);
+      showToast(`✓ Profile updated successfully!`, 'success');
+      setTimeout(() => setSavedSuccess(false), 3000);
+      refreshAll();
+    } catch (err) {
+      console.error('Failed to save profile', err);
+      showToast('Failed to update profile. Please try again.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handlePerformBackup = async () => {
     setIsBackingUp(true);
@@ -157,14 +175,14 @@ export default function SettingsView() {
       } else {
         setBackupProgress(100);
         setBackupStatusText('Local Device Vault snapshot saved!');
-        showToast(`✓ Local Vault Snapshot created (${formattedSize}) — No Google API key required!`, 'success');
+        showToast(`✓ Local Vault Snapshot created (${formattedSize})`, 'success');
       }
 
       setTimeout(() => {
         setIsBackingUp(false);
         setBackupProgress(0);
         setBackupStatusText('');
-      }, 1500);
+      }, 1200);
     } catch (err) {
       console.error('Backup failed', err);
       setIsBackingUp(false);
@@ -174,8 +192,8 @@ export default function SettingsView() {
 
   const handleRestoreFromDrive = async () => {
     showConfirm({
-      title: 'Restore from Google Drive',
-      message: `Restore your memories, conversations, tasks, and ledger from your latest Google Drive snapshot (${lastDriveBackup})?`,
+      title: 'Restore from Vault Snapshot',
+      message: `Restore your memories, conversations, tasks, and ledger from your latest snapshot (${lastLocalBackup || 'Recent'})?`,
       confirmText: 'Restore Now',
       cancelText: 'Cancel',
       type: 'warning',
@@ -184,7 +202,7 @@ export default function SettingsView() {
         try {
           const snapshot = localStorage.getItem('recall_cloud_backup_snapshot');
           if (!snapshot) {
-            showToast('No cloud backup found on Google Drive. Please create a backup first.', 'error');
+            showToast('No vault snapshot found. Please create a backup first.', 'error');
             setIsRestoring(false);
             return;
           }
@@ -196,7 +214,7 @@ export default function SettingsView() {
           });
           const result = await res.json();
           if (result.success) {
-            showToast('✓ Successfully restored from Google Drive backup!', 'success');
+            showToast('✓ Successfully restored all data from snapshot!', 'success');
             await refreshAll();
           } else {
             showToast('Failed to restore backup.', 'error');
@@ -254,8 +272,10 @@ export default function SettingsView() {
       a.download = `assistance_backup_${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
+      showToast('✓ Exported backup file successfully', 'success');
     } catch (err) {
       console.error('Export failed', err);
+      showToast('Failed to export data', 'error');
     }
   };
 
@@ -284,33 +304,35 @@ export default function SettingsView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-(--bg-primary) text-(--text-primary)">
-      {/* Top Header Bar */}
-      <div className="h-14 px-4 sm:px-6 border-b border-(--border-subtle) flex items-center justify-between shrink-0 bg-(--bg-primary)/95 backdrop-blur-md">
-        <div className="flex items-center gap-2.5 min-w-0">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-(--bg-primary) text-(--text-primary) font-sans">
+      {/* ── Top Header Bar ── */}
+      <div className="h-15 px-4 sm:px-6 border-b border-(--border-subtle) flex items-center justify-between shrink-0 bg-(--bg-card)/70 backdrop-blur-md">
+        <div className="flex items-center gap-3 min-w-0">
           {currentView !== 'main' && (
             <button
               onClick={() => setCurrentView('main')}
-              className="p-1.5 rounded-xl hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer mr-0.5 flex items-center gap-1 text-xs font-semibold shrink-0"
-              title="Back to Settings"
+              className="p-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer mr-0.5 flex items-center gap-1.5 text-xs font-bold shrink-0 border border-(--border-subtle)"
+              title="Back to Settings Hub"
             >
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Settings</span>
             </button>
           )}
-          <div className="w-8 h-8 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-(--text-primary) flex items-center justify-center shadow-2xs shrink-0">
-            <Settings size={16} />
+          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0">
+            <Settings size={18} />
           </div>
           <div className="min-w-0">
-            <h1 className="app-page-title text-sm sm:text-base font-bold truncate">
+            <h1 className="text-base sm:text-lg font-bold tracking-tight text-(--text-primary) truncate">
               {currentView === 'main' && 'System Settings'}
               {currentView === 'profile' && 'Profile & Appearance'}
+              {currentView === 'voice' && 'AI Voice & Audio'}
               {currentView === 'data' && 'Data & Privacy'}
               {currentView === 'backup' && 'Chat & Vault Backup'}
             </h1>
-            <p className="app-page-subtitle text-[11px] text-(--text-muted) truncate">
-              {currentView === 'main' && 'Personal preferences, themes, sync, and storage'}
+            <p className="text-xs text-(--text-secondary) truncate font-medium">
+              {currentView === 'main' && 'Personal preferences, themes, sync, and storage vault'}
               {currentView === 'profile' && 'Manage your personal identity, display name, and color theme'}
+              {currentView === 'voice' && 'Configure AI voice responses and sound alerts'}
               {currentView === 'data' && 'Manage local data backups and privacy storage'}
               {currentView === 'backup' && 'Encrypted device vault & cloud backup sync'}
             </p>
@@ -318,44 +340,47 @@ export default function SettingsView() {
         </div>
 
         {savedSuccess && (
-          <span className="flex items-center gap-1.5 text-xs text-emerald-500 font-semibold animate-in fade-in">
-            <Check size={14} /> Saved successfully
+          <span className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-bold animate-in fade-in bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 shrink-0">
+            <Check size={15} />
+            <span>Saved</span>
           </span>
         )}
       </div>
 
-      {/* Main Settings Body */}
+      {/* ── Main Settings Content ── */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 flex justify-center custom-scrollbar pb-32 sm:pb-36 md:pb-12">
         <div className="w-full max-w-2xl space-y-6">
+
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 1: Main System Settings List Hub (Like iOS / Android)    */}
+          {/* VIEW 1: Main System Settings Hub                              */}
           {/* ───────────────────────────────────────────────────────────── */}
           {currentView === 'main' && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Profile Card Header (Click to open Profile details!) */}
+              
+              {/* User Profile Card Header */}
               <div
                 onClick={() => setCurrentView('profile')}
-                className="p-4 sm:p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 hover:bg-(--bg-elevated) transition-all cursor-pointer shadow-xs flex items-center justify-between group"
+                className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 hover:bg-(--bg-elevated)/60 transition-all cursor-pointer shadow-xs flex items-center justify-between group"
               >
-                <div className="flex items-center gap-3.5 min-w-0">
+                <div className="flex items-center gap-4 min-w-0">
                   <div className="relative shrink-0">
-                    <div className="w-13 h-13 rounded-2xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white font-bold text-xl flex items-center justify-center shadow-md">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white font-bold text-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
                       {user?.name?.[0] ? user.name[0].toUpperCase() : 'U'}
                     </div>
                     <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-(--bg-card)" />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="app-card-title truncate flex items-center gap-1.5">
+                    <h2 className="text-base font-bold text-(--text-primary) truncate group-hover:text-[#4E82EE] transition-colors">
                       {user?.name || 'User Profile'}
                     </h2>
-                    <p className="app-card-subtitle truncate mt-0.5">
-                      Personal display name, profile & theme details
+                    <p className="text-xs text-(--text-secondary) truncate mt-0.5 font-medium">
+                      {user?.email || 'user@assistance.ai'} · Theme: {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs text-[#4E82EE] font-semibold hidden sm:inline group-hover:underline">
+                  <span className="text-xs text-[#4E82EE] font-bold hidden sm:inline group-hover:underline">
                     Edit Profile
                   </span>
                   <ChevronRight size={18} className="text-(--text-muted) group-hover:text-[#4E82EE] transition-colors" />
@@ -363,101 +388,124 @@ export default function SettingsView() {
               </div>
 
               {/* Group 1: Preferences */}
-              <div className="space-y-2">
-                <div className="app-section-title px-2">
-                  Preferences
+              <div className="space-y-2.5">
+                <div className="text-xs font-bold uppercase tracking-wider text-(--text-secondary) px-2">
+                  Preferences & Interface
                 </div>
                 <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) divide-y divide-(--border-subtle) overflow-hidden shadow-xs">
+                  
                   {/* Item 1: Profile & Appearance */}
                   <div
                     onClick={() => setCurrentView('profile')}
                     className="p-4 hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center justify-between group"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
-                        <Palette size={17} />
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0 border border-indigo-500/20">
+                        <Palette size={18} />
                       </div>
                       <div>
-                        <div className="app-card-title">
+                        <div className="text-sm font-bold text-(--text-primary)">
                           Profile & Theme
                         </div>
-                        <div className="app-card-subtitle">
-                          Display name, light/dark appearance ({theme === 'dark' ? 'Dark' : 'Light'})
+                        <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
+                          Display name, appearance & color scheme ({theme === 'dark' ? 'Dark' : 'Light'})
                         </div>
                       </div>
                     </div>
-                    <ChevronRight size={16} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
+                    <ChevronRight size={17} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
+                  </div>
+
+                  {/* Item 2: Audio & Voice */}
+                  <div
+                    onClick={() => setCurrentView('voice')}
+                    className="p-4 hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 border border-amber-500/20">
+                        <Volume2 size={18} />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-(--text-primary)">
+                          AI Voice & Sounds
+                        </div>
+                        <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
+                          Speech synthesis autoplay, alarm tones, and sound alerts
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight size={17} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
                   </div>
                 </div>
               </div>
 
-              {/* Group 2: Data & Storage */}
-              <div className="space-y-2">
-                <div className="app-section-title px-2">
-                  System & Storage
+              {/* Group 2: System & Storage */}
+              <div className="space-y-2.5">
+                <div className="text-xs font-bold uppercase tracking-wider text-(--text-secondary) px-2">
+                  System & Storage Vault
                 </div>
                 <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) divide-y divide-(--border-subtle) overflow-hidden shadow-xs">
-                  {/* Item: Chat & Cloud Backup (Local Vault & Google Drive) */}
+                  
+                  {/* Item: Chat & Cloud Backup */}
                   <div
                     onClick={() => setCurrentView('backup')}
                     className="p-4 hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center justify-between group"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
-                        <Cloud size={17} />
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-500/20">
+                        <Cloud size={18} />
                       </div>
                       <div>
-                        <div className="font-semibold text-xs sm:text-sm text-(--text-primary) flex items-center gap-2">
+                        <div className="font-bold text-sm text-(--text-primary) flex items-center gap-2">
                           <span>Chat & Vault Backup</span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                            {googleToken ? 'Google Drive & Local' : 'Local Vault (Offline)'}
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                            {googleToken ? 'Drive + Local' : 'Local Vault (Free)'}
                           </span>
                         </div>
-                        <div className="text-[11px] text-(--text-muted)">
-                          {lastLocalBackup ? `Last backup: ${lastLocalBackup}` : 'Encrypted vault backup & restore'}
+                        <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
+                          {lastLocalBackup ? `Last snapshot: ${lastLocalBackup}` : 'Encrypted vault backup & recovery'}
                         </div>
                       </div>
                     </div>
-                    <ChevronRight size={16} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
+                    <ChevronRight size={17} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
                   </div>
 
-                  {/* Item 2: Data & Privacy */}
+                  {/* Item: Data & Privacy */}
                   <div
                     onClick={() => setCurrentView('data')}
                     className="p-4 hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center justify-between group"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                        <ShieldCheck size={17} />
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                        <ShieldCheck size={18} />
                       </div>
                       <div>
-                        <div className="font-semibold text-xs sm:text-sm text-(--text-primary)">
-                          Data & Privacy
+                        <div className="font-bold text-sm text-(--text-primary)">
+                          Data & Local Privacy
                         </div>
-                        <div className="text-[11px] text-(--text-muted)">
-                          Download JSON backup, wipe local database
+                        <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
+                          Download portable JSON data, wipe local database
                         </div>
                       </div>
                     </div>
-                    <ChevronRight size={16} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
+                    <ChevronRight size={17} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
                   </div>
 
                   {/* App Info row */}
-                  <div className="p-4 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-2xl bg-[#4E82EE]/10 text-[#4E82EE] flex items-center justify-center shrink-0">
-                        <Sparkles size={17} />
+                  <div className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-2xl bg-[#4E82EE]/10 text-[#4E82EE] flex items-center justify-center shrink-0 border border-[#4E82EE]/20">
+                        <Sparkles size={18} />
                       </div>
                       <div>
-                        <div className="font-semibold text-xs sm:text-sm text-(--text-primary)">
-                          Assistance Personal AI
+                        <div className="font-bold text-sm text-(--text-primary)">
+                          Assistance Personal AI OS
                         </div>
-                        <div className="text-[11px] text-(--text-muted)">
-                          Version 2.5 · Mobile-First OS
+                        <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
+                          Next.js 15 · Offline-First Engine · AES-256 Vault
                         </div>
                       </div>
                     </div>
-                    <span className="text-[11px] px-2.5 py-1 rounded-full bg-(--bg-elevated) text-(--text-secondary) font-mono">
+                    <span className="text-xs px-3 py-1 rounded-full bg-(--bg-elevated) text-(--text-primary) font-mono font-bold border border-(--border-subtle)">
                       v2.5
                     </span>
                   </div>
@@ -467,27 +515,27 @@ export default function SettingsView() {
           )}
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 2: Profile & Theme Detail Sub-Page                       */}
+          {/* VIEW 2: Profile & Theme Sub-Page                              */}
           {/* ───────────────────────────────────────────────────────────── */}
           {currentView === 'profile' && (
-            <form onSubmit={handleSaveSettings} className="space-y-5 animate-in fade-in duration-200">
+            <form onSubmit={handleSaveProfile} className="space-y-5 animate-in fade-in duration-200">
               <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-6">
-                <div className="flex items-center gap-3.5 pb-2 border-b border-(--border-subtle)">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white font-bold text-xl flex items-center justify-center shadow-md">
+                <div className="flex items-center gap-4 pb-4 border-b border-(--border-subtle)">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white font-bold text-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
                     {user?.name?.[0] ? user.name[0].toUpperCase() : 'U'}
                   </div>
                   <div>
-                    <h3 className="app-card-title">
+                    <h3 className="text-base font-bold text-(--text-primary)">
                       {user?.name || 'User Profile'}
                     </h3>
-                    <p className="app-card-subtitle">
-                      Personal AI identity & display name
+                    <p className="text-xs text-(--text-secondary) font-medium mt-0.5">
+                      Personal display name & interface theme
                     </p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-(--text-secondary) uppercase tracking-wider">
+                  <label className="block text-xs font-bold text-(--text-secondary) uppercase tracking-wider">
                     Display Name
                   </label>
                   <input
@@ -496,49 +544,49 @@ export default function SettingsView() {
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter your name..."
                     required
-                    className="w-full px-4 py-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-sm text-(--text-primary) focus:outline-hidden focus:border-[#4E82EE] transition-all font-medium"
+                    className="w-full px-4 py-3 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-sm font-semibold text-(--text-primary) focus:outline-hidden focus:border-[#4E82EE] transition-all"
                   />
                 </div>
 
                 {/* Theme Selector */}
                 <div className="space-y-3 pt-2">
-                  <label className="block text-xs font-semibold text-(--text-secondary) uppercase tracking-wider">
+                  <label className="block text-xs font-bold text-(--text-secondary) uppercase tracking-wider">
                     Color Theme Mode
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => setTheme('dark')}
-                      className={`p-4 rounded-2xl border flex items-center gap-3 transition-all cursor-pointer ${
+                      className={`p-4 rounded-2xl border flex items-center gap-3.5 transition-all cursor-pointer ${
                         theme === 'dark'
-                          ? 'border-[#4E82EE] bg-[#4E82EE]/10 ring-2 ring-[#4E82EE]/20 shadow-xs'
+                          ? 'border-[#4E82EE] bg-[#4E82EE]/10 ring-2 ring-[#4E82EE]/30 shadow-md'
                           : 'border-(--border-subtle) bg-(--bg-elevated) hover:border-(--border-subtle)/80'
                       }`}
                     >
-                      <div className="w-8 h-8 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-slate-100 shrink-0">
-                        <Moon size={16} />
+                      <div className="w-9 h-9 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-slate-100 shrink-0">
+                        <Moon size={18} />
                       </div>
                       <div className="text-left min-w-0">
                         <div className="text-xs font-bold text-(--text-primary)">Dark Mode</div>
-                        <div className="text-[10px] text-(--text-muted) truncate">High contrast night mode</div>
+                        <div className="text-[11px] text-(--text-secondary) font-medium truncate">Night contrast mode</div>
                       </div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setTheme('light')}
-                      className={`p-4 rounded-2xl border flex items-center gap-3 transition-all cursor-pointer ${
+                      className={`p-4 rounded-2xl border flex items-center gap-3.5 transition-all cursor-pointer ${
                         theme === 'light'
-                          ? 'border-[#4E82EE] bg-[#4E82EE]/10 ring-2 ring-[#4E82EE]/20 shadow-xs'
+                          ? 'border-[#4E82EE] bg-[#4E82EE]/10 ring-2 ring-[#4E82EE]/30 shadow-md'
                           : 'border-(--border-subtle) bg-(--bg-elevated) hover:border-(--border-subtle)/80'
                       }`}
                     >
-                      <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700 shrink-0">
-                        <Sun size={16} />
+                      <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-700 shrink-0">
+                        <Sun size={18} />
                       </div>
                       <div className="text-left min-w-0">
                         <div className="text-xs font-bold text-(--text-primary)">Light Mode</div>
-                        <div className="text-[10px] text-(--text-muted) truncate">Clean modern bright mode</div>
+                        <div className="text-[11px] text-(--text-secondary) font-medium truncate">Clean bright mode</div>
                       </div>
                     </button>
                   </div>
@@ -557,7 +605,7 @@ export default function SettingsView() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-6 py-2.5 rounded-xl bg-(--accent) text-(--accent-contrast) hover:opacity-90 font-semibold text-sm transition-all cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] text-white hover:opacity-95 font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-md shadow-blue-500/20 disabled:opacity-50 flex items-center gap-2"
                 >
                   {isSaving ? <span>Saving...</span> : <><span>Save Profile</span><Check size={16} /></>}
                 </button>
@@ -566,64 +614,153 @@ export default function SettingsView() {
           )}
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 3: Chat & Cloud Backup Detail Sub-Page                   */}
+          {/* VIEW 3: AI Voice & Sound Preferences                         */}
+          {/* ───────────────────────────────────────────────────────────── */}
+          {currentView === 'voice' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-5">
+                <div className="flex items-center gap-3.5 pb-4 border-b border-(--border-subtle)">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20">
+                    <Volume2 size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-(--text-primary)">
+                      AI Voice & Sound Settings
+                    </h3>
+                    <p className="text-xs text-(--text-secondary) font-medium mt-0.5">
+                      Configure live speech synthesis and audio notification tones
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {/* Voice Autoread toggle */}
+                  <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center justify-between gap-4">
+                    <div>
+                      <div className="font-bold text-xs sm:text-sm text-(--text-primary)">
+                        Voice Auto-Read Responses
+                      </div>
+                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
+                        Automatically read assistant answers aloud using Web Speech Synthesis
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={voiceAutoRead}
+                        onChange={async (e) => {
+                          const val = e.target.checked;
+                          setVoiceAutoRead(val);
+                          await updateUserPreferences({ voiceAutoRead: val });
+                          showToast(val ? '✓ Voice Auto-Read enabled' : 'Voice Auto-Read disabled', 'info');
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-6 bg-gray-300 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#4E82EE] dark:bg-gray-700" />
+                    </label>
+                  </div>
+
+                  {/* Sound Effects toggle */}
+                  <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center justify-between gap-4">
+                    <div>
+                      <div className="font-bold text-xs sm:text-sm text-(--text-primary)">
+                        Interface & Timer Sound Alerts
+                      </div>
+                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
+                        Play chime audio when focus timer expires or alarms trigger
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={soundEffects}
+                        onChange={async (e) => {
+                          const val = e.target.checked;
+                          setSoundEffects(val);
+                          await updateUserPreferences({ soundEffects: val });
+                          showToast(val ? '✓ Sound effects enabled' : 'Sound effects disabled', 'info');
+                        }}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-6 bg-gray-300 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#4E82EE] dark:bg-gray-700" />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Back button */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView('main')}
+                  className="px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
+                >
+                  Back to Settings
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ───────────────────────────────────────────────────────────── */}
+          {/* VIEW 4: Chat & Cloud Backup Sub-Page                         */}
           {/* ───────────────────────────────────────────────────────────── */}
           {currentView === 'backup' && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              {/* Informative Header Banner */}
-              <div className="p-4 sm:p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) text-xs space-y-2.5 shadow-2xs">
+              
+              {/* Informative Header Banner with Clean Contrast */}
+              <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) space-y-3 shadow-xs">
                 <div className="font-bold text-sm flex items-center gap-2.5 text-(--text-primary)">
-                  <div className="w-7 h-7 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-500/20">
-                    <Cloud size={16} />
+                  <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0 border border-teal-500/20">
+                    <Cloud size={17} />
                   </div>
                   <span>How Backup & Recovery Works</span>
                 </div>
                 <ul className="list-disc pl-5 space-y-2 text-xs leading-relaxed text-(--text-secondary)">
                   <li>
-                    <strong className="text-(--text-primary) font-semibold">Local Device Vault (Default & 100% Free):</strong> Your data is stored securely right here on your device storage without requiring any external API key. You can download or restore portable <code className="px-1.5 py-0.5 rounded-md bg-(--bg-elevated) font-mono text-[11px] text-(--text-primary) border border-(--border-subtle)">.json</code> backup files anytime.
+                    <strong className="text-(--text-primary) font-bold">Local Device Vault (100% Free & Offline):</strong> Your data is stored securely in your device browser and memory without requiring external API keys. You can also export portable <code className="px-1.5 py-0.5 rounded-md bg-(--bg-elevated) font-mono text-[11px] text-(--text-primary) border border-(--border-subtle)">.json</code> files anytime.
                   </li>
                   <li>
-                    <strong className="text-(--text-primary) font-semibold">Google Drive Cloud Sync (Optional):</strong> If you want to automatically sync and encrypt backups to your personal Google Drive, you can provide an optional Google OAuth Token below.
+                    <strong className="text-(--text-primary) font-bold">Google Drive Cloud Sync (Optional):</strong> Automatically encrypt and sync your backup snapshots to your private Google Drive account by saving your Google OAuth token below.
                   </li>
                 </ul>
               </div>
 
-              {/* ── Last Backup Card ── */}
-              <div className="p-4 sm:p-5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-(--border-subtle)/50">
-                  <div className="text-xs font-bold uppercase tracking-wider text-(--text-muted)">
+              {/* Backup Status Metrics Card */}
+              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-4 shadow-xs">
+                <div className="flex items-center justify-between pb-3 border-b border-(--border-subtle)">
+                  <div className="text-xs font-bold uppercase tracking-wider text-(--text-secondary)">
                     Backup Status
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span>{googleToken ? 'Drive + Local Ready' : 'Local Vault Active'}</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3 rounded-xl bg-(--bg-card) border border-(--border-subtle)/50">
-                    <div className="text-(--text-muted) text-[11px]">Local Device Snapshot:</div>
-                    <div className="font-semibold text-(--text-primary) mt-0.5">{lastLocalBackup || 'Today, 2:00 AM'}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle)">
+                    <div className="text-(--text-secondary) text-xs font-semibold">Local Device Snapshot:</div>
+                    <div className="font-bold text-sm text-(--text-primary) mt-1">{lastLocalBackup || 'Today, 2:00 AM'}</div>
                   </div>
-                  <div className="p-3 rounded-xl bg-(--bg-card) border border-(--border-subtle)/50">
-                    <div className="text-(--text-muted) text-[11px]">Google Drive Cloud:</div>
-                    <div className="font-semibold text-(--text-primary) mt-0.5">
+                  <div className="p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle)">
+                    <div className="text-(--text-secondary) text-xs font-semibold">Google Drive Cloud:</div>
+                    <div className="font-bold text-sm text-(--text-primary) mt-1">
                       {lastDriveBackup ? lastDriveBackup : (googleToken ? 'Ready to sync' : 'Offline / Optional')}
                     </div>
                   </div>
-                  <div className="p-3 rounded-xl bg-(--bg-card) border border-(--border-subtle)/50">
-                    <div className="text-(--text-muted) text-[11px]">Vault Archive Size:</div>
-                    <div className="font-semibold text-(--text-primary) mt-0.5">{backupSize}</div>
+                  <div className="p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle)">
+                    <div className="text-(--text-secondary) text-xs font-semibold">Vault Archive Size:</div>
+                    <div className="font-bold text-sm text-(--text-primary) mt-1">{backupSize}</div>
                   </div>
                 </div>
 
-                {/* Prominent BACK UP button */}
+                {/* Big BACK UP NOW button */}
                 <div className="pt-2">
                   <button
                     type="button"
                     disabled={isBackingUp}
                     onClick={handlePerformBackup}
-                    className={`w-full py-3 px-4 rounded-2xl font-bold text-xs sm:text-sm text-white transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
+                    className={`w-full py-3.5 px-4 rounded-2xl font-bold text-sm text-white transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
                       isBackingUp
                         ? 'bg-emerald-600/70 cursor-not-allowed'
                         : 'bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] shadow-emerald-600/25'
@@ -631,27 +768,26 @@ export default function SettingsView() {
                   >
                     {isBackingUp ? (
                       <>
-                        <RefreshCw size={16} className="animate-spin" />
+                        <RefreshCw size={17} className="animate-spin" />
                         <span>{backupStatusText || 'Backing up vault...'}</span>
                       </>
                     ) : (
                       <>
-                        <CloudUpload size={17} />
+                        <CloudUpload size={18} />
                         <span>BACK UP NOW</span>
                       </>
                     )}
                   </button>
 
-                  {/* Progress bar if backing up */}
                   {isBackingUp && (
                     <div className="mt-3 space-y-1.5 animate-in fade-in">
-                      <div className="w-full bg-(--bg-card) h-2 rounded-full overflow-hidden border border-(--border-subtle)">
+                      <div className="w-full bg-(--bg-elevated) h-2.5 rounded-full overflow-hidden border border-(--border-subtle)">
                         <div
                           className="bg-emerald-500 h-full transition-all duration-300 rounded-full"
                           style={{ width: `${backupProgress}%` }}
                         />
                       </div>
-                      <div className="flex justify-between text-[11px] text-(--text-muted)">
+                      <div className="flex justify-between text-xs text-(--text-secondary) font-mono">
                         <span>{backupStatusText}</span>
                         <span>{backupProgress}%</span>
                       </div>
@@ -660,18 +796,19 @@ export default function SettingsView() {
                 </div>
               </div>
 
-              {/* ── Storage & Security Preferences ── */}
+              {/* Storage & Security Settings */}
               <div className="space-y-3">
-                <div className="text-xs font-bold uppercase tracking-wider text-(--text-muted) px-1">
+                <div className="text-xs font-bold uppercase tracking-wider text-(--text-secondary) px-2">
                   Storage & Security Settings
                 </div>
 
-                <div className="rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) divide-y divide-(--border-subtle) text-xs">
+                <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) divide-y divide-(--border-subtle) shadow-xs overflow-hidden">
+                  
                   {/* Account Name */}
-                  <div className="p-3.5 flex items-center justify-between gap-3">
+                  <div className="p-4 flex items-center justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-(--text-primary)">Vault Owner Account</div>
-                      <div className="text-[11px] text-(--text-muted)">{googleAccount || 'user@assistance.ai'}</div>
+                      <div className="font-bold text-sm text-(--text-primary)">Vault Owner Account</div>
+                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">{googleAccount || 'user@assistance.ai'}</div>
                     </div>
                     <button
                       type="button"
@@ -683,22 +820,22 @@ export default function SettingsView() {
                           showToast(`✓ Account updated to ${newAcc.trim()}`, 'success');
                         }
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE] text-[11px] font-semibold text-(--text-primary) transition-all cursor-pointer"
+                      className="px-3.5 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:border-[#4E82EE] text-xs font-bold text-(--text-primary) transition-all cursor-pointer"
                     >
                       Change Account
                     </button>
                   </div>
 
                   {/* Optional Google Drive OAuth Token */}
-                  <div className="p-3.5 space-y-2">
+                  <div className="p-4 space-y-2.5">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="font-semibold text-(--text-primary) flex items-center gap-1.5">
-                          <Cloud size={14} className="text-teal-500" />
+                        <div className="font-bold text-sm text-(--text-primary) flex items-center gap-1.5">
+                          <Cloud size={15} className="text-teal-500" />
                           <span>Google Drive OAuth Token (Optional)</span>
                         </div>
-                        <div className="text-[11px] text-(--text-muted)">
-                          Leave empty to use 100% offline local device storage
+                        <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
+                          Leave empty to use 100% offline local device vault
                         </div>
                       </div>
                     </div>
@@ -708,26 +845,26 @@ export default function SettingsView() {
                         value={googleToken}
                         onChange={(e) => setGoogleToken(e.target.value)}
                         placeholder="Optional Google OAuth Access Token (Bearer ya29...)"
-                        className="flex-1 px-3 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-xs font-mono text-(--text-primary) placeholder:text-(--text-muted) focus:outline-hidden focus:border-teal-500"
+                        className="flex-1 px-3.5 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-mono text-(--text-primary) placeholder:text-(--text-muted) focus:outline-hidden focus:border-teal-500"
                       />
                       <button
                         type="button"
                         onClick={() => {
                           localStorage.setItem('recall_google_drive_token', googleToken.trim());
-                          showToast(googleToken.trim() ? '✓ Google Drive Token saved!' : 'Switched to Local Vault Offline Mode', 'info');
+                          showToast(googleToken.trim() ? '✓ Google Drive Token saved!' : 'Switched to Local Vault Mode', 'info');
                         }}
-                        className="px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs transition-colors cursor-pointer shrink-0"
+                        className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-colors cursor-pointer shrink-0"
                       >
                         Save
                       </button>
                     </div>
                   </div>
 
-                  {/* Frequency */}
-                  <div className="p-3.5 flex items-center justify-between gap-3">
+                  {/* Auto-Backup Frequency */}
+                  <div className="p-4 flex items-center justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-(--text-primary)">Auto-Backup Schedule</div>
-                      <div className="text-[11px] text-(--text-muted)">Automatic background snapshot interval</div>
+                      <div className="font-bold text-sm text-(--text-primary)">Auto-Backup Schedule</div>
+                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">Automatic background snapshot interval</div>
                     </div>
                     <select
                       value={backupFrequency}
@@ -736,7 +873,7 @@ export default function SettingsView() {
                         localStorage.setItem('recall_backup_freq', e.target.value);
                         showToast(`✓ Backup frequency: ${e.target.value}`, 'info');
                       }}
-                      className="px-2.5 py-1.5 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-[11px] font-semibold text-(--text-primary) cursor-pointer focus:outline-hidden"
+                      className="px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-bold text-(--text-primary) cursor-pointer focus:outline-hidden"
                     >
                       <option value="daily">Daily</option>
                       <option value="weekly">Weekly</option>
@@ -747,75 +884,73 @@ export default function SettingsView() {
                   </div>
 
                   {/* End-to-end encryption */}
-                  <div className="p-3.5 flex items-center justify-between gap-3">
+                  <div className="p-4 flex items-center justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-(--text-primary) flex items-center gap-1.5">
-                        <Lock size={13} className="text-emerald-500" />
-                        <span>End-to-end encrypted backup (AES-256)</span>
+                      <div className="font-bold text-sm text-(--text-primary) flex items-center gap-1.5">
+                        <Lock size={14} className="text-emerald-500" />
+                        <span>End-to-End Encryption (AES-256)</span>
                       </div>
-                      <div className="text-[11px] text-(--text-muted)">
+                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
                         Protects your memories, ledger & chats with strong encryption
                       </div>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
                       <input
                         type="checkbox"
                         checked={e2eeEnabled}
                         onChange={(e) => {
                           setE2eeEnabled(e.target.checked);
                           localStorage.setItem('recall_backup_e2ee', String(e.target.checked));
-                          showToast(e.target.checked ? '✓ E2EE encryption enabled' : 'E2EE encryption disabled', 'info');
+                          showToast(e.target.checked ? '✓ AES-256 encryption enabled' : 'Encryption disabled', 'info');
                         }}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-gray-300 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500 dark:bg-gray-700" />
+                      <div className="w-10 h-6 bg-gray-300 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 dark:bg-gray-700" />
                     </label>
                   </div>
                 </div>
               </div>
 
-              {/* ── Restore & Disaster Recovery ── */}
+              {/* Disaster Recovery & Restore */}
               <div className="space-y-3">
-                <div className="text-xs font-bold uppercase tracking-wider text-(--text-muted) px-1">
+                <div className="text-xs font-bold uppercase tracking-wider text-(--text-secondary) px-2">
                   Restore & Disaster Recovery
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Restore from Local Snapshot */}
-                  <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex flex-col justify-between gap-3">
+                  <div className="p-4 sm:p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) flex flex-col justify-between gap-3 shadow-xs">
                     <div>
-                      <div className="font-bold text-xs text-(--text-primary) flex items-center gap-1.5">
-                        <RefreshCw size={14} className="text-[#4E82EE]" />
-                        <span>Restore from Vault Snapshot</span>
+                      <div className="font-bold text-sm text-(--text-primary) flex items-center gap-1.5">
+                        <RefreshCw size={15} className="text-[#4E82EE]" />
+                        <span>Restore Vault Snapshot</span>
                       </div>
-                      <div className="text-[11px] text-(--text-muted) mt-1">
-                        Restore from your latest device vault snapshot ({lastLocalBackup || 'Available'})
+                      <div className="text-xs text-(--text-secondary) font-medium mt-1">
+                        Restore from your latest snapshot ({lastLocalBackup || 'Available'})
                       </div>
                     </div>
                     <button
                       type="button"
                       disabled={isRestoring}
                       onClick={handleRestoreFromDrive}
-                      className="w-full py-2 px-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE] text-xs font-semibold text-(--text-primary) transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="w-full py-2.5 px-3 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:border-[#4E82EE] text-xs font-bold text-(--text-primary) transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
-                      {isRestoring ? <RefreshCw size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                      {isRestoring ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                       <span>Restore Snapshot</span>
                     </button>
                   </div>
 
-                  {/* Restore from JSON File */}
-                  <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex flex-col justify-between gap-3">
+                  <div className="p-4 sm:p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) flex flex-col justify-between gap-3 shadow-xs">
                     <div>
-                      <div className="font-bold text-xs text-(--text-primary) flex items-center gap-1.5">
-                        <FileJson size={14} className="text-amber-500" />
+                      <div className="font-bold text-sm text-(--text-primary) flex items-center gap-1.5">
+                        <FileJson size={15} className="text-amber-500" />
                         <span>Restore from JSON File</span>
                       </div>
-                      <div className="text-[11px] text-(--text-muted) mt-1">
-                        Import an exported JSON backup file from your device disk
+                      <div className="text-xs text-(--text-secondary) font-medium mt-1">
+                        Import an exported JSON backup file from disk
                       </div>
                     </div>
-                    <label className="w-full py-2 px-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500 text-xs font-semibold text-(--text-primary) transition-all flex items-center justify-center gap-1.5 cursor-pointer">
-                      <Upload size={13} />
+                    <label className="w-full py-2.5 px-3 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:border-amber-500 text-xs font-bold text-(--text-primary) transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                      <Upload size={14} />
                       <span>Select Backup File</span>
                       <input
                         type="file"
@@ -827,24 +962,23 @@ export default function SettingsView() {
                   </div>
                 </div>
 
-                {/* Direct Offline Download button */}
-                <div className="p-3.5 rounded-2xl bg-(--bg-elevated)/60 border border-(--border-subtle) flex items-center justify-between gap-3 text-xs">
+                <div className="p-4 rounded-2xl bg-(--bg-card) border border-(--border-subtle) flex items-center justify-between gap-3 text-xs shadow-xs">
                   <div>
-                    <div className="font-semibold text-(--text-primary)">Export Portable JSON Backup</div>
-                    <div className="text-[11px] text-(--text-muted)">Download a full offline copy of all your memories, tasks, and data</div>
+                    <div className="font-bold text-sm text-(--text-primary)">Export Portable JSON Backup</div>
+                    <div className="text-xs text-(--text-secondary) font-medium mt-0.5">Download a full offline copy of all your memories, tasks, and data</div>
                   </div>
                   <button
                     type="button"
                     onClick={handleExportData}
-                    className="px-3.5 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE] text-[11px] font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
+                    className="px-4 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) hover:border-[#4E82EE] text-xs font-bold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5 shrink-0 shadow-2xs"
                   >
-                    <Download size={13} />
+                    <Download size={14} />
                     <span>Download .JSON</span>
                   </button>
                 </div>
               </div>
 
-              {/* Footer Back Button */}
+              {/* Back to Settings */}
               <div className="pt-2">
                 <button
                   type="button"
@@ -858,20 +992,20 @@ export default function SettingsView() {
           )}
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 4: Data & Privacy Sub-Page                              */}
+          {/* VIEW 5: Data & Local Privacy Sub-Page                         */}
           {/* ───────────────────────────────────────────────────────────── */}
           {currentView === 'data' && (
             <div className="space-y-6 animate-in fade-in duration-200">
-              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-4">
-                <div className="flex items-center gap-3 pb-3 border-b border-(--border-subtle)">
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-5">
+                <div className="flex items-center gap-3.5 pb-4 border-b border-(--border-subtle)">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
                     <ShieldCheck size={20} />
                   </div>
                   <div>
-                    <h3 className="app-card-title">
+                    <h3 className="text-base font-bold text-(--text-primary)">
                       Data & Local Privacy
                     </h3>
-                    <p className="app-card-subtitle">
+                    <p className="text-xs text-(--text-secondary) font-medium mt-0.5">
                       Manage your offline database, downloads, and storage wipe
                     </p>
                   </div>
@@ -880,37 +1014,37 @@ export default function SettingsView() {
                 <div className="space-y-3">
                   <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-xs text-(--text-primary)">Export All Data (.json)</div>
-                      <div className="text-[11px] text-(--text-muted)">Save a local copy of all memories, tasks, and goals</div>
+                      <div className="font-bold text-sm text-(--text-primary)">Export All Data (.json)</div>
+                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">Save a local copy of all memories, tasks, and goals</div>
                     </div>
                     <button
                       type="button"
                       onClick={handleExportData}
-                      className="px-3.5 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE] text-xs font-semibold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5"
+                      className="px-4 py-2 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE] text-xs font-bold text-(--text-primary) transition-all cursor-pointer flex items-center gap-1.5"
                     >
-                      <Download size={13} />
+                      <Download size={14} />
                       <span>Export</span>
                     </button>
                   </div>
 
                   <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-xs text-rose-500">Wipe Local Database</div>
-                      <div className="text-[11px] text-(--text-muted)">Permanently erase all local memories, tasks, and history</div>
+                      <div className="font-bold text-sm text-rose-600 dark:text-rose-400">Wipe Local Database</div>
+                      <div className="text-xs text-(--text-secondary) font-medium mt-0.5">Permanently erase all local memories, tasks, and history</div>
                     </div>
                     <button
                       type="button"
                       onClick={handleWipeData}
-                      className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                      className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={14} />
                       <span>Wipe All</span>
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Footer Back Button */}
+              {/* Back to Settings */}
               <div className="pt-2">
                 <button
                   type="button"
@@ -922,6 +1056,7 @@ export default function SettingsView() {
               </div>
             </div>
           )}
+
         </div>
       </div>
     </div>

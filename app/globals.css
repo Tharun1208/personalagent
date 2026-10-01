@@ -21,11 +21,11 @@
     --bg-elevated: #e9eef6;
     --bg-bubble-user: #f0f4f9;
     --bg-composer: #f0f4f9;
-    --text-primary: #1f1f1f;
-    --text-secondary: #444746;
-    --text-muted: #727775;
-    --border-subtle: #e3e3e3;
-    --border-medium: #c4c7c5;
+    --text-primary: #111827;
+    --text-secondary: #374151;
+    --text-muted: #6b7280;
+    --border-subtle: #e5e7eb;
+    --border-medium: #d1d5db;
     --border-composer: #d3d7dc;
     --accent: #1a73e8;
     --accent-hover: #1557b0;
@@ -51,9 +51,9 @@
     --bg-elevated: #282a2c;
     --bg-bubble-user: #282a2c;
     --bg-composer: #1e1f20;
-    --text-primary: #e3e3e3;
-    --text-secondary: #c4c7c5;
-    --text-muted: #8e918f;
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
     --border-subtle: #282a2c;
     --border-medium: #3c4043;
     --border-composer: #3c4043;
@@ -189,21 +189,21 @@
 
   .app-page-subtitle {
     font-family: var(--font-ibm-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: 0.6875rem; /* 11px */
+    font-size: 0.75rem; /* 12px */
     font-weight: 500;
-    color: var(--text-muted);
+    color: var(--text-secondary);
   }
 
   @media (min-width: 640px) {
     .app-page-subtitle {
-      font-size: 0.75rem; /* 12px */
+      font-size: 0.8125rem; /* 13px */
     }
   }
 
   .app-card-subtitle {
-    font-size: 0.6875rem; /* 11px */
-    font-weight: 400;
-    color: var(--text-muted);
+    font-size: 0.75rem; /* 12px */
+    font-weight: 500;
+    color: var(--text-secondary);
   }
 
   .app-modal-title {
