@@ -42,6 +42,24 @@ export type AppTab =
   | 'apps'
   | 'settings';
 
+export const VALID_TABS: AppTab[] = [
+  'chat',
+  'calendar',
+  'habits',
+  'tasks',
+  'reminders',
+  'goals',
+  'ledger',
+  'actions',
+  'dashboard',
+  'apps',
+  'settings',
+];
+
+export function isValidTab(tab: any): tab is AppTab {
+  return typeof tab === 'string' && VALID_TABS.includes(tab as AppTab);
+}
+
 interface AppContextType {
   user: User | null;
   isGuest: boolean;
@@ -189,7 +207,49 @@ const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(getInitialUser);
   const [theme, setThemeState] = useState<'light' | 'dark'>('light');
-  const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
+  const [activeTab, setActiveTabState] = useState<AppTab>('dashboard');
+
+  const setActiveTab = useCallback((tab: AppTab) => {
+    if (!isValidTab(tab)) return;
+    setActiveTabState((prev) => {
+      if (prev === tab) return prev;
+      if (typeof window !== 'undefined') {
+        const targetUrl = tab === 'dashboard' ? window.location.pathname : `${window.location.pathname}#${tab}`;
+        window.history.pushState({ tab }, '', targetUrl);
+      }
+      return tab;
+    });
+  }, []);
+
+  // Synchronize Mobile Hardware/System Back Button & Browser History
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Handle initial route on app launch
+    const hash = window.location.hash.replace('#', '') as AppTab;
+    const initialTab: AppTab = isValidTab(hash) ? hash : 'dashboard';
+    setActiveTabState(initialTab);
+
+    const initialUrl = initialTab === 'dashboard' ? window.location.pathname : `${window.location.pathname}#${initialTab}`;
+    window.history.replaceState({ tab: initialTab, isInitial: true }, '', initialUrl);
+
+    const handlePopState = (event: PopStateEvent) => {
+      const stateTab = event.state?.tab;
+      const currentHash = window.location.hash.replace('#', '') as AppTab;
+
+      let targetTab: AppTab = 'dashboard';
+      if (isValidTab(stateTab)) {
+        targetTab = stateTab;
+      } else if (isValidTab(currentHash)) {
+        targetTab = currentHash;
+      }
+
+      setActiveTabState(targetTab);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [conversations, setConversations] = useState<Conversation[]>(() => getInitialList<Conversation>('recall_conversations'));
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -411,7 +471,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setActiveConversationId(null);
     setMessages([]);
     setActiveTab('chat');
-  }, []);
+  }, [setActiveTab]);
 
   // Global Keyboard shortcuts: Ctrl+K (Search) & Alt+N / Cmd+N (New Chat)
   useEffect(() => {
