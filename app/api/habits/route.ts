@@ -44,11 +44,22 @@ export async function PATCH(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const { id } = body;
+  const { id, title, frequency, streak, toggle } = body;
 
   if (!id) return NextResponse.json({ error: 'ID is required' }, { status: 400 });
 
-  const updated = db.toggleHabit(id, user.id);
+  if (toggle || (title === undefined && frequency === undefined && streak === undefined)) {
+    const updated = db.toggleHabit(id, user.id);
+    if (!updated) return NextResponse.json({ error: 'Habit not found' }, { status: 404 });
+    return NextResponse.json({ habit: updated });
+  }
+
+  const patch: Partial<Habit> = {};
+  if (title !== undefined) patch.title = title.trim();
+  if (frequency !== undefined) patch.frequency = frequency;
+  if (streak !== undefined) patch.streak = Number(streak);
+
+  const updated = db.updateHabit(id, user.id, patch);
   if (!updated) return NextResponse.json({ error: 'Habit not found' }, { status: 404 });
 
   return NextResponse.json({ habit: updated });

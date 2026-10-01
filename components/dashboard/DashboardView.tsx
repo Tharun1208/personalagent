@@ -323,8 +323,11 @@ export default function DashboardView() {
                 <span className="font-bold text-[11px] sm:text-xs truncate">Today Spend</span>
                 <DollarSign size={15} className="text-emerald-500" />
               </div>
-              <div>
-                <p className="text-xl sm:text-2xl font-black text-emerald-500 font-cutive truncate">₹{todaySpendingTotal.toLocaleString('en-IN')}</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-lg sm:text-xl font-bold text-emerald-500/80">₹</span>
+                <p className="text-xl sm:text-2xl font-black text-emerald-500 truncate tracking-tight">
+                  {todaySpendingTotal.toLocaleString('en-IN')}
+                </p>
               </div>
               <p className="text-[10px] text-(--text-muted) truncate font-medium">Month: ₹{monthSpendingTotal.toLocaleString('en-IN')}</p>
             </div>
@@ -338,9 +341,12 @@ export default function DashboardView() {
                 <span className="font-bold text-[11px] sm:text-xs truncate">Net Dues</span>
                 <HandCoins size={15} className="text-indigo-500" />
               </div>
-              <div>
-                <p className={`text-xl sm:text-2xl font-black font-cutive truncate ${duesStats.net >= 0 ? 'text-[#4E82EE]' : 'text-rose-500'}`}>
-                  {duesStats.net >= 0 ? '+' : ''}₹{duesStats.net.toLocaleString('en-IN')}
+              <div className="flex items-baseline gap-1">
+                <span className={`text-lg sm:text-xl font-bold ${duesStats.net >= 0 ? 'text-[#4E82EE]/80' : 'text-rose-500/80'}`}>
+                  {duesStats.net >= 0 ? '+' : ''}₹
+                </span>
+                <p className={`text-xl sm:text-2xl font-black truncate tracking-tight ${duesStats.net >= 0 ? 'text-[#4E82EE]' : 'text-rose-500'}`}>
+                  {Math.abs(duesStats.net).toLocaleString('en-IN')}
                 </p>
               </div>
               <p className="text-[10px] text-(--text-muted) truncate font-medium">{duesStats.pendingCount} active dues</p>

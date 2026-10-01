@@ -343,10 +343,12 @@ function DailySpendingPanel({ currency }: { currency: string }) {
           <p className="text-xs text-(--text-muted) font-semibold uppercase tracking-wider">
             {spendingView === 'monthly' ? `${MONTH_NAMES[reportMonth]} ${reportYear} Total` : "Today's Spending"}
           </p>
-          <p className="text-3xl font-bold text-(--text-primary) tracking-tight font-cutive">
-            {currency}
-            {(spendingView === 'monthly' ? monthTotal : todayTotal).toLocaleString('en-IN')}
-          </p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold text-[#4E82EE]">{currency}</span>
+            <span className="text-3xl font-extrabold text-(--text-primary) tracking-tight">
+              {(spendingView === 'monthly' ? monthTotal : todayTotal).toLocaleString('en-IN')}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -1130,7 +1132,20 @@ function DailySpendingPanel({ currency }: { currency: string }) {
               </div>
 
               {/* Buttons */}
-              <div className="flex gap-2 pt-1">
+              <div className="flex items-center gap-2 pt-1">
+                {editId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleDelete(editId);
+                      setShowForm(false);
+                    }}
+                    className="p-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 font-semibold text-sm cursor-pointer transition-colors flex items-center justify-center shrink-0"
+                    title="Delete this expense"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
@@ -1486,7 +1501,7 @@ export default function LedgerView() {
 
                         <div className="text-right shrink-0">
                           <div
-                            className={`text-xl sm:text-2xl font-black font-cutive ${
+                            className={`text-xl sm:text-2xl font-black flex items-baseline justify-end gap-0.5 tracking-tight ${
                               isSettled
                                 ? 'text-(--text-muted) line-through'
                                 : isGive
@@ -1494,7 +1509,9 @@ export default function LedgerView() {
                                 : 'text-emerald-500'
                             }`}
                           >
-                            {isGive ? '-' : '+'}{entry.currency}{entry.amount.toLocaleString('en-IN')}
+                            <span>{isGive ? '-' : '+'}</span>
+                            <span className="text-lg opacity-85">{entry.currency}</span>
+                            <span>{entry.amount.toLocaleString('en-IN')}</span>
                           </div>
                         </div>
                       </div>

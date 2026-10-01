@@ -1037,6 +1037,17 @@ export const db = {
     return habit;
   },
 
+  updateHabit(id: string, userId: string, patch: Partial<Habit>): Habit | null {
+    const data = ensureDbFile();
+    data.habits = data.habits || [];
+    const idx = data.habits.findIndex((h) => h.id === id && h.userId === userId);
+    if (idx === -1) return null;
+    data.habits[idx] = { ...data.habits[idx], ...patch };
+    persistDb();
+    persistDocs('habits', data.habits[idx]);
+    return data.habits[idx];
+  },
+
   deleteHabit(id: string, userId: string): boolean {
     const data = ensureDbFile();
     data.habits = data.habits || [];
