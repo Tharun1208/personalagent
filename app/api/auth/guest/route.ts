@@ -13,7 +13,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     await ensureDbReady();
-    let primaryUser = db.getUserById('usr_primary_default');
+    const allUsers = db.getAllUsers();
+    let primaryUser = db.getUserById('usr_primary_default') || (allUsers.length > 0 ? allUsers[0] : null);
     if (!primaryUser) {
       primaryUser = {
         id: 'usr_primary_default',

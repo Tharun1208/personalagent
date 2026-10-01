@@ -5,6 +5,7 @@ import { routeLLMRequest } from './providers/router';
 import { processAllAttachments } from './fileAnalyzer';
 import { Message, ToolExecutionStep, Memory, AgentAction } from '@/types';
 import { FuzzyMatcher } from '@/lib/dsa/FuzzyMatcher';
+import { getHolidayForDate, getUpcomingHolidays, getHolidaysForYear, isGovernmentHoliday } from '@/lib/calendar/holidays';
 
 export interface AgentRunParams {
   userId: string;
@@ -919,8 +920,21 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       return { reply: res.message, toolSteps };
     }
 
-    // Task querying (e.g., "what are the pending task", "show my tasks", "pending tasks", "any todos", etc.)
+    // Task querying (e.g., "what are the pending task is", "tell that what are the pending task", "show my tasks", "pending tasks", "existing tasks", etc.)
     const isTaskQuery =
+      lower.includes('pending task') ||
+      lower.includes('pending tasks') ||
+      lower.includes('existing task') ||
+      lower.includes('existing tasks') ||
+      lower.includes('unfinished task') ||
+      lower.includes('unfinished tasks') ||
+      lower.includes('open task') ||
+      lower.includes('open tasks') ||
+      lower.includes('my tasks') ||
+      lower.includes('my task') ||
+      lower.includes('all tasks') ||
+      lower.includes('task list') ||
+      lower.includes('todo list') ||
       (/\b(?:pending|unfinished|open|current|my|all|active|today'?s?|existing)?\s*(?:tasks?|todos?|to-dos?)\b/i.test(lower) &&
         /\b(?:what|show|list|get|tell|check|see|any|is there|are there|do i have|display|view|find)\b/i.test(lower)) ||
       /\b(?:what are (?:the|my)? pending tasks?|what pending tasks?|pending tasks?|pending task|unfinished tasks?|unfinished task|task list|todos?)\b/i.test(lower) ||
@@ -943,14 +957,15 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         status: 'success',
       };
 
-      const tasks = res.data as any[];
+      const tasks = (res.data as any[]) || [];
       const pending = tasks.filter((t) => t.status !== 'completed' && t.status !== 'cancelled');
       const completed = tasks.filter((t) => t.status === 'completed');
 
-      let reply = `### 📋 Your Current Tasks (${pending.length} pending, ${completed.length} completed)\n\n`;
+      let reply = `### 📋 Your Tasks (${pending.length} Pending, ${completed.length} Completed)\n\n`;
       if (!pending.length) {
-        reply += `*You have no unfinished tasks right now. Great job!*\n\n`;
+        reply += `*You have no unfinished tasks right now.*\n\n`;
       } else {
+        reply += `#### ⏳ Pending Tasks (${pending.length}):\n`;
         for (const t of pending) {
           const badge = t.priority === 'urgent' ? '🔴 **[URGENT]**' : t.priority === 'high' ? '🟠 **[HIGH]**' : '🟢';
           const due = t.dueDate ? ` *(Due: ${new Date(t.dueDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })})*` : '';
@@ -959,11 +974,106 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       }
 
       if (completed.length > 0) {
-        reply += `\n**Recently Completed:**\n`;
-        for (const t of completed.slice(0, 3)) {
+        reply += `\n#### ✅ Completed Tasks (${completed.length}):\n`;
+        for (const t of completed.slice(0, 5)) {
           reply += `* ~~${t.title}~~\n`;
         }
       }
+
+      return { reply, toolSteps };
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // STEP 3.5: GOVERNMENT / PUBLIC HOLIDAYS QUERY
+    // ─────────────────────────────────────────────────────────────
+    const isHolidayQuery =
+      lower.includes('govt holiday') ||
+      lower.includes('government holiday') ||
+      lower.includes('govt holidays') ||
+      lower.includes('government holidays') ||
+      lower.includes('public holiday') ||
+      lower.includes('public holidays') ||
+      lower.includes('upcoming holiday') ||
+      lower.includes('upcoming holidays') ||
+      lower.includes('next holiday') ||
+      lower.includes('is today a holiday') ||
+      lower.includes('is tomorrow a holiday') ||
+      lower.includes('holidays in') ||
+      lower.includes('calendar holidays') ||
+      lower.includes('list holidays');
+
+    if (isHolidayQuery) {
+      toolSteps.push({
+        toolName: 'HolidayTool',
+        action: 'getHolidays',
+        input: { prompt: trimmed },
+        status: 'executing',
+      });
+
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      let yearToFetch = currentYear;
+      const yearMatch = lower.match(/\b(202\d)\b/);
+      if (yearMatch) {
+        yearToFetch = parseInt(yearMatch[1], 10);
+      }
+
+      let holidays = getUpcomingHolidays(today, 8);
+      if (lower.includes('year') || yearMatch || lower.includes('all holidays')) {
+        holidays = getHolidaysForYear(yearToFetch);
+      }
+
+      toolSteps[toolSteps.length - 1] = {
+        toolName: 'HolidayTool',
+        action: 'getHolidays',
+        input: { year: yearToFetch },
+        output: { count: holidays.length },
+        status: 'success',
+      };
+
+      // Check if specifically asking about today or tomorrow
+      if (lower.includes('today')) {
+        const todayHoliday = getHolidayForDate(today);
+        if (todayHoliday) {
+          return {
+            reply: `### 🏛️ Today is a Government Holiday!\n\n**${todayHoliday.emoji || '🎉'} ${todayHoliday.name}** (${todayHoliday.type.toUpperCase()})\n${todayHoliday.description || ''}`,
+            toolSteps,
+          };
+        } else {
+          return {
+            reply: `Today (${today.toLocaleDateString([], { dateStyle: 'full' })}) is **not** a government holiday. The next upcoming holiday is **${holidays[0]?.name || 'N/A'}** on **${holidays[0]?.date || ''}**.`,
+            toolSteps,
+          };
+        }
+      }
+
+      if (lower.includes('tomorrow')) {
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomHoliday = getHolidayForDate(tomorrow);
+        if (tomHoliday) {
+          return {
+            reply: `### 🏛️ Tomorrow is a Government Holiday!\n\n**${tomHoliday.emoji || '🎉'} ${tomHoliday.name}** (${tomHoliday.type.toUpperCase()})\n${tomHoliday.description || ''}`,
+            toolSteps,
+          };
+        } else {
+          return {
+            reply: `Tomorrow (${tomorrow.toLocaleDateString([], { dateStyle: 'full' })}) is **not** a government holiday. The next upcoming holiday is **${holidays[0]?.name || 'N/A'}** on **${holidays[0]?.date || ''}**.`,
+            toolSteps,
+          };
+        }
+      }
+
+      let reply = `### 🏛️ Official Government & Public Holidays (${yearToFetch})\n\n`;
+      reply += `| Date | Holiday | Type |\n`;
+      reply += `| :--- | :--- | :--- |\n`;
+      for (const h of holidays) {
+        const d = new Date(h.date);
+        const formattedDate = d.toLocaleDateString([], { month: 'short', day: 'numeric', weekday: 'short' });
+        const typeBadge = h.type === 'national' ? '🇮🇳 National' : h.type === 'gazetted' ? '🏛️ Gazetted' : '✨ Restricted';
+        reply += `| **${formattedDate}** | ${h.emoji || '🎉'} **${h.name}** | ${typeBadge} |\n`;
+      }
+      reply += `\n*All government holidays are synced in real time with your interactive calendar.*`;
 
       return { reply, toolSteps };
     }

@@ -31,6 +31,14 @@ import {
   Share2,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
+import {
+  getHolidayForDate,
+  getHolidaysForYear,
+  getHolidaysForMonth,
+  isGovernmentHoliday,
+  GovtHoliday,
+  GOVT_HOLIDAYS,
+} from '@/lib/calendar/holidays';
 
 export type CalendarViewMode = 'day' | 'week' | 'month' | 'year';
 
@@ -67,7 +75,7 @@ export default function CalendarView() {
     if (!datePickerOpen) setDatePickerAlign(pickAlign(datePickerAnchorRef.current, 240));
     setDatePickerOpen((o) => !o);
   };
-  const [filterType, setFilterType] = useState<'all' | 'tasks' | 'reminders' | 'completed'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'tasks' | 'reminders' | 'holidays' | 'completed'>('all');
   
   // Quick natural language input
   const [quickInput, setQuickInput] = useState('');
@@ -666,17 +674,24 @@ export default function CalendarView() {
 
         {/* Filter Badges */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
-          {(['all', 'tasks', 'reminders', 'completed'] as const).map((ft) => (
+          {(['all', 'tasks', 'reminders', 'holidays', 'completed'] as const).map((ft) => (
             <button
               key={ft}
               onClick={() => setFilterType(ft)}
-              className={`px-2.5 py-1 rounded-full text-[11px] capitalize transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-full text-[11px] capitalize transition-all cursor-pointer flex items-center gap-1 ${
                 filterType === ft
                   ? 'bg-[#4E82EE]/15 text-[#4E82EE] dark:text-[#a8c7fa] font-bold border border-[#4E82EE]/30'
                   : 'text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
               }`}
             >
-              {ft}
+              {ft === 'holidays' ? (
+                <>
+                  <span>🏛️</span>
+                  <span>Govt Holidays</span>
+                </>
+              ) : (
+                ft
+              )}
             </button>
           ))}
         </div>
@@ -699,6 +714,7 @@ export default function CalendarView() {
               {monthDays.map((day, idx) => {
                 const dayNum = day.date.getDate();
                 const isSelected = day.date.toDateString() === selectedDate.toDateString();
+                const holiday = getHolidayForDate(day.date);
 
                 return (
                   <div
@@ -707,12 +723,14 @@ export default function CalendarView() {
                     className={`min-h-[68px] sm:min-h-[110px] p-1.5 sm:p-2.5 rounded-xl sm:rounded-2xl border transition-all cursor-pointer flex flex-col justify-between group relative active:scale-98 ${
                       isSelected
                         ? 'border-[#4E82EE] bg-[#4E82EE]/5 ring-1 sm:ring-2 ring-[#4E82EE]/20 shadow-xs'
+                        : holiday
+                        ? 'bg-(--bg-card) border-rose-500/30 hover:border-rose-500/60'
                         : day.isCurrentMonth
                         ? 'bg-(--bg-card) border-(--border-subtle) hover:border-[#4E82EE]/40 hover:bg-(--bg-elevated)'
                         : 'bg-(--bg-sidebar)/30 border-(--border-subtle)/30 opacity-40'
                     }`}
                   >
-                    {/* Header: Date Number + Quick Add Button */}
+                    {/* Header: Date Number + Quick Add Button + Holiday Tag */}
                     <div className="flex items-center justify-between pointer-events-none">
                       <span
                         className={`text-[10px] sm:text-xs font-bold w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center ${
@@ -720,6 +738,8 @@ export default function CalendarView() {
                             ? 'bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white shadow-xs'
                             : isSelected
                             ? 'text-[#4E82EE] font-black'
+                            : holiday
+                            ? 'text-rose-500 font-bold'
                             : 'text-(--text-primary)'
                         }`}
                       >
@@ -727,6 +747,14 @@ export default function CalendarView() {
                       </span>
 
                       <div className="flex items-center gap-1">
+                        {holiday && (
+                          <span
+                            className="text-[10px] px-1 py-0.2 rounded bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold leading-tight"
+                            title={`Government Holiday: ${holiday.name} (${holiday.type.toUpperCase()})`}
+                          >
+                            {holiday.emoji || '🏛️'}
+                          </span>
+                        )}
                         {day.items.length > 0 && (
                           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-[#4E82EE]/15 text-[#4E82EE] font-bold">
                             {day.items.length}
@@ -735,9 +763,14 @@ export default function CalendarView() {
                       </div>
                     </div>
 
-                    {/* Mobile Dots View (<sm) */}
+                    {/* Mobile Dots & Holiday View (<sm) */}
                     <div className="flex sm:hidden items-center justify-center gap-1 my-1 flex-wrap pointer-events-none">
-                      {day.items.slice(0, 4).map((item) => (
+                      {holiday && (
+                        <span className="text-[10px] leading-none" title={holiday.name}>
+                          {holiday.emoji || '🏛️'}
+                        </span>
+                      )}
+                      {day.items.slice(0, holiday ? 3 : 4).map((item) => (
                         <span
                           key={item.id}
                           className={`w-2 h-2 rounded-full ring-1 ring-black/10 ${
@@ -756,7 +789,16 @@ export default function CalendarView() {
 
                     {/* Tablet/Desktop Day Events Stack (>=sm) */}
                     <div className="hidden sm:block space-y-1 my-1 flex-1 overflow-hidden pointer-events-none">
-                      {day.items.slice(0, 2).map((item) => (
+                      {holiday && (
+                        <div
+                          className="text-[10px] sm:text-[11px] truncate px-1.5 py-0.5 rounded-md flex items-center gap-1 font-bold bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 shadow-2xs"
+                          title={`🏛️ Official Govt Holiday: ${holiday.name} (${holiday.type.toUpperCase()})`}
+                        >
+                          <span className="text-xs shrink-0">{holiday.emoji || '🏛️'}</span>
+                          <span className="truncate">{holiday.name}</span>
+                        </div>
+                      )}
+                      {day.items.slice(0, holiday ? 1 : 2).map((item) => (
                         <div
                           key={item.id}
                           className={`text-[11px] truncate px-1.5 py-0.5 rounded-md flex items-center gap-1 font-medium ${
@@ -772,9 +814,9 @@ export default function CalendarView() {
                           <span className="truncate">{item.title}</span>
                         </div>
                       ))}
-                      {day.items.length > 2 && (
+                      {day.items.length > (holiday ? 1 : 2) && (
                         <div className="text-[10px] text-(--text-muted) font-medium pl-1">
-                          +{day.items.length - 2} more
+                          +{day.items.length - (holiday ? 1 : 2)} more
                         </div>
                       )}
                     </div>
@@ -821,6 +863,7 @@ export default function CalendarView() {
                 const isSelectedMonth =
                   selectedDate.getFullYear() === selectedDate.getFullYear() &&
                   selectedDate.getMonth() === m.monthIndex;
+                const monthHolidays = getHolidaysForMonth(selectedDate.getFullYear(), m.monthIndex);
 
                 return (
                   <div
@@ -839,11 +882,18 @@ export default function CalendarView() {
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="font-bold text-sm text-(--text-primary)">{m.monthName}</h3>
-                      {m.itemsCount > 0 && (
-                        <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#4E82EE]/15 text-[#4E82EE] font-semibold">
-                          {m.itemsCount} events
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1">
+                        {monthHolidays.length > 0 && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-semibold" title={`${monthHolidays.length} Govt Holidays`}>
+                            🏛️ {monthHolidays.length}
+                          </span>
+                        )}
+                        {m.itemsCount > 0 && (
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-[#4E82EE]/15 text-[#4E82EE] font-semibold">
+                            {m.itemsCount}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Mini Month Grid */}
@@ -862,6 +912,7 @@ export default function CalendarView() {
                         const dayNum = dIdx + 1;
                         const cellDate = new Date(selectedDate.getFullYear(), m.monthIndex, dayNum);
                         const isDayToday = cellDate.toDateString() === new Date().toDateString();
+                        const isCellHoliday = isGovernmentHoliday(cellDate);
 
                         const cellItems = m.items.filter(
                           (it) => it.dateTime.getDate() === dayNum
@@ -874,6 +925,8 @@ export default function CalendarView() {
                             className={`w-6 h-6 mx-auto rounded-full flex items-center justify-center text-[10px] font-mono ${
                               isDayToday
                                 ? 'bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white font-bold'
+                                : isCellHoliday
+                                ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 font-bold ring-1 ring-rose-500/40'
                                 : hasEvents
                                 ? 'bg-[#4E82EE]/20 text-[#4E82EE] font-bold ring-1 ring-[#4E82EE]/40'
                                 : 'text-(--text-muted) hover:bg-(--bg-elevated)'
@@ -887,6 +940,67 @@ export default function CalendarView() {
                   </div>
                 );
               })}
+            </div>
+
+            {/* Year Govt Holidays Showcase */}
+            <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-(--border-subtle)">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold text-sm">
+                    🏛️
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base text-(--text-primary)">
+                      Government & Public Holidays ({selectedDate.getFullYear()})
+                    </h3>
+                    <p className="text-[11px] text-(--text-muted)">
+                      National, gazetted, and cultural holidays for the year
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400">
+                  {getHolidaysForYear(selectedDate.getFullYear()).length} Holidays
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {getHolidaysForYear(selectedDate.getFullYear()).map((h) => {
+                  const d = new Date(h.date);
+                  const isPast = d.getTime() < new Date().setHours(0, 0, 0, 0);
+                  const isTodayHol = d.toDateString() === new Date().toDateString();
+                  return (
+                    <div
+                      key={h.date}
+                      onClick={() => {
+                        setSelectedDate(d);
+                        setViewMode('month');
+                      }}
+                      className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                        isTodayHol
+                          ? 'border-rose-500 bg-rose-500/10 ring-2 ring-rose-500/20'
+                          : isPast
+                          ? 'border-(--border-subtle)/50 bg-(--bg-elevated)/40 opacity-60'
+                          : 'border-(--border-subtle) bg-(--bg-elevated) hover:border-rose-500/40 hover:bg-(--bg-card)'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-lg shrink-0">{h.emoji || '🎉'}</span>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-xs text-(--text-primary) truncate">
+                            {h.name}
+                          </div>
+                          <div className="text-[10px] text-(--text-muted) font-mono">
+                            {d.toLocaleDateString([], { month: 'short', day: 'numeric', weekday: 'short' })}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 bg-(--bg-card) text-rose-500 border border-rose-500/20">
+                        {h.type}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -912,6 +1026,7 @@ export default function CalendarView() {
               const isSelected = w.date.toDateString() === selectedDate.toDateString();
               const dayLabel = SHORT_WEEKDAYS[w.date.getDay()];
               const isWeekend = w.date.getDay() === 0 || w.date.getDay() === 6;
+              const holiday = getHolidayForDate(w.date);
 
               return (
                 <div
@@ -919,6 +1034,8 @@ export default function CalendarView() {
                   className={`flex gap-0 rounded-2xl border overflow-hidden transition-all ${
                     isSelected
                       ? 'border-[#4E82EE] shadow-md ring-2 ring-[#4E82EE]/15'
+                      : holiday
+                      ? 'border-rose-500/30'
                       : 'border-(--border-subtle) hover:border-[#4E82EE]/30'
                   } ${isWeekend ? 'opacity-80' : ''}`}
                 >
@@ -931,11 +1048,13 @@ export default function CalendarView() {
                     className={`w-20 sm:w-24 flex-shrink-0 flex flex-col items-center justify-center py-4 border-r border-(--border-subtle) cursor-pointer transition-all ${
                       isSelected
                         ? 'bg-[#4E82EE]/8'
+                        : holiday
+                        ? 'bg-rose-500/5 hover:bg-rose-500/10'
                         : 'bg-(--bg-elevated) hover:bg-(--bg-card)'
                     }`}
                   >
                     <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                      w.isToday ? 'text-[#4E82EE]' : 'text-(--text-muted)'
+                      w.isToday ? 'text-[#4E82EE]' : holiday ? 'text-rose-500' : 'text-(--text-muted)'
                     }`}>
                       {dayLabel}
                     </span>
@@ -944,12 +1063,19 @@ export default function CalendarView() {
                         ? 'bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white shadow-sm'
                         : isSelected
                         ? 'text-[#4E82EE] bg-[#4E82EE]/10'
+                        : holiday
+                        ? 'text-rose-500 bg-rose-500/15'
                         : 'text-(--text-primary)'
                     }`}>
                       {w.date.getDate()}
                     </div>
+                    {holiday && (
+                      <span className="mt-1 text-[10px]" title={holiday.name}>
+                        {holiday.emoji || '🏛️'}
+                      </span>
+                    )}
                     {w.items.length > 0 && (
-                      <span className="mt-1.5 text-[9px] font-semibold text-(--text-muted)">
+                      <span className="mt-1 text-[9px] font-semibold text-(--text-muted)">
                         {w.items.length} event{w.items.length > 1 ? 's' : ''}
                       </span>
                     )}
@@ -961,7 +1087,25 @@ export default function CalendarView() {
                       isSelected ? 'bg-[#4E82EE]/4' : 'bg-(--bg-card)'
                     }`}
                   >
-                    {w.items.length === 0 ? (
+                    {holiday && (
+                      <div
+                        onClick={() => handleDayClick(w.date)}
+                        className="flex-shrink-0 flex flex-col justify-between px-3 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 min-w-[130px] max-w-[180px] transition-all cursor-pointer hover:border-rose-500/60 shadow-2xs"
+                        title={`Government Holiday: ${holiday.name} (${holiday.type.toUpperCase()})`}
+                      >
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span className="text-[9px] font-mono font-bold text-rose-500 uppercase">
+                            Govt Holiday
+                          </span>
+                          <span className="text-xs">{holiday.emoji || '🏛️'}</span>
+                        </div>
+                        <div className="text-[11px] font-bold text-rose-600 dark:text-rose-400 line-clamp-2">
+                          {holiday.name}
+                        </div>
+                      </div>
+                    )}
+
+                    {w.items.length === 0 && !holiday ? (
                       <button
                         onClick={() => openScheduleModal(w.date)}
                         className="flex items-center gap-1.5 text-[11px] text-(--text-muted) hover:text-[#4E82EE] transition-colors cursor-pointer group"
@@ -996,7 +1140,7 @@ export default function CalendarView() {
                                 </span>
                                 <span className={`w-1.5 h-1.5 rounded-full ${
                                   isCompleted ? 'bg-emerald-500' : item.type === 'task' ? 'bg-[#4E82EE]' : 'bg-amber-500'
-                                }`} />
+                                }`}></span>
                               </div>
                               <div className={`text-[11px] font-semibold leading-tight line-clamp-2 ${
                                 isCompleted
@@ -1031,6 +1175,32 @@ export default function CalendarView() {
         {/* ── 4. DAY VIEW (HOUR-BY-HOUR TIMELINE) ──────────────── */}
         {viewMode === 'day' && (
           <div className="max-w-4xl mx-auto space-y-3">
+            {/* Day Govt Holiday Banner if applicable */}
+            {getHolidayForDate(selectedDate) && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-500/15 via-amber-500/10 to-emerald-500/15 border border-rose-500/30 flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center text-xl shrink-0">
+                    {getHolidayForDate(selectedDate)?.emoji || '🏛️'}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-sm text-(--text-primary)">
+                        {getHolidayForDate(selectedDate)?.name}
+                      </h3>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-600 dark:text-rose-400 uppercase tracking-wider font-mono">
+                        Official Government Holiday ({getHolidayForDate(selectedDate)?.type})
+                      </span>
+                    </div>
+                    {getHolidayForDate(selectedDate)?.description && (
+                      <p className="text-xs text-(--text-muted) mt-0.5">
+                        {getHolidayForDate(selectedDate)?.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {hoursGrid.map((hour) => {
               const hourItems = selectedDayItems.filter((item) => item.dateTime.getHours() === hour);
               const hourLabel = `${hour > 12 ? hour - 12 : hour}:00 ${hour >= 12 ? 'PM' : 'AM'}`;
@@ -1155,6 +1325,22 @@ export default function CalendarView() {
                 <X size={18} />
               </button>
             </div>
+
+            {/* Top Holiday Notification inside Modal */}
+            {getHolidayForDate(selectedDate) && (
+              <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center gap-3 shrink-0">
+                <span className="text-2xl shrink-0">{getHolidayForDate(selectedDate)?.emoji || '🏛️'}</span>
+                <div>
+                  <div className="font-bold text-xs sm:text-sm text-rose-600 dark:text-rose-400 flex items-center gap-1.5">
+                    <span>{getHolidayForDate(selectedDate)?.name}</span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-rose-500/20 uppercase font-bold">Govt Holiday</span>
+                  </div>
+                  <p className="text-[11px] text-(--text-muted) mt-0.5">
+                    {getHolidayForDate(selectedDate)?.description || 'Official Public Holiday'}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* List of events on this day */}
             <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar py-1">

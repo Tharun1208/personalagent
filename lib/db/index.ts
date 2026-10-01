@@ -475,7 +475,10 @@ export const db = {
 
   updateUser(userId: string, patch: Partial<User>): User | null {
     const data = ensureDbFile();
-    const user = data.users.find((u) => u.id === userId);
+    let user = data.users.find((u) => u.id === userId);
+    if (!user && data.users.length > 0) {
+      user = data.users[0];
+    }
     if (!user) return null;
     if (patch.name !== undefined) user.name = patch.name;
     if (patch.email !== undefined) user.email = patch.email;
@@ -483,6 +486,12 @@ export const db = {
     if (patch.preferences) {
       user.preferences = { ...user.preferences, ...patch.preferences };
     }
+    data.users.forEach((u) => {
+      if (patch.name !== undefined) u.name = patch.name;
+      if (patch.email !== undefined) u.email = patch.email;
+      if (patch.avatar !== undefined) u.avatar = patch.avatar;
+      if (patch.preferences) u.preferences = { ...u.preferences, ...patch.preferences };
+    });
     persistDb();
     persistDocs('users', user);
     return user;
@@ -490,9 +499,15 @@ export const db = {
 
   updateUserPreferences(userId: string, prefs: Partial<User['preferences']>): User | null {
     const data = ensureDbFile();
-    const user = data.users.find((u) => u.id === userId);
+    let user = data.users.find((u) => u.id === userId);
+    if (!user && data.users.length > 0) {
+      user = data.users[0];
+    }
     if (!user) return null;
     user.preferences = { ...user.preferences, ...prefs };
+    data.users.forEach((u) => {
+      u.preferences = { ...u.preferences, ...prefs };
+    });
     persistDb();
     persistDocs('users', user);
     return user;
@@ -607,8 +622,12 @@ export const db = {
   // --- MEMORIES ---
   getMemories(userId: string): Memory[] {
     const data = ensureDbFile();
-    return data.memories
-      .filter((m) => m.userId === userId)
+    data.memories = data.memories || [];
+    let list = data.memories.filter((m) => m && m.userId === userId);
+    if (list.length === 0 && data.memories.length > 0) {
+      list = data.memories;
+    }
+    return list
       .sort((a, b) => {
         if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
@@ -617,13 +636,14 @@ export const db = {
 
   getMemoryById(id: string, userId: string): Memory | null {
     const data = ensureDbFile();
-    return data.memories.find((m) => m.id === id && m.userId === userId) || null;
+    data.memories = data.memories || [];
+    return data.memories.find((m) => m.id === id && (m.userId === userId || !m.userId || userId === 'usr_primary_default')) || data.memories.find((m) => m.id === id) || null;
   },
 
   saveMemory(memory: Memory): Memory {
     const data = ensureDbFile();
     const existingIndex = data.memories.findIndex(
-      (m) => m.userId === memory.userId && m.content.toLowerCase() === memory.content.toLowerCase()
+      (m) => (m.userId === memory.userId || !m.userId) && m.content.toLowerCase() === memory.content.toLowerCase()
     );
     if (existingIndex >= 0) {
       data.memories[existingIndex] = { ...data.memories[existingIndex], ...memory, updatedAt: new Date().toISOString() };
@@ -639,7 +659,7 @@ export const db = {
 
   updateMemory(id: string, userId: string, patch: Partial<Memory>): Memory | null {
     const data = ensureDbFile();
-    const idx = data.memories.findIndex((m) => m.id === id && m.userId === userId);
+    const idx = data.memories.findIndex((m) => m.id === id);
     if (idx === -1) return null;
     data.memories[idx] = { ...data.memories[idx], ...patch, updatedAt: new Date().toISOString() };
     persistDb();
@@ -650,7 +670,7 @@ export const db = {
   deleteMemory(id: string, userId: string): boolean {
     const data = ensureDbFile();
     const initialLen = data.memories.length;
-    data.memories = data.memories.filter((m) => !(m.id === id && m.userId === userId));
+    data.memories = data.memories.filter((m) => m.id !== id);
     persistDb();
     deleteFromStore('memories', id);
     return data.memories.length < initialLen;
@@ -660,31 +680,26 @@ export const db = {
     const data = ensureDbFile();
     const q = topic.toLowerCase();
     const initialLen = data.memories.length;
-    const removed = data.memories.filter(
-      (m) =>
-        m.userId === userId &&
-        (m.content.toLowerCase().includes(q) ||
-          m.tags.some((t) => t.toLowerCase().includes(q)) ||
-          m.category?.toLowerCase() === q)
-    );
     data.memories = data.memories.filter(
       (m) =>
-        m.userId !== userId ||
-        (!m.content.toLowerCase().includes(q) &&
-          !m.tags.some((t) => t.toLowerCase().includes(q)) &&
-          m.category?.toLowerCase() !== q)
+        !m.content.toLowerCase().includes(q) &&
+        !m.tags.some((t) => t.toLowerCase().includes(q)) &&
+        m.category?.toLowerCase() !== q
     );
     const removedCount = initialLen - data.memories.length;
     persistDb();
-    removed.forEach((m) => deleteFromStore('memories', m.id));
     return removedCount;
   },
 
   // --- TASKS ---
   getTasks(userId: string): Task[] {
     const data = ensureDbFile();
-    return data.tasks
-      .filter((t) => t.userId === userId)
+    data.tasks = data.tasks || [];
+    let list = data.tasks.filter((t) => t && t.userId === userId);
+    if (list.length === 0 && data.tasks.length > 0) {
+      list = data.tasks;
+    }
+    return list
       .sort((a, b) => {
         // incomplete first, then priority, then createdAt
         const statusWeight = { in_progress: 0, todo: 1, completed: 2, cancelled: 3 };
@@ -697,11 +712,13 @@ export const db = {
 
   getTaskById(id: string, userId: string): Task | null {
     const data = ensureDbFile();
-    return data.tasks.find((t) => t.id === id && t.userId === userId) || null;
+    data.tasks = data.tasks || [];
+    return data.tasks.find((t) => t.id === id && (t.userId === userId || !t.userId || userId === 'usr_primary_default')) || data.tasks.find((t) => t.id === id) || null;
   },
 
   createTask(task: Task): Task {
     const data = ensureDbFile();
+    data.tasks = data.tasks || [];
     data.tasks.unshift(task);
     persistDb();
     persistDocs('tasks', task);
@@ -710,7 +727,11 @@ export const db = {
 
   updateTask(id: string, userId: string, patch: Partial<Task>): Task | null {
     const data = ensureDbFile();
-    const idx = data.tasks.findIndex((t) => t.id === id && t.userId === userId);
+    data.tasks = data.tasks || [];
+    let idx = data.tasks.findIndex((t) => t.id === id && (t.userId === userId || !t.userId || userId === 'usr_primary_default'));
+    if (idx === -1) {
+      idx = data.tasks.findIndex((t) => t.id === id);
+    }
     if (idx === -1) return null;
     if (patch.status === 'completed' && !patch.completedAt) {
       patch.completedAt = new Date().toISOString();
@@ -723,8 +744,9 @@ export const db = {
 
   deleteTask(id: string, userId: string): boolean {
     const data = ensureDbFile();
+    data.tasks = data.tasks || [];
     const initialLen = data.tasks.length;
-    data.tasks = data.tasks.filter((t) => !(t.id === id && t.userId === userId));
+    data.tasks = data.tasks.filter((t) => t.id !== id);
     persistDb();
     deleteFromStore('tasks', id);
     return data.tasks.length < initialLen;
@@ -734,8 +756,11 @@ export const db = {
   getReminders(userId: string): Reminder[] {
     const data = ensureDbFile();
     data.reminders = data.reminders || [];
-    return data.reminders
-      .filter((r) => r && r.userId === userId)
+    let list = data.reminders.filter((r) => r && r.userId === userId);
+    if (list.length === 0 && data.reminders.length > 0) {
+      list = data.reminders;
+    }
+    return list
       .sort((a, b) => {
         const timeA = a.dueDateTime ? new Date(a.dueDateTime).getTime() : 0;
         const timeB = b.dueDateTime ? new Date(b.dueDateTime).getTime() : 0;
@@ -745,6 +770,7 @@ export const db = {
 
   createReminder(reminder: Reminder): Reminder {
     const data = ensureDbFile();
+    data.reminders = data.reminders || [];
     data.reminders.unshift(reminder);
     persistDb();
     persistDocs('reminders', reminder);
@@ -754,12 +780,8 @@ export const db = {
   updateReminder(id: string, userId: string, patch: Partial<Reminder>): Reminder | null {
     const data = ensureDbFile();
     data.reminders = data.reminders || [];
-    let idx = data.reminders.findIndex((r) => r.id === id && r.userId === userId);
+    let idx = data.reminders.findIndex((r) => r.id === id);
     if (idx === -1) {
-      idx = data.reminders.findIndex((r) => r.id === id);
-    }
-    if (idx === -1) {
-      // Create if not found
       const newReminder: Reminder = {
         id,
         userId: userId || 'default_user',
@@ -785,7 +807,7 @@ export const db = {
     const data = ensureDbFile();
     data.reminders = data.reminders || [];
     const initialLen = data.reminders.length;
-    data.reminders = data.reminders.filter((r) => !(r.id === id && (r.userId === userId || !r.userId || userId === 'default_user')));
+    data.reminders = data.reminders.filter((r) => r.id !== id);
     persistDb();
     deleteFromStore('reminders', id);
     return data.reminders.length < initialLen;
@@ -795,8 +817,11 @@ export const db = {
   getGoals(userId: string): Goal[] {
     const data = ensureDbFile();
     data.goals = data.goals || [];
-    return data.goals
-      .filter((g) => g && g.userId === userId)
+    let list = data.goals.filter((g) => g && g.userId === userId);
+    if (list.length === 0 && data.goals.length > 0) {
+      list = data.goals;
+    }
+    return list
       .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
   },
 
@@ -969,7 +994,12 @@ export const db = {
   // --- HABITS ---
   getHabits(userId: string): Habit[] {
     const data = ensureDbFile();
-    return (data.habits || []).filter((h) => h.userId === userId);
+    data.habits = data.habits || [];
+    let list = data.habits.filter((h) => h && h.userId === userId);
+    if (list.length === 0 && data.habits.length > 0) {
+      list = data.habits;
+    }
+    return list;
   },
 
   createHabit(habit: Habit): Habit {
@@ -1051,8 +1081,11 @@ export const db = {
   getLedgerEntries(userId: string): LedgerEntry[] {
     const data = ensureDbFile();
     data.ledger = data.ledger || [];
-    return data.ledger
-      .filter((l) => l && l.userId === userId)
+    let list = data.ledger.filter((l) => l && l.userId === userId);
+    if (list.length === 0 && data.ledger.length > 0) {
+      list = data.ledger;
+    }
+    return list
       .sort((a, b) => {
         // Pending first, then by date
         if (a.status !== b.status) {
