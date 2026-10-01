@@ -30,11 +30,6 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
       icon: LayoutDashboard,
     },
     {
-      key: 'chat',
-      label: 'AI Brain',
-      icon: Sparkles,
-    },
-    {
       key: 'tasks',
       label: 'Tasks',
       icon: CheckSquare,
@@ -50,6 +45,11 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps) {
       label: 'Ledger',
       icon: Wallet,
       badge: pendingLedger,
+    },
+    {
+      key: 'calendar',
+      label: 'Calendar',
+      icon: Calendar,
     },
     {
       key: 'settings',
