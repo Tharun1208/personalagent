@@ -144,10 +144,10 @@ export default function AuthScreen({ notice, initialMode, hideGuest }: AuthScree
               <div className="bg-white p-4 rounded-2xl shadow-lg mb-5 border border-gray-50">
                 <Brain size={44} className="text-[#3B82F6]" strokeWidth={1.8} />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 text-center">
+              <h2 className="app-modal-title text-center text-gray-900">
                 {mode === 'login' ? 'Welcome Back' : 'Create Account'}
               </h2>
-              <p className="text-center text-gray-500 mt-2 text-sm">
+              <p className="app-card-subtitle text-center text-gray-500 mt-2">
                 {mode === 'login'
                   ? 'Sign in to continue to your account'
                   : 'Get started with Assistance AI'}

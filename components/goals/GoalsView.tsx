@@ -224,8 +224,8 @@ export default function GoalsView() {
                 <Target size={22} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">Goals & Strategic OKRs</h1>
-                <p className="text-xs sm:text-sm text-(--text-secondary)">
+                <h1 className="app-page-title">Goals & Strategic OKRs</h1>
+                <p className="app-page-subtitle">
                   Set measurable objectives, track key milestones, and accelerate your progress.
                 </p>
               </div>
@@ -588,10 +588,10 @@ export default function GoalsView() {
                   <Target size={18} />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-(--text-primary)">
+                  <h2 className="app-modal-title">
                     {editingGoal ? 'Edit Objective' : 'New Objective (OKR)'}
                   </h2>
-                  <p className="text-[11px] text-(--text-muted)">
+                  <p className="app-card-subtitle">
                     Set measurable strategic goals with milestone tracking
                   </p>
                 </div>

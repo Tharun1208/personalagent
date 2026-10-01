@@ -302,10 +302,10 @@ export default function TasksView() {
             <CheckSquare size={17} />
           </div>
           <div>
-            <h1 className="font-semibold text-sm sm:text-base text-(--text-primary) flex items-center gap-2">
+            <h1 className="app-page-title flex items-center gap-2">
               Task Management
             </h1>
-            <p className="text-[10px] sm:text-[11px] text-(--text-muted)">
+            <p className="app-page-subtitle">
               {tasks.filter((t) => t.status !== 'completed').length} pending tasks with AI subtask checklists
             </p>
           </div>
@@ -586,7 +586,7 @@ export default function TasksView() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
           <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3">
-              <h3 className="font-bold text-base text-(--text-primary)">Create New Task</h3>
+              <h3 className="app-modal-title">Create New Task</h3>
               <button
                 onClick={() => setIsAddOpen(false)}
                 className="p-1 rounded-full text-(--text-muted) hover:text-(--text-primary)"

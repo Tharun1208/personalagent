@@ -130,8 +130,8 @@ export default function DailyBriefingModal({ isOpen, onClose }: DailyBriefingMod
               <Sparkles size={20} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-(--text-primary)">Morning Audio Briefing</h2>
-              <p className="text-[11px] text-(--text-muted)">Voice-synthesized executive summary</p>
+              <h2 className="app-modal-title">Morning Audio Briefing</h2>
+              <p className="app-card-subtitle">Voice-synthesized executive summary</p>
             </div>
           </div>
 

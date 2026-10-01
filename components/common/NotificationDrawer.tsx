@@ -64,7 +64,7 @@ export default function NotificationDrawer() {
         <div className="p-4 border-b border-(--border-subtle) flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bell size={16} className="text-[#4E82EE]" />
-            <h2 className="font-semibold text-xs text-(--text-primary)">Notification Center</h2>
+            <h2 className="app-modal-title">Notification Center</h2>
             {notifications.length > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-(--bg-elevated) text-(--text-muted) font-mono">
                 {notifications.length}

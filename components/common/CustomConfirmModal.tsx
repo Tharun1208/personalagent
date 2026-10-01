@@ -93,10 +93,10 @@ export default function CustomConfirmModal({ dialog, onClose }: CustomConfirmMod
         <div className="flex items-start gap-4">
           {getIcon()}
           <div className="flex-1 min-w-0">
-            <h3 className="text-base font-bold text-(--text-primary) leading-tight mb-1.5">
+            <h3 className="app-modal-title leading-tight mb-1.5">
               {title}
             </h3>
-            <p className="text-xs text-(--text-muted) leading-relaxed">
+            <p className="app-card-subtitle leading-relaxed">
               {message}
             </p>
           </div>

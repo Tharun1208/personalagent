@@ -302,13 +302,13 @@ export default function SettingsView() {
             <Settings size={16} />
           </div>
           <div>
-            <h1 className="font-semibold text-xs sm:text-sm text-(--text-primary)">
+            <h1 className="app-page-title">
               {currentView === 'main' && 'System Settings'}
               {currentView === 'profile' && 'Profile & Appearance'}
               {currentView === 'data' && 'Data & Privacy'}
               {currentView === 'backup' && 'Chat & Vault Backup'}
             </h1>
-            <p className="text-[10px] sm:text-[11px] text-(--text-muted)">
+            <p className="app-page-subtitle">
               {currentView === 'main' && 'Personal preferences, themes, sync, and storage'}
               {currentView === 'profile' && 'Manage your personal identity, display name, and color theme'}
               {currentView === 'data' && 'Manage local data backups and privacy storage'}
@@ -345,10 +345,10 @@ export default function SettingsView() {
                     <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-2 ring-(--bg-card)" />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="font-bold text-sm sm:text-base text-(--text-primary) truncate flex items-center gap-1.5">
+                    <h2 className="app-card-title truncate flex items-center gap-1.5">
                       {user?.name || 'User Profile'}
                     </h2>
-                    <p className="text-xs text-(--text-muted) truncate mt-0.5">
+                    <p className="app-card-subtitle truncate mt-0.5">
                       Personal display name, profile & theme details
                     </p>
                   </div>
@@ -364,7 +364,7 @@ export default function SettingsView() {
 
               {/* Group 1: Preferences */}
               <div className="space-y-2">
-                <div className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider px-2">
+                <div className="app-section-title px-2">
                   Preferences
                 </div>
                 <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) divide-y divide-(--border-subtle) overflow-hidden shadow-xs">
@@ -378,10 +378,10 @@ export default function SettingsView() {
                         <Palette size={17} />
                       </div>
                       <div>
-                        <div className="font-semibold text-xs sm:text-sm text-(--text-primary)">
+                        <div className="app-card-title">
                           Profile & Theme
                         </div>
-                        <div className="text-[11px] text-(--text-muted)">
+                        <div className="app-card-subtitle">
                           Display name, light/dark appearance ({theme === 'dark' ? 'Dark' : 'Light'})
                         </div>
                       </div>
@@ -393,7 +393,7 @@ export default function SettingsView() {
 
               {/* Group 2: Data & Storage */}
               <div className="space-y-2">
-                <div className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider px-2">
+                <div className="app-section-title px-2">
                   System & Storage
                 </div>
                 <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) divide-y divide-(--border-subtle) overflow-hidden shadow-xs">
@@ -477,10 +477,10 @@ export default function SettingsView() {
                     {user?.name?.[0] ? user.name[0].toUpperCase() : 'U'}
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-(--text-primary)">
+                    <h3 className="app-card-title">
                       {user?.name || 'User Profile'}
                     </h3>
-                    <p className="text-xs text-(--text-muted)">
+                    <p className="app-card-subtitle">
                       Personal AI identity & display name
                     </p>
                   </div>
@@ -897,10 +897,10 @@ export default function SettingsView() {
                     <ShieldCheck size={20} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-(--text-primary)">
+                    <h3 className="app-card-title">
                       Data & Local Privacy
                     </h3>
-                    <p className="text-[11px] text-(--text-muted)">
+                    <p className="app-card-subtitle">
                       Manage your offline database, downloads, and storage wipe
                     </p>
                   </div>

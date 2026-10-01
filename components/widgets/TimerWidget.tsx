@@ -66,8 +66,8 @@ export default function TimerWidget({ onClose }: { onClose?: () => void }) {
             <TimerIcon size={16} />
           </div>
           <div>
-            <h3 className="font-bold text-sm text-(--text-primary)">Focus Timer</h3>
-            <p className="text-[10px] text-(--text-muted)">Pomodoro Focus & Productivity</p>
+            <h3 className="app-modal-title">Focus Timer</h3>
+            <p className="app-card-subtitle">Pomodoro Focus & Productivity</p>
           </div>
         </div>
 

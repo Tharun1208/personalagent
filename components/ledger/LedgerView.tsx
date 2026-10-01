@@ -1046,7 +1046,7 @@ function DailySpendingPanel({ currency }: { currency: string }) {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
           <div className="bg-(--bg-card) border border-(--border-subtle) rounded-t-3xl sm:rounded-3xl w-full max-w-md shadow-2xl p-6 animate-in slide-in-from-bottom-4 sm:zoom-in-95">
             <div className="flex items-center justify-between pb-4 border-b border-(--border-subtle) mb-4">
-              <h2 className="text-base font-bold text-(--text-primary)">
+              <h2 className="app-modal-title">
                 {editId ? 'Edit Expense' : 'Add Expense'}
               </h2>
               <button
@@ -1263,8 +1263,8 @@ export default function LedgerView() {
               <HandCoins size={22} />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Money Ledger</h1>
-              <p className="text-xs text-(--text-secondary)">Track dues, debts, and daily spending</p>
+              <h1 className="app-page-title">Money Ledger</h1>
+              <p className="app-page-subtitle">Track dues, debts, and daily spending</p>
             </div>
           </div>
           {mainTab === 'dues' && (
@@ -1505,7 +1505,7 @@ export default function LedgerView() {
             <div className="flex items-center justify-between pb-4 border-b border-(--border-subtle)">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-[#4E82EE]/20 text-[#4E82EE] flex items-center justify-center"><HandCoins size={16} /></div>
-                <h2 className="text-lg font-bold">{editingEntry ? 'Edit Due / Debt' : 'Add Due / Debt'}</h2>
+                <h2 className="app-modal-title">{editingEntry ? 'Edit Due / Debt' : 'Add Due / Debt'}</h2>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="p-1.5 rounded-full text-(--text-muted) hover:bg-(--bg-elevated) cursor-pointer"><X size={18} /></button>
             </div>

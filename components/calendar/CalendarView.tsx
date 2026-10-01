@@ -474,10 +474,10 @@ export default function CalendarView() {
             <CalendarIcon size={17} />
           </div>
           <div>
-            <h1 className="font-semibold text-sm sm:text-base text-(--text-primary) flex items-center gap-2 font-sans">
+            <h1 className="app-page-title flex items-center gap-2">
               Schedule & Calendar
             </h1>
-            <p className="text-[10px] sm:text-[11px] text-(--text-muted)">
+            <p className="app-page-subtitle">
               Visual Day, Week, Month & Year Event Management
             </p>
           </div>
@@ -1312,7 +1312,7 @@ export default function CalendarView() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#4E82EE]">
                   {SHORT_WEEKDAYS[selectedDate.getDay()]}
                 </span>
-                <h2 className="font-bold text-base text-(--text-primary)">
+                <h2 className="app-modal-title">
                   {MONTH_NAMES[selectedDate.getMonth()]} {selectedDate.getDate()}, {selectedDate.getFullYear()}
                 </h2>
               </div>
@@ -1459,10 +1459,10 @@ export default function CalendarView() {
                   <CalendarIcon size={16} />
                 </div>
                 <div>
-                  <h2 className="font-bold text-base text-(--text-primary)">
+                  <h2 className="app-modal-title">
                     Schedule Calendar Event
                   </h2>
-                  <p className="text-[11px] text-(--text-muted)">
+                  <p className="app-card-subtitle">
                     Add a calendar event, milestone, or task deadline
                   </p>
                 </div>

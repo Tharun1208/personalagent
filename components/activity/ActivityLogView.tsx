@@ -47,8 +47,8 @@ export default function ActivityLogView() {
             <Activity size={18} />
           </div>
           <div>
-            <h1 className="font-semibold text-sm text-(--text-primary)">Agent Activity Log</h1>
-            <p className="text-[11px] text-(--text-muted)">
+            <h1 className="app-page-title">Agent Activity Log</h1>
+            <p className="app-page-subtitle">
               Audit timeline of all autonomous tool operations, memory indexing, and actions
             </p>
           </div>

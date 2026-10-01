@@ -175,10 +175,10 @@ export default function HabitsView() {
             <Flame size={18} />
           </div>
           <div>
-            <h1 className="font-semibold text-base text-(--text-primary) flex items-center gap-2 font-sans">
+            <h1 className="app-page-title flex items-center gap-2">
               Habits & Daily Streaks
             </h1>
-            <p className="text-[11px] text-(--text-muted)">
+            <p className="app-page-subtitle">
               Build consistency and maintain daily streaks
             </p>
           </div>
@@ -198,8 +198,8 @@ export default function HabitsView() {
         {/* Habit Summary Card */}
         <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) flex items-center justify-between shadow-2xs">
           <div>
-            <div className="font-bold text-base text-(--text-primary)">Daily Consistency</div>
-            <div className="text-xs text-(--text-muted) mt-0.5">
+            <div className="app-card-title">Daily Consistency</div>
+            <div className="app-card-subtitle mt-0.5">
               {habits.filter((h) => h.lastCompletedDate === todayStr).length} of {habits.length} habits completed today
             </div>
           </div>
@@ -278,7 +278,7 @@ export default function HabitsView() {
       {isAddOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
           <div className="w-full max-w-md rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-4">
-            <h2 className="font-bold text-base text-(--text-primary)">Add New Daily Habit</h2>
+            <h3 className="app-modal-title">Add New Daily Habit</h3>
             <form onSubmit={handleCreate} className="space-y-4">
               <input
                 type="text"

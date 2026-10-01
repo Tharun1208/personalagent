@@ -182,10 +182,10 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                 <Sparkles size={28} />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-(--text-primary) tracking-tight">
+                <h2 className="app-modal-title">
                   {mode === 'login' ? 'Welcome back' : 'Create your account'}
                 </h2>
-                <p className="text-xs text-(--text-muted) mt-1 leading-relaxed">
+                <p className="app-card-subtitle mt-1 leading-relaxed">
                   {mode === 'login'
                     ? 'Sign in to sync your memories, tasks & goals across all devices.'
                     : 'Set up your Assistance account for encrypted cloud backup.'}

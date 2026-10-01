@@ -203,10 +203,10 @@ export default function DashboardView() {
             <Sun size={18} />
           </div>
           <div className="min-w-0">
-            <h1 className="font-extrabold text-xs sm:text-base text-(--text-primary) truncate">
+            <h1 className="app-page-title truncate">
               {getGreeting()}, {user?.name || 'User'}
             </h1>
-            <p className="text-[10px] sm:text-[11px] text-(--text-muted) truncate font-medium">
+            <p className="app-page-subtitle truncate">
               {formattedDate} · <span className="font-cutive font-bold text-[#4E82EE]">{timeStr}</span>
             </p>
           </div>
@@ -290,7 +290,7 @@ export default function DashboardView() {
 
         {/* ── 2. Master 5-Pillar Executive KPI Grid ── */}
         <div>
-          <h2 className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-(--text-muted) mb-2.5 px-1 flex items-center gap-1.5">
+          <h2 className="app-section-title mb-2.5 px-1 flex items-center gap-1.5">
             <Activity size={14} className="text-[#4E82EE]" />
             Core Executive KPI Metrics
           </h2>
@@ -391,11 +391,11 @@ export default function DashboardView() {
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-(--text-primary) flex items-center gap-1.5">
-                  <TrendingUp size={14} className="text-[#4E82EE]" />
+                <h3 className="app-card-title flex items-center gap-1.5">
+                  <TrendingUp size={15} className="text-[#4E82EE]" />
                   7-Day Spending Velocity
                 </h3>
-                <p className="text-[11px] text-(--text-muted)">Daily spend trends for the past week</p>
+                <p className="app-card-subtitle mt-0.5">Daily spend trends for the past week</p>
               </div>
               <button
                 onClick={() => setActiveTab('ledger')}
@@ -439,11 +439,11 @@ export default function DashboardView() {
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-(--text-primary) flex items-center gap-1.5">
-                  <Wallet size={14} className="text-teal-500" />
+                <h3 className="app-card-title flex items-center gap-1.5">
+                  <Wallet size={15} className="text-teal-500" />
                   Financial Health Overview
                 </h3>
-                <p className="text-[11px] text-(--text-muted)">Dues, receivables, and net cashflow</p>
+                <p className="app-card-subtitle mt-0.5">Dues, receivables, and net cashflow</p>
               </div>
               <button
                 onClick={() => setActiveTab('ledger')}
@@ -490,10 +490,10 @@ export default function DashboardView() {
           {/* Priority Tasks Column */}
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
+              <h3 className="app-card-title flex items-center gap-2">
                 <CheckCircle2 size={15} className="text-emerald-500" />
                 Priority Tasks Queue ({pendingTasks.length})
-              </span>
+              </h3>
               <button
                 onClick={() => setActiveTab('tasks')}
                 className="text-xs text-[#4E82EE] font-bold hover:underline cursor-pointer"
@@ -534,10 +534,10 @@ export default function DashboardView() {
           {/* Strategic OKRs Column */}
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
+              <h3 className="app-card-title flex items-center gap-2">
                 <Target size={15} className="text-purple-500" />
                 Active Goals & OKRs ({activeGoals.length})
-              </span>
+              </h3>
               <button
                 onClick={() => setActiveTab('goals')}
                 className="text-xs text-purple-500 font-bold hover:underline cursor-pointer"
@@ -585,10 +585,10 @@ export default function DashboardView() {
         {habits.length > 0 && (
           <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-(--text-primary) flex items-center gap-2">
+              <h3 className="app-card-title flex items-center gap-2">
                 <Trophy size={15} className="text-amber-500" />
                 Habit Streak & Daily Progress
-              </span>
+              </h3>
               <button
                 onClick={() => setActiveTab('habits')}
                 className="text-xs text-amber-500 font-bold hover:underline cursor-pointer"

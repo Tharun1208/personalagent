@@ -199,10 +199,10 @@ function DynamicTipCalc() {
             <Zap size={16} />
           </div>
           <div>
-            <h1 className="font-extrabold text-xs sm:text-base text-(--text-primary)">
+            <h1 className="app-page-title">
               Dynamic Apps & Tools
             </h1>
-            <p className="text-[10px] sm:text-[11px] text-(--text-muted)">
+            <p className="app-page-subtitle">
               Interactive utilities, financial calculators & AI dynamic sandboxes
             </p>
           </div>
@@ -273,10 +273,10 @@ function DynamicTipCalc() {
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-bold text-(--text-primary) group-hover:text-[#4E82EE] transition-colors">
+                  <h3 className="app-card-title group-hover:text-[#4E82EE] transition-colors">
                     {app.name}
                   </h3>
-                  <p className="text-xs text-(--text-muted) line-clamp-2 mt-1 leading-relaxed">
+                  <p className="app-card-subtitle line-clamp-2 mt-1 leading-relaxed">
                     {app.description}
                   </p>
                 </div>
@@ -302,8 +302,8 @@ function DynamicTipCalc() {
                     <Sparkles size={16} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-(--text-primary)">AI Dynamic App Sandbox</h3>
-                    <p className="text-xs text-(--text-muted)">Generate and run bespoke micro-apps instantly</p>
+                    <h3 className="app-card-title">AI Dynamic App Sandbox</h3>
+                    <p className="app-card-subtitle">Generate and run bespoke micro-apps instantly</p>
                   </div>
                 </div>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 font-bold">
@@ -363,8 +363,8 @@ function DynamicTipCalc() {
                     <Calculator size={16} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-(--text-primary)">Smart Loan & EMI Calculator</h3>
-                    <p className="text-xs text-(--text-muted)">Accurate monthly payments & interest analytics</p>
+                    <h3 className="app-card-title">Smart Loan & EMI Calculator</h3>
+                    <p className="app-card-subtitle">Accurate monthly payments & interest analytics</p>
                   </div>
                 </div>
               </div>
@@ -429,8 +429,8 @@ function DynamicTipCalc() {
                     <Users size={16} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-(--text-primary)">Group Bill & Expense Splitter</h3>
-                    <p className="text-xs text-(--text-muted)">Equal & fair division with automatic tip calculation</p>
+                    <h3 className="app-card-title">Group Bill & Expense Splitter</h3>
+                    <p className="app-card-subtitle">Equal & fair division with automatic tip calculation</p>
                   </div>
                 </div>
               </div>
@@ -524,8 +524,8 @@ function DynamicTipCalc() {
                     <FileText size={16} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-(--text-primary)">Instant Quick Scratchpad</h3>
-                    <p className="text-xs text-(--text-muted)">Auto-saved markdown notes and rapid thoughts</p>
+                    <h3 className="app-card-title">Instant Quick Scratchpad</h3>
+                    <p className="app-card-subtitle">Auto-saved markdown notes and rapid thoughts</p>
                   </div>
                 </div>
 
@@ -559,8 +559,8 @@ function DynamicTipCalc() {
                     <Droplets size={16} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-(--text-primary)">Daily Hydration Tracker</h3>
-                    <p className="text-xs text-(--text-muted)">Log your water intake to stay sharp and energized</p>
+                    <h3 className="app-card-title">Daily Hydration Tracker</h3>
+                    <p className="app-card-subtitle">Log your water intake to stay sharp and energized</p>
                   </div>
                 </div>
               </div>
@@ -602,8 +602,8 @@ function DynamicTipCalc() {
                     <Timer size={16} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-(--text-primary)">Deep Focus & Pomodoro Blocks</h3>
-                    <p className="text-xs text-(--text-muted)">Launch dedicated focus intervals for peak flow</p>
+                    <h3 className="app-card-title">Deep Focus & Pomodoro Blocks</h3>
+                    <p className="app-card-subtitle">Launch dedicated focus intervals for peak flow</p>
                   </div>
                 </div>
               </div>
