@@ -963,11 +963,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const due = new Date(r.dueDateTime).getTime();
         if (!isNaN(due) && due <= now) {
           triggeredAny = true;
-
-          // Request screen wake lock so phone/desktop display doesn't dim or turn off while ringing
-          if (typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
-            try { (navigator as any).wakeLock.request('screen').catch(() => {}); } catch {}
-          }
+          const isOverdueFromPast = now - due > 2 * 60 * 1000; // Overdue by more than 2 minutes before app load
 
           let nextDueDateTime = r.dueDateTime;
           let nextStatus: Reminder['status'] = 'triggered';
@@ -995,18 +991,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             )
           );
 
-          // Create instant alarm notification
-          const newNotif: AppNotification = {
-            id: `notif_alarm_${r.id}_${Date.now()}`,
-            userId: user.id,
-            title: r.title || 'Alarm',
-            message: r.notes || `Your alarm "${r.title || 'Alarm'}" is ringing now!`,
-            type: 'reminder',
-            read: false,
-            actionUrl: '/reminders',
-            createdAt: new Date().toISOString(),
-          };
-          setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)]);
+          if (!isOverdueFromPast) {
+            // Request screen wake lock so phone/desktop display doesn't dim or turn off while ringing
+            if (typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
+              try { (navigator as any).wakeLock.request('screen').catch(() => {}); } catch {}
+            }
+
+            // Create instant alarm notification
+            const newNotif: AppNotification = {
+              id: `notif_alarm_${r.id}_${Date.now()}`,
+              userId: user.id,
+              title: r.title || 'Alarm',
+              message: r.notes || `Your alarm "${r.title || 'Alarm'}" is ringing now!`,
+              type: 'reminder',
+              read: false,
+              actionUrl: '/reminders',
+              createdAt: new Date().toISOString(),
+            };
+            setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)]);
+          } else {
+            // Stale past reminder: silently record as missed reminder notification
+            const missedNotif: AppNotification = {
+              id: `notif_missed_${r.id}_${Date.now()}`,
+              userId: user.id,
+              title: `Missed Reminder: ${r.title || 'Alarm'}`,
+              message: r.notes || `Reminder was scheduled for ${new Date(r.dueDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+              type: 'reminder',
+              read: false,
+              actionUrl: '/reminders',
+              createdAt: new Date(due).toISOString(),
+            };
+            setNotifications((prev) => [missedNotif, ...prev.filter((n) => n.id !== missedNotif.id)]);
+          }
 
           apiFetch(`/api/reminders/${r.id}`, {
             method: 'PATCH',

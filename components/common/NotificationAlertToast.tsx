@@ -45,6 +45,7 @@ export default function NotificationAlertToast() {
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [currentTime, setCurrentTime] = useState<string>('');
   const [isAudioUnlocked, setIsAudioUnlocked] = useState<boolean>(true);
+  const mountTimeRef = React.useRef<number>(Date.now());
 
   // Monitor sound engine unlock state
   useEffect(() => {
@@ -76,11 +77,26 @@ export default function NotificationAlertToast() {
     }
   }, []);
 
-  // Check unread notifications and pop them up as real native alerts
+  // Check unread notifications and pop them up as real native alerts only for fresh live alarms
   useEffect(() => {
-    const unread = notifications.filter((n) => !n.read && !dismissedIds.has(n.id));
-    if (unread.length > 0) {
-      const newItems = unread.filter((n) => !activeAlerts.some((a) => a.id === n.id));
+    const now = Date.now();
+    // Only trigger full-screen loud alarm for fresh reminder alarms created during active session (within 60s)
+    const freshAlarms = notifications.filter((n) => {
+      if (n.read || dismissedIds.has(n.id)) return false;
+      if (n.type !== 'reminder' && !n.id.startsWith('notif_alarm_')) return false;
+      if (n.id.startsWith('notif_missed_')) return false;
+
+      const createdAt = new Date(n.createdAt).getTime();
+      if (isNaN(createdAt)) return false;
+
+      // Must be created in the last 60 seconds and after this session mounted
+      const isRecent = now - createdAt < 60000;
+      const isAfterMount = createdAt >= mountTimeRef.current - 5000;
+      return isRecent && isAfterMount;
+    });
+
+    if (freshAlarms.length > 0) {
+      const newItems = freshAlarms.filter((n) => !activeAlerts.some((a) => a.id === n.id));
       if (newItems.length > 0) {
         setActiveAlerts((prev) => [...newItems, ...prev]);
 
