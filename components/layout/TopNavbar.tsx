@@ -3,11 +3,8 @@
 import React from 'react';
 import {
   AlignLeft,
-  SquarePen,
   Search,
   Bell,
-  Timer,
-  Sparkles,
   Settings,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
@@ -26,11 +23,9 @@ export default function TopNavbar({
   const {
     activeTab,
     setActiveTab,
-    startNewChat,
     unreadNotificationCount,
     setNotificationDrawerOpen,
     setCommandPaletteOpen,
-    setFocusTimerOpen,
     user,
   } = useApp();
 
@@ -61,11 +56,7 @@ export default function TopNavbar({
         {/* Branding */}
         <div
           onClick={() => {
-            if (activeTab !== 'chat') {
-              setActiveTab('chat');
-            } else {
-              startNewChat();
-            }
+            setActiveTab('dashboard');
           }}
           className="flex items-center cursor-pointer group"
         >
@@ -73,31 +64,10 @@ export default function TopNavbar({
             Assistance
           </span>
         </div>
-
-        {/* Quick New Chat Button */}
-        <button
-          onClick={() => {
-            setActiveTab('chat');
-            startNewChat();
-          }}
-          className="hidden sm:flex p-1.5 rounded-xl text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) transition-colors cursor-pointer ml-1"
-          title="Start New Chat"
-        >
-          <SquarePen size={16} />
-        </button>
       </div>
 
       {/* Right Action Icons & Profile Avatar */}
       <div className="flex items-center gap-1.5 sm:gap-2">
-        {/* Focus Timer Button */}
-        <button
-          onClick={() => setFocusTimerOpen(true)}
-          className="p-2 rounded-xl text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) transition-colors cursor-pointer active:scale-95"
-          title="Focus & Pomodoro Timer"
-        >
-          <Timer size={17} />
-        </button>
-
         {/* Search (⌘K) Button */}
         <button
           onClick={() => setCommandPaletteOpen(true)}

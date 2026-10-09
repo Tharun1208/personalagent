@@ -5,11 +5,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '@/lib/context/AppContext';
 import Sidebar from '@/components/sidebar/Sidebar';
 import TopNavbar from '@/components/layout/TopNavbar';
-import ChatView from '@/components/chat/ChatView';
 import CalendarView from '@/components/calendar/CalendarView';
-import HabitsView from '@/components/habits/HabitsView';
 import TasksView from '@/components/tasks/TasksView';
-import GoalsView from '@/components/goals/GoalsView';
 import NotesView from '@/components/notes/NotesView';
 import ActivityLogView from '@/components/activity/ActivityLogView';
 import DashboardView from '@/components/dashboard/DashboardView';
@@ -19,8 +16,6 @@ import LedgerView from '@/components/ledger/LedgerView';
 import CommandPalette from '@/components/common/CommandPalette';
 import NotificationDrawer from '@/components/common/NotificationDrawer';
 import NotificationAlertToast from '@/components/common/NotificationAlertToast';
-import LiveVoiceModal from '@/components/voice/LiveVoiceModal';
-import TimerWidget from '@/components/widgets/TimerWidget';
 import CustomConfirmModal from '@/components/common/CustomConfirmModal';
 import CustomToastAlert from '@/components/common/CustomToastAlert';
 import SplashScreen from '@/components/common/SplashScreen';
@@ -30,10 +25,6 @@ export default function AppLayout() {
   const {
     activeTab,
     setActiveTab,
-    liveVoiceOpen,
-    setLiveVoiceOpen,
-    focusTimerOpen,
-    setFocusTimerOpen,
     authModalOpen,
     setAuthModalOpen,
     user,
@@ -65,11 +56,8 @@ export default function AppLayout() {
 
   const renderActiveView = () => {
     switch (activeTab) {
-      case 'chat':      return <ChatView />;
       case 'calendar':  return <CalendarView />;
-      case 'habits':    return <HabitsView />;
       case 'tasks':     return <TasksView />;
-      case 'goals':     return <GoalsView />;
       case 'notes':     return <NotesView />;
       case 'ledger':    return <LedgerView />;
       case 'actions':   return <ActivityLogView />;
@@ -162,21 +150,11 @@ export default function AppLayout() {
       <NotificationDrawer />
       <NotificationAlertToast />
 
-      <LiveVoiceModal isOpen={liveVoiceOpen} onClose={() => setLiveVoiceOpen(false)} />
-
       {/* Global in-app confirm dialog */}
       <CustomConfirmModal dialog={confirmDialog} onClose={dismissConfirm} />
 
       {/* Global in-app toast alerts */}
       <CustomToastAlert toasts={toasts} onDismiss={dismissToast} />
-
-      {focusTimerOpen && (
-        <div className="fixed inset-x-3 bottom-20 sm:inset-auto sm:bottom-6 sm:right-6 z-40 flex justify-center pointer-events-none">
-          <div className="w-full max-w-[340px] sm:max-w-sm pointer-events-auto shadow-2xl animate-in slide-in-from-bottom-5 duration-200">
-            <TimerWidget onClose={() => setFocusTimerOpen(false)} />
-          </div>
-        </div>
-      )}
 
       {/* Native App Opening Splash Animation */}
       <SplashScreen durationMs={2400} />

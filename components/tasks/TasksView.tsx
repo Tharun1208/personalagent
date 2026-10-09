@@ -139,7 +139,6 @@ export default function TasksView() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [breakingDownId, setBreakingDownId] = useState<string | null>(null);
 
   // Form states
   const [title, setTitle] = useState('');
@@ -175,21 +174,6 @@ export default function TasksView() {
 
   const handleUpdateStatus = (taskId: string, newStatus: Task['status']) => {
     updateTaskStatus(taskId, newStatus);
-  };
-
-  const handleBreakdown = async (taskId: string) => {
-    setBreakingDownId(taskId);
-    try {
-      const res = await apiFetch(`/api/tasks/${taskId}/breakdown`, { method: 'POST' });
-      const data = await res.json();
-      if (data.task) {
-        refreshAll();
-      }
-    } catch (err) {
-      console.error('Failed to break down task', err);
-    } finally {
-      setBreakingDownId(null);
-    }
   };
 
   const handleToggleSubtask = async (taskId: string, subtaskId: string) => {
@@ -305,7 +289,7 @@ export default function TasksView() {
               Task Management
             </h1>
             <p className="app-page-subtitle">
-              {tasks.filter((t) => t.status !== 'completed').length} pending tasks with AI subtask checklists
+              {tasks.filter((t) => t.status !== 'completed').length} pending tasks
             </p>
           </div>
         </div>
@@ -388,7 +372,7 @@ export default function TasksView() {
             <CheckSquare size={36} className="mx-auto text-(--text-muted) opacity-30" />
             <div className="text-base font-medium text-(--text-primary)">No tasks found</div>
             <p className="text-xs text-(--text-muted)">
-              Ask Assistance *"Add a task to..."* or click "New Task" above.
+              Click &ldquo;New Task&rdquo; above to create your first task.
             </p>
           </div>
         ) : viewMode === 'kanban' ? (
@@ -517,18 +501,6 @@ export default function TasksView() {
                           </div>
 
                           <div className="flex items-center gap-2 shrink-0">
-                            {/* AI Breakdown Button */}
-                            {!isDone && (
-                              <button
-                                onClick={() => handleBreakdown(task.id)}
-                                disabled={breakingDownId === task.id}
-                                className="px-3 py-1.5 rounded-xl bg-(--bg-elevated) hover:bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
-                              >
-                                <Sparkles size={13} className={breakingDownId === task.id ? 'animate-spin' : ''} />
-                                <span>{breakingDownId === task.id ? 'Generating...' : 'AI Subtasks'}</span>
-                              </button>
-                            )}
-
                             <button
                               onClick={() => deleteTask(task.id)}
                               className="p-2 text-rose-500/80 hover:text-rose-500 rounded-xl hover:bg-rose-500/10 transition-colors cursor-pointer"

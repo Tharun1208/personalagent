@@ -3,15 +3,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
-  MessageSquare,
   CheckSquare,
   Clock,
-  Target,
   Settings,
-  Plus,
   ArrowRight,
-  Sparkles,
-  X,
+  FileText,
+  Calendar,
   HandCoins,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
@@ -21,12 +18,7 @@ export default function CommandPalette() {
     commandPaletteOpen,
     setCommandPaletteOpen,
     setActiveTab,
-    startNewChat,
-    conversations,
-    setActiveConversationId,
     tasks,
-    reminders,
-    goals,
   } = useApp();
 
   const [query, setQuery] = useState('');
@@ -45,28 +37,18 @@ export default function CommandPalette() {
 
   const actions = [
     {
-      id: 'act_new_chat',
-      title: 'New Conversation',
-      category: 'Actions',
-      icon: Plus,
-      run: () => {
-        startNewChat();
-        setCommandPaletteOpen(false);
-      },
-    },
-    {
-      id: 'nav_chat',
-      title: 'Go to AI Assistant',
+      id: 'nav_dashboard',
+      title: 'Go to Executive KPI Dashboard',
       category: 'Navigation',
-      icon: MessageSquare,
+      icon: CheckSquare,
       run: () => {
-        setActiveTab('chat');
+        setActiveTab('dashboard');
         setCommandPaletteOpen(false);
       },
     },
     {
       id: 'nav_tasks',
-      title: 'Go to Tasks Board',
+      title: 'Go to Tasks & Todos',
       category: 'Navigation',
       icon: CheckSquare,
       run: () => {
@@ -75,32 +57,32 @@ export default function CommandPalette() {
       },
     },
     {
-      id: 'nav_reminders',
-      title: 'Go to Smart Reminders',
+      id: 'nav_notes',
+      title: 'Go to Notes & Documents',
       category: 'Navigation',
-      icon: Clock,
+      icon: FileText,
       run: () => {
-        setActiveTab('reminders');
-        setCommandPaletteOpen(false);
-      },
-    },
-    {
-      id: 'nav_goals',
-      title: 'Go to Goals & Milestones (OKRs)',
-      category: 'Navigation',
-      icon: Target,
-      run: () => {
-        setActiveTab('goals');
+        setActiveTab('notes');
         setCommandPaletteOpen(false);
       },
     },
     {
       id: 'nav_ledger',
-      title: 'Go to Money Ledger & Dues',
+      title: 'Go to Ledger & Spending',
       category: 'Navigation',
       icon: HandCoins,
       run: () => {
         setActiveTab('ledger');
+        setCommandPaletteOpen(false);
+      },
+    },
+    {
+      id: 'nav_calendar',
+      title: 'Go to Calendar & Schedule',
+      category: 'Navigation',
+      icon: Calendar,
+      run: () => {
+        setActiveTab('calendar');
         setCommandPaletteOpen(false);
       },
     },
@@ -116,25 +98,9 @@ export default function CommandPalette() {
     },
   ];
 
-  // Search matches
-  const conversationMatches = conversations
-    .filter((c) => c.title.toLowerCase().includes(query.toLowerCase()))
-    .slice(0, 3)
-    .map((c) => ({
-      id: c.id,
-      title: c.title,
-      category: 'Conversations',
-      icon: MessageSquare,
-      run: () => {
-        setActiveConversationId(c.id);
-        setActiveTab('chat');
-        setCommandPaletteOpen(false);
-      },
-    }));
-
   const taskMatches = tasks
     .filter((t) => t.title.toLowerCase().includes(query.toLowerCase()))
-    .slice(0, 3)
+    .slice(0, 4)
     .map((t) => ({
       id: t.id,
       title: `Task: ${t.title}`,
@@ -148,7 +114,6 @@ export default function CommandPalette() {
 
   const allItems = [
     ...actions.filter((a) => a.title.toLowerCase().includes(query.toLowerCase())),
-    ...conversationMatches,
     ...taskMatches,
   ];
 
@@ -190,7 +155,7 @@ export default function CommandPalette() {
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command, search memories, tasks, or chats..."
+            placeholder="Type a command or search tasks..."
             className="w-full text-sm bg-transparent border-none focus:outline-none placeholder:text-(--text-muted)"
           />
           <span className="text-[10px] text-(--text-muted) px-1.5 py-0.5 rounded bg-(--bg-secondary) border border-(--border-subtle) font-mono">
@@ -202,7 +167,7 @@ export default function CommandPalette() {
         <div className="max-h-80 overflow-y-auto p-2 space-y-1 custom-scrollbar">
           {allItems.length === 0 ? (
             <div className="py-8 text-center text-xs text-(--text-muted)">
-              No matching commands or items found
+              No matching commands or tasks found
             </div>
           ) : (
             allItems.map((item, idx) => {
@@ -241,7 +206,7 @@ export default function CommandPalette() {
             <span>↑↓ Navigate</span>
             <span>↵ Select</span>
           </div>
-          <span>Recall AI Intelligence</span>
+          <span>Personal Assistant Workspace</span>
         </div>
       </div>
     </div>

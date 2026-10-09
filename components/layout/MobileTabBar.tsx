@@ -17,11 +17,6 @@ interface MobileTabBarProps {
 export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {}) {
   const { activeTab, setActiveTab, tasks, ledgerEntries } = useApp();
 
-  // Hide the bottom navigation bar completely when inside AI Assistance Chat
-  if (activeTab === 'chat') {
-    return null;
-  }
-
   const pendingTasks = tasks.filter((t) => t.status !== 'completed').length;
   const pendingLedger = (ledgerEntries || []).filter((l) => l.status === 'pending').length;
 

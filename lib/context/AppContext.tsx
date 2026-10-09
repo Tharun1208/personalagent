@@ -30,30 +30,24 @@ import {
 } from '@/lib/notifications/scheduler';
 
 export type AppTab =
-  | 'chat'
-  | 'calendar'
-  | 'habits'
+  | 'dashboard'
   | 'tasks'
-  | 'reminders'
-  | 'goals'
+  | 'calendar'
   | 'notes'
   | 'ledger'
+  | 'reminders'
   | 'actions'
-  | 'dashboard'
   | 'apps'
   | 'settings';
 
 export const VALID_TABS: AppTab[] = [
-  'chat',
-  'calendar',
-  'habits',
+  'dashboard',
   'tasks',
-  'reminders',
-  'goals',
+  'calendar',
   'notes',
   'ledger',
+  'reminders',
   'actions',
-  'dashboard',
   'apps',
   'settings',
 ];
@@ -482,7 +476,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const startNewChat = useCallback((initialMessage?: string) => {
     setActiveConversationId(null);
     setMessages([]);
-    setActiveTab('chat');
+    setActiveTab('dashboard');
   }, [setActiveTab]);
 
   // Global Keyboard shortcuts: Ctrl+K (Search) & Alt+N / Cmd+N (New Chat)

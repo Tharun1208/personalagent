@@ -48,36 +48,12 @@ const NAV_ITEMS: NavItem[] = [
     glow: 'shadow-blue-500/25',
   },
   {
-    key: 'chat',
-    title: 'AI Intelligence',
-    subtitle: 'Assistant & voice brain',
-    icon: Sparkles,
-    gradient: 'from-purple-600 via-indigo-600 to-pink-500',
-    glow: 'shadow-purple-500/25',
-  },
-  {
     key: 'tasks',
     title: 'Tasks & Todos',
     subtitle: 'Action items & priorities',
     icon: CheckSquare,
     gradient: 'from-emerald-500 to-teal-500',
     glow: 'shadow-emerald-500/25',
-  },
-  {
-    key: 'habits',
-    title: 'Habits & Streaks',
-    subtitle: 'Daily routine tracker',
-    icon: Flame,
-    gradient: 'from-rose-500 to-pink-600',
-    glow: 'shadow-rose-500/25',
-  },
-  {
-    key: 'goals',
-    title: 'Goals & Strategic OKRs',
-    subtitle: 'Objectives & milestones',
-    icon: Target,
-    gradient: 'from-cyan-500 to-blue-600',
-    glow: 'shadow-cyan-500/25',
   },
   {
     key: 'notes',
@@ -110,11 +86,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
     activeTab,
     setActiveTab,
     tasks,
-    goals,
     ledgerEntries,
     user,
-    setLiveVoiceOpen,
-    setFocusTimerOpen,
   } = useApp();
 
   const pendingTaskCount = tasks.filter((t) => t.status !== 'completed').length;
@@ -123,7 +96,6 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const getBadge = (key: string) => {
     if (key === 'tasks') return pendingTaskCount;
     if (key === 'ledger') return pendingLedgerCount;
-    if (key === 'goals') return goals.length;
     return 0;
   };
 
@@ -234,34 +206,6 @@ export default function Sidebar({ onClose }: SidebarProps) {
 
       {/* ── Quick Tools Row ── */}
       <div className="p-3 pt-2 border-t border-(--border-subtle)/50 space-y-2 shrink-0 bg-(--bg-card)/30">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-(--text-muted) px-1">
-          Quick Launch
-        </div>
-        
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => {
-              setLiveVoiceOpen(true);
-              if (onClose) onClose();
-            }}
-            className="h-10 px-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/50 hover:bg-(--bg-elevated) text-(--text-primary) transition-all text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-2xs group"
-          >
-            <AudioLines size={15} className="text-[#4E82EE] group-hover:scale-110 transition-transform" />
-            <span>Live Voice</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setFocusTimerOpen(true);
-              if (onClose) onClose();
-            }}
-            className="h-10 px-3 rounded-xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/50 hover:bg-(--bg-elevated) text-(--text-primary) transition-all text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-2xs group"
-          >
-            <Flame size={15} className="text-amber-500 group-hover:scale-110 transition-transform" />
-            <span>Focus Timer</span>
-          </button>
-        </div>
-
         {/* Cloud Sync Status Pill */}
         <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium">
           <div className="flex items-center gap-1.5">

@@ -3,12 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   CheckSquare,
-  Target,
-  Sparkles,
   ArrowRight,
   CheckCircle2,
-  Flame,
-  Volume2,
   HandCoins,
   TrendingUp,
   Sun,
@@ -17,18 +13,13 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   ListTodo,
-  Trophy,
   CreditCard,
   Activity,
   DollarSign,
-  ChevronRight,
-  ShieldCheck,
+  FileText,
   Calendar,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
-import { Habit } from '@/types';
-import DailyBriefingModal from '@/components/briefing/DailyBriefingModal';
-import { apiFetch } from '@/lib/api';
 
 // Storage key for daily spending to pull real-time financial KPI
 const SPENDING_STORAGE_KEY = 'assistance_daily_spending';
@@ -56,17 +47,12 @@ export default function DashboardView() {
   const {
     user,
     tasks,
-    goals,
     ledgerEntries,
     setActiveTab,
-    sendMessage,
     toggleTask,
-    setFocusTimerOpen,
   } = useApp();
 
-  const [habits, setHabits] = useState<Habit[]>([]);
   const [timeStr, setTimeStr] = useState('');
-  const [briefingOpen, setBriefingOpen] = useState(false);
   const [spendingList, setSpendingList] = useState<SpendingEntry[]>([]);
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -83,33 +69,6 @@ export default function DashboardView() {
   useEffect(() => {
     setSpendingList(loadSpending());
   }, []);
-
-  useEffect(() => {
-    const fetchHabits = async () => {
-      try {
-        const res = await apiFetch('/api/habits');
-        const data = await res.json();
-        if (data.habits) setHabits(data.habits);
-      } catch {}
-    };
-    fetchHabits();
-  }, []);
-
-  const handleToggleHabit = async (id: string) => {
-    try {
-      const res = await apiFetch('/api/habits', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      const data = await res.json();
-      if (data.habit) {
-        setHabits((prev) => prev.map((h) => (h.id === id ? data.habit : h)));
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   // ── 1. Task Velocity KPIs ───────────────────────────────────────
   const { totalTasks, completedTasks, pendingTasks, taskCompletionRate, highPriorityTasks } = useMemo(() => {
@@ -145,25 +104,7 @@ export default function DashboardView() {
     return { give, receive, net, pendingCount: pending.length };
   }, [ledgerEntries]);
 
-  // ── 3. Goals & Milestone KPIs ────────────────────────────────────
-  const activeGoals = goals.filter((g) => g.status === 'active');
-  const goalsMilestonesCompleted = useMemo(() => {
-    let totalM = 0;
-    let compM = 0;
-    goals.forEach((g) => {
-      if (g.milestones) {
-        totalM += g.milestones.length;
-        compM += g.milestones.filter((m) => m.completed).length;
-      }
-    });
-    return { totalM, compM, pct: totalM > 0 ? Math.round((compM / totalM) * 100) : 0 };
-  }, [goals]);
-
-  // ── 4. Habits KPIs ───────────────────────────────────────────────
-  const habitsCompletedToday = habits.filter((h) => h.lastCompletedDate === todayStr).length;
-  const habitCompletionRate = habits.length > 0 ? Math.round((habitsCompletedToday / habits.length) * 100) : 0;
-
-  // ── 5. 7-Day Spending Trend for Chart ───────────────────────────
+  // ── 3. 7-Day Spending Trend for Chart ───────────────────────────
   const past7Days = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
@@ -196,7 +137,7 @@ export default function DashboardView() {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-(--bg-primary) text-(--text-primary)">
       
-      {/* ── Top Header Bar (v3.0 Next-Gen OS) ── */}
+      {/* ── Top Header Bar ── */}
       <div className="px-4 py-3 sm:px-6 sm:h-16 border-b border-(--border-subtle)/50 flex items-center justify-between shrink-0 bg-(--bg-primary)/90 backdrop-blur-xl">
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-md shadow-blue-500/20 shrink-0 select-none">
@@ -211,45 +152,24 @@ export default function DashboardView() {
             </p>
           </div>
         </div>
-
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <button
-            onClick={() => setBriefingOpen(true)}
-            className="px-3.5 py-2 rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#4E82EE] text-white text-[11px] sm:text-xs font-bold hover:opacity-95 shadow-md shadow-blue-500/25 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shrink-0"
-          >
-            <Volume2 size={13} />
-            <span>AI Briefing</span>
-          </button>
-        </div>
       </div>
 
       {/* ── Main Executive Command Canvas ── */}
       <div className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-6 max-w-6xl mx-auto w-full space-y-4 sm:space-y-6 custom-scrollbar pb-32 sm:pb-36 md:pb-12">
 
-        {/* ── 1. Executive Intelligence Hero Card ── */}
+        {/* ── 1. Executive Summary Hero Card ── */}
         <div className="p-4 sm:p-6 rounded-3xl bg-gradient-to-br from-[#4E82EE]/12 via-(--bg-card) to-[#9B72CF]/10 border border-[#4E82EE]/25 shadow-lg shadow-blue-500/5 space-y-3 sm:space-y-4 relative overflow-hidden backdrop-blur-md">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-extrabold text-[#4E82EE] uppercase tracking-wider">
-              <Sparkles size={14} className="text-[#4E82EE]" />
-              <span>Assistance OS v3.0 Intelligence</span>
+              <Activity size={14} className="text-[#4E82EE]" />
+              <span>Executive Overview & Workspace</span>
             </div>
-            <button
-              onClick={() => {
-                setActiveTab('chat');
-                sendMessage('Analyze my tasks, goals, financial dues, and today\'s schedule. Give me a 3-point action plan.');
-              }}
-              className="text-[11px] sm:text-xs font-bold text-[#4E82EE] hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <span>Generate AI Plan</span>
-              <ArrowUpRight size={13} />
-            </button>
           </div>
 
           <p className="text-xs sm:text-sm font-medium text-(--text-primary) leading-relaxed">
             You have <strong className="text-[#4E82EE] font-cutive">{pendingTasks.length} pending action items</strong>, today&apos;s spending stands at{' '}
             <strong className="text-emerald-500 font-cutive">₹{todaySpendingTotal.toLocaleString('en-IN')}</strong>, and you have{' '}
-            <strong className="text-indigo-500 font-cutive">{activeGoals.length} active OKR goals</strong> with{' '}
-            <strong className="text-amber-500 font-cutive">{habitsCompletedToday}/{habits.length || 1} habits completed</strong> today.
+            <strong className="text-indigo-500 font-cutive">{duesStats.pendingCount} active balance settlements</strong>.
             {highPriorityTasks.length > 0 && (
               <span> Top priority: <strong className="text-(--text-primary)">&ldquo;{highPriorityTasks[0].title}&rdquo;</strong>.</span>
             )}
@@ -272,30 +192,30 @@ export default function DashboardView() {
               <span>Log Expense</span>
             </button>
             <button
-              onClick={() => setActiveTab('goals')}
-              className="px-3.5 py-2.5 rounded-2xl bg-(--bg-card) border border-(--border-subtle) hover:border-purple-500/50 text-xs font-bold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 group"
-            >
-              <Target size={14} className="text-purple-500 group-hover:scale-110 transition-transform" />
-              <span>Track Goals</span>
-            </button>
-            <button
-              onClick={() => setFocusTimerOpen(true)}
+              onClick={() => setActiveTab('notes')}
               className="px-3.5 py-2.5 rounded-2xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/50 text-xs font-bold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 group"
             >
-              <Flame size={14} className="text-amber-500 group-hover:scale-110 transition-transform" />
-              <span>Focus 25m</span>
+              <FileText size={14} className="text-amber-500 group-hover:scale-110 transition-transform" />
+              <span>New Note</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('calendar')}
+              className="px-3.5 py-2.5 rounded-2xl bg-(--bg-card) border border-(--border-subtle) hover:border-indigo-500/50 text-xs font-bold text-(--text-primary) transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 group"
+            >
+              <Calendar size={14} className="text-indigo-500 group-hover:scale-110 transition-transform" />
+              <span>Calendar</span>
             </button>
           </div>
         </div>
 
-        {/* ── 2. Master 5-Pillar Executive KPI Grid ── */}
+        {/* ── 2. Master KPI Grid ── */}
         <div>
           <h2 className="app-section-title mb-2.5 px-1 flex items-center gap-1.5">
             <Activity size={14} className="text-[#4E82EE]" />
             Core Executive KPI Metrics
           </h2>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
             {/* KPI 1: Task Completion Rate */}
             <div
               onClick={() => setActiveTab('tasks')}
@@ -352,40 +272,22 @@ export default function DashboardView() {
               <p className="text-[10px] text-(--text-muted) truncate font-medium">{duesStats.pendingCount} active dues</p>
             </div>
 
-            {/* KPI 4: Goal Milestones */}
+            {/* KPI 4: Pending Tasks Count */}
             <div
-              onClick={() => setActiveTab('goals')}
-              className="p-3.5 sm:p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-purple-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
+              onClick={() => setActiveTab('tasks')}
+              className="p-3.5 sm:p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-indigo-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98"
             >
               <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-bold text-[11px] sm:text-xs truncate">Goals</span>
-                <Target size={15} className="text-purple-500" />
+                <span className="font-bold text-[11px] sm:text-xs truncate">Pending Queue</span>
+                <CheckSquare size={15} className="text-indigo-500" />
               </div>
               <div>
-                <p className="text-xl sm:text-2xl font-black text-purple-500 font-cutive">{activeGoals.length}</p>
+                <p className="text-xl sm:text-2xl font-black text-indigo-500 font-cutive">{pendingTasks.length}</p>
                 <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-1.5 overflow-hidden">
-                  <div className="h-full rounded-full bg-purple-500" style={{ width: `${goalsMilestonesCompleted.pct}%` }} />
+                  <div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.min(100, pendingTasks.length * 10)}%` }} />
                 </div>
               </div>
-              <p className="text-[10px] text-(--text-muted) truncate font-medium">{goalsMilestonesCompleted.compM}/{goalsMilestonesCompleted.totalM || 1} milestones</p>
-            </div>
-
-            {/* KPI 5: Habits & Daily Streak */}
-            <div
-              onClick={() => setActiveTab('habits')}
-              className="p-3.5 sm:p-4 rounded-3xl bg-(--bg-card) border border-(--border-subtle) hover:border-amber-500/40 transition-all cursor-pointer shadow-xs space-y-1.5 group active:scale-98 col-span-2 md:col-span-1"
-            >
-              <div className="flex items-center justify-between text-xs text-(--text-muted)">
-                <span className="font-bold text-[11px] sm:text-xs truncate">Habit Streak</span>
-                <Flame size={15} className="text-amber-500" />
-              </div>
-              <div>
-                <p className="text-xl sm:text-2xl font-black text-amber-500 font-cutive">{habitCompletionRate}%</p>
-                <div className="w-full h-1.5 rounded-full bg-(--bg-elevated) mt-1.5 overflow-hidden">
-                  <div className="h-full rounded-full bg-amber-500" style={{ width: `${habitCompletionRate}%` }} />
-                </div>
-              </div>
-              <p className="text-[10px] text-(--text-muted) truncate font-medium">{habitsCompletedToday}/{habits.length || 1} done today</p>
+              <p className="text-[10px] text-(--text-muted) truncate font-medium">{highPriorityTasks.length} high priority</p>
             </div>
           </div>
         </div>
@@ -490,162 +392,51 @@ export default function DashboardView() {
           </div>
         </div>
 
-        {/* ── 4. Detailed Sections: Priority Tasks & Strategic OKRs ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-          {/* Priority Tasks Column */}
-          <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <h3 className="app-card-title flex items-center gap-2">
-                <CheckCircle2 size={15} className="text-emerald-500" />
-                Priority Tasks Queue ({pendingTasks.length})
-              </h3>
-              <button
-                onClick={() => setActiveTab('tasks')}
-                className="text-xs text-[#4E82EE] font-bold hover:underline cursor-pointer"
-              >
-                View All
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {pendingTasks.length === 0 ? (
-                <div className="py-8 text-center text-xs text-(--text-muted) font-medium">
-                  All tasks completed for today!
-                </div>
-              ) : (
-                pendingTasks.slice(0, 4).map((t) => (
-                  <div
-                    key={t.id}
-                    onClick={() => toggleTask(t.id, t.status)}
-                    className="p-3.5 rounded-2xl bg-(--bg-elevated) hover:bg-(--bg-elevated)/80 border border-(--border-subtle) transition-all cursor-pointer flex items-center justify-between gap-2.5 active:scale-98"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-5 h-5 rounded-lg border border-(--border-subtle) flex items-center justify-center shrink-0">
-                        {t.status === 'completed' && <span className="text-xs text-emerald-500 font-bold">✓</span>}
-                      </div>
-                      <span className="text-xs font-semibold text-(--text-primary) truncate">
-                        {t.title}
-                      </span>
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded-md font-bold uppercase bg-(--bg-card) text-(--text-secondary) shrink-0 font-cutive">
-                      {t.priority}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
+        {/* ── 4. Priority Tasks Section ── */}
+        <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <h3 className="app-card-title flex items-center gap-2">
+              <CheckCircle2 size={15} className="text-emerald-500" />
+              Priority Tasks Queue ({pendingTasks.length})
+            </h3>
+            <button
+              onClick={() => setActiveTab('tasks')}
+              className="text-xs text-[#4E82EE] font-bold hover:underline cursor-pointer"
+            >
+              View All Tasks
+            </button>
           </div>
 
-          {/* Strategic OKRs Column */}
-          <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <h3 className="app-card-title flex items-center gap-2">
-                <Target size={15} className="text-purple-500" />
-                Active Goals & OKRs ({activeGoals.length})
-              </h3>
-              <button
-                onClick={() => setActiveTab('goals')}
-                className="text-xs text-purple-500 font-bold hover:underline cursor-pointer"
-              >
-                View Goals
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {activeGoals.length === 0 ? (
-                <div className="py-8 text-center text-xs text-(--text-muted) font-medium">
-                  No active goals created yet. Set a strategic goal!
-                </div>
-              ) : (
-                activeGoals.slice(0, 4).map((g) => {
-                  const milestones = g.milestones || [];
-                  const compCount = milestones.filter((m) => m.completed).length;
-                  const pct = milestones.length > 0 ? Math.round((compCount / milestones.length) * 100) : 0;
-                  return (
-                    <div
-                      key={g.id}
-                      onClick={() => setActiveTab('goals')}
-                      className="p-3.5 rounded-2xl bg-(--bg-elevated) hover:bg-(--bg-elevated)/80 border border-(--border-subtle) transition-all cursor-pointer space-y-2 active:scale-98"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold text-(--text-primary) truncate">
-                          {g.title}
-                        </span>
-                        <span className="text-[11px] font-cutive font-bold text-purple-500 shrink-0">
-                          {pct}%
-                        </span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full bg-(--bg-card) overflow-hidden">
-                        <div className="h-full rounded-full bg-purple-500 transition-all duration-300" style={{ width: `${pct}%` }} />
-                      </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            {pendingTasks.length === 0 ? (
+              <div className="py-8 text-center text-xs text-(--text-muted) font-medium col-span-full">
+                All tasks completed for today!
+              </div>
+            ) : (
+              pendingTasks.slice(0, 6).map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => toggleTask(t.id, t.status)}
+                  className="p-3.5 rounded-2xl bg-(--bg-elevated) hover:bg-(--bg-elevated)/80 border border-(--border-subtle) transition-all cursor-pointer flex items-center justify-between gap-2.5 active:scale-98"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-5 h-5 rounded-lg border border-(--border-subtle) flex items-center justify-center shrink-0">
+                      {t.status === 'completed' && <span className="text-xs text-emerald-500 font-bold">✓</span>}
                     </div>
-                  );
-                })
-              )}
-            </div>
+                    <span className="text-xs font-semibold text-(--text-primary) truncate">
+                      {t.title}
+                    </span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md font-bold uppercase bg-(--bg-card) text-(--text-secondary) shrink-0 font-cutive">
+                    {t.priority}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
-        {/* ── 5. Habit Streaks Section ── */}
-        {habits.length > 0 && (
-          <div className="p-5 rounded-3xl bg-(--bg-card) border border-(--border-subtle) space-y-3.5 shadow-2xs">
-            <div className="flex items-center justify-between">
-              <h3 className="app-card-title flex items-center gap-2">
-                <Trophy size={15} className="text-amber-500" />
-                Habit Streak & Daily Progress
-              </h3>
-              <button
-                onClick={() => setActiveTab('habits')}
-                className="text-xs text-amber-500 font-bold hover:underline cursor-pointer"
-              >
-                Manage Habits
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-              {habits.map((habit) => {
-                const isCompletedToday = habit.lastCompletedDate === todayStr;
-                return (
-                  <div
-                    key={habit.id}
-                    onClick={() => handleToggleHabit(habit.id)}
-                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between active:scale-98 ${
-                      isCompletedToday
-                        ? 'border-emerald-500/50 bg-emerald-500/10 shadow-xs shadow-emerald-500/10'
-                        : 'border-(--border-subtle) bg-(--bg-elevated) hover:border-(--border-medium)'
-                    }`}
-                  >
-                    <div className="min-w-0 pr-2">
-                      <div className="font-bold text-xs text-(--text-primary) truncate">
-                        {habit.title}
-                      </div>
-                      <div className="text-[10px] text-(--text-muted) font-cutive">
-                        {habit.streak || 0} day streak
-                      </div>
-                    </div>
-                    <div
-                      className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                        isCompletedToday
-                          ? 'bg-emerald-500 text-white shadow-xs'
-                          : 'bg-(--bg-card) border border-(--border-subtle) text-transparent'
-                      }`}
-                    >
-                      <span className="text-xs font-bold">✓</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
       </div>
-
-      {/* Audio Daily Briefing Modal */}
-      {briefingOpen && (
-        <DailyBriefingModal isOpen={briefingOpen} onClose={() => setBriefingOpen(false)} />
-      )}
     </div>
   );
 }
