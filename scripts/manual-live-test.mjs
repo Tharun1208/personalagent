@@ -130,8 +130,53 @@ async function runLiveManualTest() {
     console.log(`     ↳ Found ${entries.length} ledger entry/entries`);
   });
 
-  // 8. Settings & Full JSON Data Export
-  await step('8. Backup & Data Export (POST /api/settings)', async () => {
+  // 8. Money Ledger - Partial Payment & History Tracking
+  await step('8. Money Ledger - Partial Payment & Auto-Settle (PATCH /api/ledger)', async () => {
+    // 1st partial payment: ₹200 out of ₹450
+    const res1 = await request('/api/ledger', {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+      body: {
+        id: createdLedgerId,
+        action: 'partial_payment',
+        paymentAmount: 200,
+        note: 'GPay Installment 1',
+      },
+    });
+    if (res1.status !== 200) throw new Error(`Expected 200, got ${res1.status}`);
+    if (res1.data.entry?.paidAmount !== 200) {
+      throw new Error(`Expected paidAmount 200, got ${res1.data.entry?.paidAmount}`);
+    }
+    if (res1.data.entry?.status !== 'pending') {
+      throw new Error(`Expected status pending, got ${res1.data.entry?.status}`);
+    }
+
+    // 2nd partial payment: ₹250 (remaining ₹250 -> auto-settles!)
+    const res2 = await request('/api/ledger', {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+      body: {
+        id: createdLedgerId,
+        action: 'partial_payment',
+        paymentAmount: 250,
+        note: 'Cash balance settlement',
+      },
+    });
+    if (res2.status !== 200) throw new Error(`Expected 200, got ${res2.status}`);
+    if (res2.data.entry?.paidAmount !== 450) {
+      throw new Error(`Expected paidAmount 450, got ${res2.data.entry?.paidAmount}`);
+    }
+    if (res2.data.entry?.status !== 'settled') {
+      throw new Error(`Expected status settled, got ${res2.data.entry?.status}`);
+    }
+    if (!Array.isArray(res2.data.entry?.payments) || res2.data.entry.payments.length !== 2) {
+      throw new Error(`Expected 2 payment history records, got ${res2.data.entry?.payments?.length}`);
+    }
+    console.log(`     ↳ Partial payments logged: 2 installments totaling ₹450 -> Auto-settled: ${res2.data.entry.status}`);
+  });
+
+  // 9. Settings & Full JSON Data Export
+  await step('9. Backup & Data Export (POST /api/settings)', async () => {
     const res = await request('/api/settings', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
@@ -143,8 +188,8 @@ async function runLiveManualTest() {
     console.log(`     ↳ Exported datasets: ${exportKeys.join(', ')}`);
   });
 
-  // 9. Task Cleanup / Deletion
-  await step('9. Task Management - Delete (DELETE /api/tasks/:id)', async () => {
+  // 10. Task Cleanup / Deletion
+  await step('10. Task Management - Delete (DELETE /api/tasks/:id)', async () => {
     const res = await request(`/api/tasks/${createdTaskId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },

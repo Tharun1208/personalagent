@@ -112,7 +112,13 @@ interface AppContextType {
   createLedgerEntry: (personName: string, amount: number, type: 'give' | 'receive', options?: { description?: string; dueDate?: string; category?: string; currency?: string }) => Promise<void>;
   updateLedgerEntry: (id: string, patch: Partial<LedgerEntry>) => Promise<void>;
   settleLedgerEntry: (id: string) => Promise<void>;
+  recordPartialPayment: (id: string, paymentAmount: number, note?: string) => Promise<void>;
   deleteLedgerEntry: (id: string) => Promise<void>;
+  isPinSet: boolean;
+  isAppLocked: boolean;
+  setAppPin: (pin: string | null) => void;
+  unlockApp: (pin: string) => boolean;
+  lockApp: () => void;
   confirmAction: (toolName: string, action: string, payload: any, approved: boolean) => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
@@ -275,6 +281,70 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [guestPromptsUsed, setGuestPromptsUsed] = useState(0);
   const [isHydrated, setIsHydrated] = useState(false);
   const initialLoadedRef = React.useRef(false);
+
+  const [isPinSet, setIsPinSet] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return !!localStorage.getItem('recall_app_pin_hash');
+    } catch {
+      return false;
+    }
+  });
+
+  const [isAppLocked, setIsAppLocked] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return !!localStorage.getItem('recall_app_pin_hash');
+    } catch {
+      return false;
+    }
+  });
+
+  const setAppPin = useCallback((pin: string | null) => {
+    if (typeof window === 'undefined') return;
+    if (!pin) {
+      try {
+        localStorage.removeItem('recall_app_pin_hash');
+      } catch {}
+      setIsPinSet(false);
+      setIsAppLocked(false);
+    } else {
+      try {
+        const hash = btoa(pin);
+        localStorage.setItem('recall_app_pin_hash', hash);
+      } catch {}
+      setIsPinSet(true);
+      setIsAppLocked(false);
+    }
+  }, []);
+
+  const unlockApp = useCallback((pin: string): boolean => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const hash = localStorage.getItem('recall_app_pin_hash');
+      if (!hash) {
+        setIsAppLocked(false);
+        return true;
+      }
+      if (btoa(pin) === hash) {
+        setIsAppLocked(false);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const lockApp = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const hash = localStorage.getItem('recall_app_pin_hash');
+      if (hash) {
+        setIsAppLocked(true);
+      }
+    } catch {}
+  }, []);
 
   const isGuest = !user || isGuestEmail(user?.email);
 
@@ -1711,6 +1781,61 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const recordPartialPayment = async (id: string, paymentAmount: number, note?: string) => {
+    if (paymentAmount <= 0) return;
+    const now = new Date().toISOString();
+    const paymentId = `pay_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const newPayment = {
+      id: paymentId,
+      amount: paymentAmount,
+      date: now,
+      note: note?.trim() || undefined,
+    };
+
+    setLedgerEntries((prev) => {
+      const updated = prev.map((l) => {
+        if (l.id !== id) return l;
+        const currentPaid = l.paidAmount || 0;
+        const newPaid = Math.min(l.amount, currentPaid + paymentAmount);
+        const isSettled = newPaid >= l.amount;
+        const existingPayments = Array.isArray(l.payments) ? l.payments : [];
+        return {
+          ...l,
+          paidAmount: newPaid,
+          status: isSettled ? ('settled' as const) : l.status,
+          settledAt: isSettled ? (l.settledAt || now) : l.settledAt,
+          updatedAt: now,
+          payments: [newPayment, ...existingPayments],
+        };
+      });
+      try { localStorage.setItem('recall_ledger', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    try {
+      const res = await apiFetch('/api/ledger', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          action: 'partial_payment',
+          paymentAmount,
+          note,
+        }),
+      });
+      const data = await safeJson(res);
+      if (data?.entry) {
+        setLedgerEntries((prev) => {
+          const updated = prev.map((l) => (l.id === id ? data.entry : l));
+          try { localStorage.setItem('recall_ledger', JSON.stringify(updated)); } catch {}
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.warn('Ledger partial payment sync notice:', err);
+    }
+  };
+
   const deleteLedgerEntry = async (id: string) => {
     setLedgerEntries((prev) => {
       const updated = prev.filter((l) => l.id !== id);
@@ -1845,7 +1970,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createLedgerEntry,
         updateLedgerEntry,
         settleLedgerEntry,
+        recordPartialPayment,
         deleteLedgerEntry,
+        isPinSet,
+        isAppLocked,
+        setAppPin,
+        unlockApp,
+        lockApp,
         confirmAction,
         markNotificationRead,
         markAllNotificationsRead,

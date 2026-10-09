@@ -1131,9 +1131,49 @@ export const db = {
       idx = data.ledger.findIndex((l) => l.id === id);
     }
     if (idx === -1) return null;
+    const now = new Date().toISOString();
     data.ledger[idx].status = 'settled';
-    data.ledger[idx].settledAt = new Date().toISOString();
-    data.ledger[idx].updatedAt = new Date().toISOString();
+    data.ledger[idx].paidAmount = data.ledger[idx].amount;
+    data.ledger[idx].settledAt = now;
+    data.ledger[idx].updatedAt = now;
+    persistDb();
+    syncEntityToMongo('ledger', 'upsert', data.ledger[idx]).catch(() => {});
+    persistDocs('ledger', data.ledger[idx]);
+    return data.ledger[idx];
+  },
+
+  recordPartialPayment(id: string, userId: string, paymentAmount: number, note?: string): LedgerEntry | null {
+    const data = ensureDbFile();
+    data.ledger = data.ledger || [];
+    let idx = data.ledger.findIndex((l) => l.id === id && (l.userId === userId || !l.userId || userId === 'usr_primary_default' || userId === 'guest_instant'));
+    if (idx === -1) {
+      idx = data.ledger.findIndex((l) => l.id === id);
+    }
+    if (idx === -1) return null;
+
+    const entry = data.ledger[idx];
+    const currentPaid = entry.paidAmount || 0;
+    const newPaid = Math.min(entry.amount, currentPaid + Math.max(0, paymentAmount));
+    const now = new Date().toISOString();
+
+    const paymentRecord = {
+      id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      amount: paymentAmount,
+      date: now,
+      note: note?.trim() || undefined,
+    };
+
+    const isFullyPaid = newPaid >= entry.amount;
+
+    data.ledger[idx] = {
+      ...entry,
+      paidAmount: newPaid,
+      payments: [...(entry.payments || []), paymentRecord],
+      status: isFullyPaid ? 'settled' : 'pending',
+      settledAt: isFullyPaid ? now : entry.settledAt,
+      updatedAt: now,
+    };
+
     persistDb();
     syncEntityToMongo('ledger', 'upsert', data.ledger[idx]).catch(() => {});
     persistDocs('ledger', data.ledger[idx]);

@@ -64,11 +64,20 @@ export interface Habit {
 export type LedgerType = 'give' | 'receive'; // 'give' (You owe/payable) | 'receive' (They owe you/receivable)
 export type LedgerStatus = 'pending' | 'settled';
 
+export interface LedgerPayment {
+  id: string;
+  amount: number;
+  date: string;
+  note?: string;
+}
+
 export interface LedgerEntry {
   id: string;
   userId: string;
   personName: string;
   amount: number;
+  paidAmount?: number;
+  payments?: LedgerPayment[];
   currency: string;
   type: LedgerType;
   status: LedgerStatus;

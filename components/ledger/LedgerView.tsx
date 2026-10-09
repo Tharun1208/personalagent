@@ -30,6 +30,14 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Receipt,
+  Printer,
+  CreditCard,
+  History,
+  Share2,
+  FileText,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { LedgerEntry, LedgerType } from '@/types';
@@ -1178,6 +1186,7 @@ export default function LedgerView() {
     createLedgerEntry,
     updateLedgerEntry,
     settleLedgerEntry,
+    recordPartialPayment,
     deleteLedgerEntry,
     createReminder,
     showToast,
@@ -1194,6 +1203,73 @@ export default function LedgerView() {
   const [editingEntry, setEditingEntry] = useState<LedgerEntry | null>(null);
   const [showSimplifiedGraph, setShowSimplifiedGraph] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  // Partial Payment Modal State
+  const [partialPaymentEntry, setPartialPaymentEntry] = useState<LedgerEntry | null>(null);
+  const [partialAmount, setPartialAmount] = useState('');
+  const [partialNote, setPartialNote] = useState('');
+
+  // Receipt & Statement Modal State
+  const [receiptEntry, setReceiptEntry] = useState<LedgerEntry | null>(null);
+  const [expandedHistoryIds, setExpandedHistoryIds] = useState<Record<string, boolean>>({});
+
+  const toggleHistory = (id: string) => {
+    setExpandedHistoryIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleOpenPartialPayment = (entry: LedgerEntry) => {
+    setPartialPaymentEntry(entry);
+    const remaining = Math.max(0, entry.amount - (entry.paidAmount || 0));
+    setPartialAmount(remaining > 0 ? remaining.toString() : '');
+    setPartialNote('');
+  };
+
+  const handlePartialPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!partialPaymentEntry) return;
+    const numAmount = parseFloat(partialAmount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      showToast('Please enter a valid payment amount', 'warning');
+      return;
+    }
+    const remaining = Math.max(0, partialPaymentEntry.amount - (partialPaymentEntry.paidAmount || 0));
+    if (numAmount > remaining) {
+      showToast(`Amount exceeds remaining balance of ${partialPaymentEntry.currency}${remaining}`, 'warning');
+      return;
+    }
+
+    await recordPartialPayment(partialPaymentEntry.id, numAmount, partialNote);
+    showToast(`Recorded payment of ${partialPaymentEntry.currency}${numAmount} for ${partialPaymentEntry.personName}`, 'success');
+    setPartialPaymentEntry(null);
+    setPartialAmount('');
+    setPartialNote('');
+  };
+
+  const copyReceiptText = (entry: LedgerEntry) => {
+    const paid = entry.paidAmount || 0;
+    const remaining = Math.max(0, entry.amount - paid);
+    const paymentsList = (entry.payments || [])
+      .map((p, idx) => `  ${idx + 1}. ${entry.currency}${p.amount} on ${new Date(p.date).toLocaleDateString()} ${p.note ? `(${p.note})` : ''}`)
+      .join('\n');
+
+    const text = `=== PERSONAL AGENT LEDGER STATEMENT ===
+Transaction ID: ${entry.id}
+Counterparty: ${entry.personName}
+Type: ${entry.type === 'give' ? 'You Owe' : 'Owed to You'}
+Status: ${entry.status.toUpperCase()}
+Total Amount: ${entry.currency}${entry.amount}
+Paid to Date: ${entry.currency}${paid}
+Remaining Balance: ${entry.currency}${remaining}
+Due Date: ${entry.dueDate ? new Date(entry.dueDate).toLocaleDateString() : 'N/A'}
+Created Date: ${new Date(entry.createdAt).toLocaleDateString()}
+
+Payment History:
+${paymentsList || '  No partial payments logged yet.'}
+=======================================`;
+
+    navigator.clipboard.writeText(text);
+    showToast('Statement copied to clipboard!', 'success');
+  };
 
   useEffect(() => {
     const handleCloseMenu = () => setOpenMenuId(null);
@@ -1212,8 +1288,8 @@ export default function LedgerView() {
 
   const stats = useMemo(() => {
     const pending = ledgerEntries.filter((e) => e.status === 'pending');
-    const totalGive    = pending.filter((e) => e.type === 'give').reduce((s, e) => s + e.amount, 0);
-    const totalReceive = pending.filter((e) => e.type === 'receive').reduce((s, e) => s + e.amount, 0);
+    const totalGive    = pending.filter((e) => e.type === 'give').reduce((s, e) => s + (e.amount - (e.paidAmount || 0)), 0);
+    const totalReceive = pending.filter((e) => e.type === 'receive').reduce((s, e) => s + (e.amount - (e.paidAmount || 0)), 0);
     const net = totalReceive - totalGive;
     const settledCount = ledgerEntries.filter((e) => e.status === 'settled').length;
     return { totalGive, totalReceive, net, pendingCount: pending.length, settledCount };
@@ -1460,58 +1536,132 @@ export default function LedgerView() {
                 {filteredEntries.map((entry) => {
                   const isGive = entry.type === 'give';
                   const isSettled = entry.status === 'settled';
+                  const paid = entry.paidAmount || 0;
+                  const remaining = Math.max(0, entry.amount - paid);
+                  const paidPct = Math.min(100, Math.round((paid / entry.amount) * 100));
+                  const payments = entry.payments || [];
+                  const isHistoryOpen = !!expandedHistoryIds[entry.id];
+
                   return (
                     <div
                       key={entry.id}
                       className={`rounded-3xl bg-(--bg-card) border p-5 shadow-xs flex flex-col justify-between gap-4 relative transition-all card-lift animate-fade-in-up ${
                         isSettled
-                          ? 'border-(--border-subtle) opacity-65 bg-(--bg-card)/60'
+                          ? 'border-(--border-subtle) opacity-80 bg-(--bg-card)/80'
                           : isGive
                           ? 'border-(--border-subtle) hover:border-rose-500/40 shadow-xs'
                           : 'border-(--border-subtle) hover:border-emerald-500/40 shadow-xs'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h3 className="app-card-title truncate text-base font-bold text-(--text-primary)">
-                            {entry.personName}
-                          </h3>
-                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                            <span
-                              className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="app-card-title truncate text-base font-bold text-(--text-primary)">
+                              {entry.personName}
+                            </h3>
+                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                              <span
+                                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                                  isSettled
+                                    ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                                    : isGive
+                                    ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                    : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                }`}
+                              >
+                                {isSettled ? '✓ Fully Settled' : isGive ? 'You Owe' : 'Owed to You'}
+                              </span>
+                              {entry.category && (
+                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-(--bg-elevated) text-(--text-muted) capitalize border border-(--border-subtle)">
+                                  {entry.category}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <div
+                              className={`text-xl sm:text-2xl font-black flex items-baseline justify-end gap-0.5 tracking-tight ${
                                 isSettled
-                                  ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                                  ? 'text-(--text-muted)'
                                   : isGive
-                                  ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                  : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                  ? 'text-rose-600 dark:text-rose-400'
+                                  : 'text-emerald-600 dark:text-emerald-400'
                               }`}
                             >
-                              {isSettled ? '✓ Settled' : isGive ? 'You Owe' : 'Owed to You'}
-                            </span>
-                            {entry.category && (
-                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-(--bg-elevated) text-(--text-muted) capitalize border border-(--border-subtle)">
-                                {entry.category}
-                              </span>
+                              <span className="text-base sm:text-lg opacity-85">{entry.currency}</span>
+                              <span>{entry.amount.toLocaleString('en-IN')}</span>
+                            </div>
+                            {paid > 0 && !isSettled && (
+                              <p className="text-[11px] font-mono text-(--text-muted) mt-0.5">
+                                Left: <span className="font-bold text-rose-500 dark:text-rose-400">{entry.currency}{remaining.toLocaleString('en-IN')}</span>
+                              </p>
                             )}
                           </div>
                         </div>
 
-                        <div className="text-right shrink-0">
-                          <div
-                            className={`text-xl sm:text-2xl font-black flex items-baseline justify-end gap-0.5 tracking-tight ${
-                              isSettled
-                                ? 'text-(--text-muted) line-through'
-                                : isGive
-                                ? 'text-rose-600 dark:text-rose-400'
-                                : 'text-emerald-600 dark:text-emerald-400'
-                            }`}
-                          >
-                            <span className="text-base sm:text-lg opacity-85">{entry.currency}</span>
-                            <span>{entry.amount.toLocaleString('en-IN')}</span>
+                        {/* Partial Payment Progress Bar */}
+                        {paid > 0 && (
+                          <div className="p-2.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px] font-mono">
+                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                                Paid: {entry.currency}{paid.toLocaleString('en-IN')} ({paidPct}%)
+                              </span>
+                              <span className="text-(--text-muted)">
+                                {isSettled ? 'Complete' : `Due: ${entry.currency}${remaining.toLocaleString('en-IN')}`}
+                              </span>
+                            </div>
+                            <div className="h-2 w-full bg-(--bg-card) rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${
+                                  isSettled ? 'bg-blue-500' : 'bg-emerald-500'
+                                }`}
+                                style={{ width: `${paidPct}%` }}
+                              />
+                            </div>
                           </div>
-                        </div>
+                        )}
+
+                        {/* Payment History Accordion */}
+                        {payments.length > 0 && (
+                          <div className="border-t border-(--border-subtle) pt-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleHistory(entry.id)}
+                              className="w-full flex items-center justify-between text-xs text-(--text-muted) hover:text-(--text-primary) py-1 font-medium transition-colors cursor-pointer"
+                            >
+                              <span className="flex items-center gap-1.5">
+                                <History size={13} className="text-[#4E82EE]" />
+                                Payment History ({payments.length})
+                              </span>
+                              {isHistoryOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            </button>
+
+                            {isHistoryOpen && (
+                              <div className="mt-2 space-y-1.5 animate-in fade-in duration-150">
+                                {payments.map((p) => (
+                                  <div
+                                    key={p.id}
+                                    className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-(--bg-elevated) text-xs"
+                                  >
+                                    <div className="min-w-0 pr-2">
+                                      <p className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
+                                        +{entry.currency}{p.amount.toLocaleString('en-IN')}
+                                      </p>
+                                      {p.note && <p className="text-[10px] text-(--text-muted) truncate">{p.note}</p>}
+                                    </div>
+                                    <span className="text-[10px] text-(--text-muted) shrink-0 font-mono">
+                                      {new Date(p.date).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
+                      {/* Card Footer Actions */}
                       <div className="pt-3 border-t border-(--border-subtle) flex items-center justify-between gap-2 text-xs">
                         <div className="flex items-center gap-1.5 text-(--text-muted) text-[11px] font-cutive">
                           {entry.dueDate ? (
@@ -1524,81 +1674,106 @@ export default function LedgerView() {
                           )}
                         </div>
 
-                        {/* 3-Dots Options Menu */}
-                        <div className="relative">
+                        <div className="flex items-center gap-1.5">
+                          {/* Receipt Action Button */}
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenMenuId(openMenuId === entry.id ? null : entry.id);
-                            }}
-                            className="p-1.5 sm:p-2 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary) transition-all cursor-pointer active:scale-95 shadow-2xs"
-                            title="More options"
+                            onClick={() => setReceiptEntry(entry)}
+                            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary) font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                            title="Printable Statement / Receipt"
                           >
-                            <MoreVertical size={16} />
+                            <Receipt size={14} className="text-[#9B72CF]" />
+                            <span className="hidden sm:inline">Receipt</span>
                           </button>
 
-                          {openMenuId === entry.id && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              className="absolute right-0 bottom-full mb-1.5 sm:bottom-auto sm:top-full sm:mt-1.5 w-44 rounded-2xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-1.5 z-40 space-y-0.5 animate-in fade-in zoom-in-95 duration-150"
+                          {!isSettled && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPartialPayment(entry)}
+                              className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                              title="Record Partial Payment"
                             >
-                              {!isSettled && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenMenuId(null);
-                                      settleLedgerEntry(entry.id);
-                                    }}
-                                    className="w-full px-3 py-2 rounded-xl hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
-                                  >
-                                    <CheckCircle2 size={15} className="text-emerald-500" />
-                                    <span>Settle Due</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenMenuId(null);
-                                      handleSetReminderForDue(entry);
-                                    }}
-                                    className="w-full px-3 py-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-primary) font-semibold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
-                                  >
-                                    <BellRing size={15} className="text-[#4E82EE]" />
-                                    <span>Set Reminder</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setOpenMenuId(null);
-                                      handleOpenEdit(entry);
-                                    }}
-                                    className="w-full px-3 py-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-primary) font-semibold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
-                                  >
-                                    <Edit2 size={15} className="text-amber-500" />
-                                    <span>Edit Due</span>
-                                  </button>
-                                </>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenMenuId(null);
-                                  showConfirm({
-                                    title: 'Remove Record',
-                                    message: `Remove ${entry.personName} (${entry.currency}${entry.amount}) from dues ledger?`,
-                                    confirmText: 'Remove',
-                                    type: 'danger',
-                                    onConfirm: () => deleteLedgerEntry(entry.id),
-                                  });
-                                }}
-                                className="w-full px-3 py-2 rounded-xl hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
-                              >
-                                <Trash2 size={15} className="text-rose-500" />
-                                <span>Delete Record</span>
-                              </button>
-                            </div>
+                              <CreditCard size={13} />
+                              <span>Pay Partial</span>
+                            </button>
                           )}
+
+                          {/* 3-Dots Options Menu */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(openMenuId === entry.id ? null : entry.id);
+                              }}
+                              className="p-1.5 sm:p-2 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary) transition-all cursor-pointer active:scale-95 shadow-2xs"
+                              title="More options"
+                            >
+                              <MoreVertical size={15} />
+                            </button>
+
+                            {openMenuId === entry.id && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute right-0 bottom-full mb-1.5 sm:bottom-auto sm:top-full sm:mt-1.5 w-48 rounded-2xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-1.5 z-40 space-y-0.5 animate-in fade-in zoom-in-95 duration-150"
+                              >
+                                {!isSettled && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenMenuId(null);
+                                        settleLedgerEntry(entry.id);
+                                      }}
+                                      className="w-full px-3 py-2 rounded-xl hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
+                                    >
+                                      <CheckCircle2 size={15} className="text-emerald-500" />
+                                      <span>Settle Full Due</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenMenuId(null);
+                                        handleSetReminderForDue(entry);
+                                      }}
+                                      className="w-full px-3 py-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-primary) font-semibold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
+                                    >
+                                      <BellRing size={15} className="text-[#4E82EE]" />
+                                      <span>Set Reminder</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setOpenMenuId(null);
+                                        handleOpenEdit(entry);
+                                      }}
+                                      className="w-full px-3 py-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-primary) font-semibold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
+                                    >
+                                      <Edit2 size={15} className="text-amber-500" />
+                                      <span>Edit Due</span>
+                                    </button>
+                                  </>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuId(null);
+                                    showConfirm({
+                                      title: 'Remove Record',
+                                      message: `Remove ${entry.personName} (${entry.currency}${entry.amount}) from dues ledger?`,
+                                      confirmText: 'Remove',
+                                      type: 'danger',
+                                      onConfirm: () => deleteLedgerEntry(entry.id),
+                                    });
+                                  }}
+                                  className="w-full px-3 py-2 rounded-xl hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
+                                >
+                                  <Trash2 size={15} className="text-rose-500" />
+                                  <span>Delete Record</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1669,6 +1844,282 @@ export default function LedgerView() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Partial Payment Modal */}
+      {partialPaymentEntry && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-md shadow-2xl p-6 relative animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-4 border-b border-(--border-subtle)">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <CreditCard size={16} />
+                </div>
+                <div>
+                  <h2 className="app-modal-title">Record Payment</h2>
+                  <p className="text-[11px] text-(--text-muted)">{partialPaymentEntry.personName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPartialPaymentEntry(null)}
+                className="p-1.5 rounded-full text-(--text-muted) hover:bg-(--bg-elevated) cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Summary card */}
+            <div className="my-4 p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) grid grid-cols-2 gap-2 text-center">
+              <div>
+                <span className="text-[10px] text-(--text-muted) uppercase">Total Amount</span>
+                <p className="text-base font-bold text-(--text-primary) font-mono">
+                  {partialPaymentEntry.currency}{partialPaymentEntry.amount.toLocaleString('en-IN')}
+                </p>
+              </div>
+              <div>
+                <span className="text-[10px] text-(--text-muted) uppercase">Remaining Balance</span>
+                <p className="text-base font-bold text-rose-500 font-mono">
+                  {partialPaymentEntry.currency}
+                  {Math.max(0, partialPaymentEntry.amount - (partialPaymentEntry.paidAmount || 0)).toLocaleString('en-IN')}
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handlePartialPaymentSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5">
+                  Payment Amount ({partialPaymentEntry.currency}) *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted) font-semibold text-sm">
+                    {partialPaymentEntry.currency}
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    autoFocus
+                    placeholder="0.00"
+                    value={partialAmount}
+                    onChange={(e) => setPartialAmount(e.target.value)}
+                    className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) text-base font-bold focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex items-center gap-1.5 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rem = Math.max(0, partialPaymentEntry.amount - (partialPaymentEntry.paidAmount || 0));
+                      setPartialAmount((rem * 0.25).toFixed(2));
+                    }}
+                    className="flex-1 py-1 rounded-lg bg-(--bg-elevated) border border-(--border-subtle) hover:bg-emerald-500/10 text-[10px] font-semibold text-(--text-secondary) hover:text-emerald-500"
+                  >
+                    25%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rem = Math.max(0, partialPaymentEntry.amount - (partialPaymentEntry.paidAmount || 0));
+                      setPartialAmount((rem * 0.5).toFixed(2));
+                    }}
+                    className="flex-1 py-1 rounded-lg bg-(--bg-elevated) border border-(--border-subtle) hover:bg-emerald-500/10 text-[10px] font-semibold text-(--text-secondary) hover:text-emerald-500"
+                  >
+                    50%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rem = Math.max(0, partialPaymentEntry.amount - (partialPaymentEntry.paidAmount || 0));
+                      setPartialAmount(rem.toString());
+                    }}
+                    className="flex-1 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold text-emerald-600 dark:text-emerald-400"
+                  >
+                    Full Balance
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5">
+                  Payment Note (optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. GPay ref #1234, Cash given..."
+                  value={partialNote}
+                  onChange={(e) => setPartialNote(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) focus:outline-none focus:border-emerald-500 text-xs"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-(--border-subtle) flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPartialPaymentEntry(null)}
+                  className="px-4 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) font-semibold cursor-pointer hover:bg-(--bg-card) transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md transition-all cursor-pointer"
+                >
+                  Record Payment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Printable Receipt & Statement Generator Modal */}
+      {receiptEntry && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-xl shadow-2xl p-6 sm:p-8 relative animate-in zoom-in-95 text-slate-900 dark:text-slate-100 my-auto">
+            {/* Action Bar (Hidden on print) */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800 mb-6 print:hidden">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                  <Receipt size={16} />
+                </div>
+                <h2 className="text-base font-bold">Transaction Statement</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => copyReceiptText(receiptEntry)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Copy formatted text"
+                >
+                  <Share2 size={13} />
+                  <span>Copy</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                >
+                  <Printer size={13} />
+                  <span>Print / PDF</span>
+                </button>
+                <button
+                  onClick={() => setReceiptEntry(null)}
+                  className="p-1.5 rounded-full text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Receipt Container */}
+            <div id="printable-receipt" className="space-y-6">
+              {/* Receipt Header */}
+              <div className="flex items-start justify-between border-b pb-4 border-slate-200 dark:border-slate-800">
+                <div>
+                  <h1 className="text-xl font-black tracking-tight text-indigo-600 dark:text-indigo-400">
+                    PERSONAL AGENT
+                  </h1>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Official Ledger Statement</p>
+                </div>
+                <div className="text-right font-mono text-xs">
+                  <p className="font-semibold text-slate-700 dark:text-slate-300">ID: {receiptEntry.id.slice(0, 12)}</p>
+                  <p className="text-slate-400">{new Date().toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              {/* Transaction Summary Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-xs">
+                <div>
+                  <span className="text-slate-400 uppercase text-[10px] font-semibold">Counterparty</span>
+                  <p className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 text-sm">{receiptEntry.personName}</p>
+                </div>
+                <div>
+                  <span className="text-slate-400 uppercase text-[10px] font-semibold">Type</span>
+                  <p className="font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                    {receiptEntry.type === 'give' ? 'You Owe' : 'Owed to You'}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-400 uppercase text-[10px] font-semibold">Status</span>
+                  <p className={`font-bold mt-0.5 ${receiptEntry.status === 'settled' ? 'text-blue-500' : 'text-emerald-500'}`}>
+                    {receiptEntry.status.toUpperCase()}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-slate-400 uppercase text-[10px] font-semibold">Due Date</span>
+                  <p className="font-bold text-slate-800 dark:text-slate-200 mt-0.5">
+                    {receiptEntry.dueDate ? new Date(receiptEntry.dueDate).toLocaleDateString() : 'None'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Amount Breakdown */}
+              <div className="space-y-2 border-y py-4 border-slate-200 dark:border-slate-800 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Initial Total Amount:</span>
+                  <span className="font-bold font-mono text-sm">{receiptEntry.currency}{receiptEntry.amount.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Total Settled / Paid:</span>
+                  <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                    {receiptEntry.currency}{(receiptEntry.paidAmount || (receiptEntry.status === 'settled' ? receiptEntry.amount : 0)).toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-dashed border-slate-200 dark:border-slate-800 text-sm">
+                  <span className="font-bold text-slate-900 dark:text-white">Outstanding Balance:</span>
+                  <span className="font-black font-mono text-rose-600 dark:text-rose-400">
+                    {receiptEntry.currency}
+                    {Math.max(0, receiptEntry.amount - (receiptEntry.paidAmount || (receiptEntry.status === 'settled' ? receiptEntry.amount : 0))).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Payment History Table */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">
+                  Payment Installments
+                </h4>
+                {(!receiptEntry.payments || receiptEntry.payments.length === 0) ? (
+                  <p className="text-xs text-slate-400 italic py-2">
+                    {receiptEntry.status === 'settled' ? 'Settled in full via one-time settlement.' : 'No partial payments logged yet.'}
+                  </p>
+                ) : (
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                        <tr>
+                          <th className="py-2 px-3 font-semibold">#</th>
+                          <th className="py-2 px-3 font-semibold">Date</th>
+                          <th className="py-2 px-3 font-semibold">Note</th>
+                          <th className="py-2 px-3 font-semibold text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                        {receiptEntry.payments.map((p, idx) => (
+                          <tr key={p.id}>
+                            <td className="py-2 px-3 text-slate-400">{idx + 1}</td>
+                            <td className="py-2 px-3">{new Date(p.date).toLocaleDateString()}</td>
+                            <td className="py-2 px-3 font-sans text-slate-500">{p.note || '-'}</td>
+                            <td className="py-2 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                              {receiptEntry.currency}{p.amount.toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 text-[10px] text-slate-400 text-center">
+                Generated securely by Personal Agent • Client-side private ledger
+              </div>
+            </div>
           </div>
         </div>
       )}

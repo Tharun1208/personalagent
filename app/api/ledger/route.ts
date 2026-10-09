@@ -76,6 +76,17 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ entry: settled });
     }
 
+    if (action === 'partial_payment') {
+      const { paymentAmount, note } = body;
+      const numPayment = parseFloat(paymentAmount);
+      if (isNaN(numPayment) || numPayment <= 0) {
+        return NextResponse.json({ error: 'Invalid payment amount' }, { status: 400 });
+      }
+      const updated = db.recordPartialPayment(id, user.id, numPayment, note);
+      if (!updated) return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
+      return NextResponse.json({ entry: updated });
+    }
+
     const updated = db.updateLedgerEntry(id, user.id, updates);
     if (!updated) return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
 

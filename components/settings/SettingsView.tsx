@@ -19,16 +19,17 @@ import {
   FileJson,
   Database,
   Lock,
+  KeyRound,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { apiFetch } from '@/lib/api';
 
 export default function SettingsView() {
   const appCtx = useApp();
-  const { user, updateUser, refreshAll, theme, setTheme, showToast, showConfirm } = appCtx;
+  const { user, updateUser, refreshAll, theme, setTheme, showToast, showConfirm, isPinSet, setAppPin, lockApp } = appCtx;
 
-  // View routing: 'main' | 'profile' | 'backup' | 'data'
-  const [currentView, setCurrentView] = useState<'main' | 'profile' | 'backup' | 'data'>('main');
+  // View routing: 'main' | 'profile' | 'backup' | 'data' | 'security'
+  const [currentView, setCurrentView] = useState<'main' | 'profile' | 'backup' | 'data' | 'security'>('main');
 
   // Backup states
   const [lastLocalBackup, setLastLocalBackup] = useState<string>('Today, 2:00 AM');
@@ -48,6 +49,69 @@ export default function SettingsView() {
       setName(user.name || '');
     }
   }, [user]);
+
+  // Security & PIN states
+  const [pinMode, setPinMode] = useState<'view' | 'create' | 'change' | 'remove'>('view');
+  const [oldPin, setOldPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [pinError, setPinError] = useState('');
+
+  const handleSetPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError('');
+    if (!/^\d{4}$/.test(newPin)) {
+      setPinError('PIN must be exactly 4 digits');
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setPinError('PIN and Confirmation do not match');
+      return;
+    }
+    setAppPin(newPin);
+    showToast('4-Digit Security PIN enabled successfully!', 'success');
+    setNewPin('');
+    setConfirmPin('');
+    setPinMode('view');
+  };
+
+  const handleChangePin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError('');
+    const storedHash = localStorage.getItem('recall_app_pin_hash');
+    if (storedHash && btoa(oldPin) !== storedHash) {
+      setPinError('Current PIN is incorrect');
+      return;
+    }
+    if (!/^\d{4}$/.test(newPin)) {
+      setPinError('New PIN must be exactly 4 digits');
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setPinError('New PIN and Confirmation do not match');
+      return;
+    }
+    setAppPin(newPin);
+    showToast('Security PIN changed successfully!', 'success');
+    setOldPin('');
+    setNewPin('');
+    setConfirmPin('');
+    setPinMode('view');
+  };
+
+  const handleRemovePin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError('');
+    const storedHash = localStorage.getItem('recall_app_pin_hash');
+    if (storedHash && btoa(oldPin) !== storedHash) {
+      setPinError('Current PIN is incorrect');
+      return;
+    }
+    setAppPin(null);
+    showToast('PIN Lock disabled successfully', 'info');
+    setOldPin('');
+    setPinMode('view');
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -262,12 +326,14 @@ export default function SettingsView() {
             <h1 className="text-base sm:text-lg font-bold tracking-tight text-(--text-primary) truncate">
               {currentView === 'main' && 'System Settings'}
               {currentView === 'profile' && 'Profile & Appearance'}
+              {currentView === 'security' && 'Privacy & PIN Lock'}
               {currentView === 'backup' && 'Personal Backup & Restore'}
               {currentView === 'data' && 'Data & Privacy'}
             </h1>
             <p className="text-xs text-(--text-secondary) truncate font-medium">
               {currentView === 'main' && 'Personal preferences, themes, backup and storage'}
               {currentView === 'profile' && 'Manage your personal identity, display name, and color theme'}
+              {currentView === 'security' && 'Configure 4-digit security PIN and privacy app lock'}
               {currentView === 'backup' && 'Simple 1-click personal backup and recovery'}
               {currentView === 'data' && 'Manage local data export and privacy reset'}
             </p>
@@ -343,6 +409,52 @@ export default function SettingsView() {
                         </div>
                         <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
                           Display name, appearance & color scheme ({theme === 'dark' ? 'Dark' : 'Light'})
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight size={17} className="text-(--text-muted) group-hover:text-(--text-primary) transition-colors" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Group 2: Privacy & Security */}
+              <div className="space-y-2.5">
+                <div className="text-xs font-bold uppercase tracking-wider text-(--text-secondary) px-2">
+                  Privacy & App Lock
+                </div>
+                <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) overflow-hidden shadow-xs">
+                  <div
+                    onClick={() => {
+                      setPinError('');
+                      setOldPin('');
+                      setNewPin('');
+                      setConfirmPin('');
+                      setPinMode('view');
+                      setCurrentView('security');
+                    }}
+                    className="p-4 hover:bg-(--bg-elevated) transition-colors cursor-pointer flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0 border border-indigo-500/20">
+                        <Lock size={18} />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-(--text-primary) flex items-center gap-2">
+                          <span>4-Digit PIN App Lock</span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isPinSet
+                                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-slate-500/15 text-slate-600 dark:text-slate-400'
+                            }`}
+                          >
+                            {isPinSet ? 'Active' : 'Disabled'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-(--text-secondary) font-medium mt-0.5">
+                          {isPinSet
+                            ? 'Screen lock is active. Tap to change or remove PIN.'
+                            : 'Set a 4-digit PIN to secure your ledger, notes, and messages.'}
                         </div>
                       </div>
                     </div>
@@ -524,6 +636,269 @@ export default function SettingsView() {
                 </button>
               </div>
             </form>
+          )}
+
+          {/* ───────────────────────────────────────────────────────────── */}
+          {/* VIEW: Privacy & PIN Lock Sub-Page                            */}
+          {/* ───────────────────────────────────────────────────────────── */}
+          {currentView === 'security' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div className="p-5 sm:p-6 rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-xs space-y-6">
+                <div className="flex items-center justify-between pb-4 border-b border-(--border-subtle)">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center border border-indigo-500/20">
+                      <Lock size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-(--text-primary)">
+                        4-Digit PIN & Privacy Lock
+                      </h3>
+                      <p className="text-xs text-(--text-secondary) font-medium mt-0.5">
+                        Client-side passcode protection for your ledger, notes, and messages
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={`text-xs font-bold px-3 py-1 rounded-full ${
+                      isPinSet
+                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                        : 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-500/30'
+                    }`}
+                  >
+                    {isPinSet ? 'Active' : 'Not Set'}
+                  </span>
+                </div>
+
+                {pinError && (
+                  <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-semibold">
+                    {pinError}
+                  </div>
+                )}
+
+                {/* State A: PIN Not Set */}
+                {!isPinSet && (
+                  <form onSubmit={handleSetPin} className="space-y-4 text-xs">
+                    <p className="text-xs text-(--text-secondary)">
+                      Create a 4-digit numeric PIN. Every time you open Personal Agent or return to it, this PIN will be required.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block font-bold text-(--text-secondary) uppercase mb-1.5">
+                          New 4-Digit PIN *
+                        </label>
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={4}
+                          required
+                          placeholder="••••"
+                          value={newPin}
+                          onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+                          className="w-full px-4 py-2.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-lg font-bold text-center tracking-widest text-(--text-primary) focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-(--text-secondary) uppercase mb-1.5">
+                          Confirm PIN *
+                        </label>
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={4}
+                          required
+                          placeholder="••••"
+                          value={confirmPin}
+                          onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+                          className="w-full px-4 py-2.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-lg font-bold text-center tracking-widest text-(--text-primary) focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="submit"
+                        className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                      >
+                        Enable PIN Protection
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* State B: PIN Already Set */}
+                {isPinSet && pinMode === 'view' && (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="font-bold text-sm text-(--text-primary)">Lock Application Now</div>
+                        <div className="text-xs text-(--text-secondary) mt-0.5">
+                          Instantly lock the app to test or protect your active session
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => lockApp()}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center gap-1.5"
+                      >
+                        <Lock size={14} />
+                        <span>Lock Now</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPinError('');
+                          setOldPin('');
+                          setNewPin('');
+                          setConfirmPin('');
+                          setPinMode('change');
+                        }}
+                        className="p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) hover:border-indigo-500/50 text-left transition-all cursor-pointer group"
+                      >
+                        <div className="font-bold text-xs text-(--text-primary) group-hover:text-indigo-500">Change PIN</div>
+                        <div className="text-[11px] text-(--text-secondary) mt-0.5">Update your existing 4-digit code</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPinError('');
+                          setOldPin('');
+                          setPinMode('remove');
+                        }}
+                        className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 text-left transition-all cursor-pointer group"
+                      >
+                        <div className="font-bold text-xs text-rose-600 dark:text-rose-400">Disable PIN Lock</div>
+                        <div className="text-[11px] text-rose-500/70 mt-0.5">Remove passcode protection</div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* State C: Change PIN Form */}
+                {isPinSet && pinMode === 'change' && (
+                  <form onSubmit={handleChangePin} className="space-y-4 text-xs">
+                    <div>
+                      <label className="block font-bold text-(--text-secondary) uppercase mb-1.5">
+                        Current 4-Digit PIN *
+                      </label>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={4}
+                        required
+                        placeholder="••••"
+                        value={oldPin}
+                        onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ''))}
+                        className="w-full sm:w-1/2 px-4 py-2.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-lg font-bold text-center tracking-widest text-(--text-primary) focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block font-bold text-(--text-secondary) uppercase mb-1.5">
+                          New 4-Digit PIN *
+                        </label>
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={4}
+                          required
+                          placeholder="••••"
+                          value={newPin}
+                          onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+                          className="w-full px-4 py-2.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-lg font-bold text-center tracking-widest text-(--text-primary) focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-(--text-secondary) uppercase mb-1.5">
+                          Confirm New PIN *
+                        </label>
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={4}
+                          required
+                          placeholder="••••"
+                          value={confirmPin}
+                          onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+                          className="w-full px-4 py-2.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-lg font-bold text-center tracking-widest text-(--text-primary) focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPinMode('view')}
+                        className="px-4 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) font-semibold cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-all cursor-pointer"
+                      >
+                        Update PIN
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* State D: Remove PIN Form */}
+                {isPinSet && pinMode === 'remove' && (
+                  <form onSubmit={handleRemovePin} className="space-y-4 text-xs">
+                    <p className="text-xs text-rose-500 font-semibold">
+                      Please enter your current 4-digit PIN to disable app lock.
+                    </p>
+                    <div>
+                      <label className="block font-bold text-(--text-secondary) uppercase mb-1.5">
+                        Current PIN *
+                      </label>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={4}
+                        required
+                        placeholder="••••"
+                        value={oldPin}
+                        onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ''))}
+                        className="w-full sm:w-1/2 px-4 py-2.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) text-lg font-bold text-center tracking-widest text-(--text-primary) focus:outline-none focus:border-rose-500"
+                      />
+                    </div>
+
+                    <div className="pt-2 flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPinMode('view')}
+                        className="px-4 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) font-semibold cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold transition-all cursor-pointer"
+                      >
+                        Confirm & Remove PIN
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+
+              {/* Back to Settings */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentView('main')}
+                  className="px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
+                >
+                  Back to Settings
+                </button>
+              </div>
+            </div>
           )}
 
           {/* ───────────────────────────────────────────────────────────── */}

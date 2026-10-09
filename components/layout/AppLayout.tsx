@@ -19,6 +19,7 @@ import NotificationAlertToast from '@/components/common/NotificationAlertToast';
 import CustomConfirmModal from '@/components/common/CustomConfirmModal';
 import CustomToastAlert from '@/components/common/CustomToastAlert';
 import SplashScreen from '@/components/common/SplashScreen';
+import SecurityLockScreen from '@/components/common/SecurityLockScreen';
 import MobileTabBar from '@/components/layout/MobileTabBar';
 
 export default function AppLayout() {
@@ -158,6 +159,9 @@ export default function AppLayout() {
 
       {/* Native App Opening Splash Animation */}
       <SplashScreen durationMs={2400} />
+
+      {/* 4-Digit Security PIN App Lock Screen */}
+      <SecurityLockScreen />
     </motion.div>
   );
 }
