@@ -723,17 +723,17 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         status: 'success',
       };
 
-      let reply = `## 🌅 Daily Executive Briefing for ${userName}\n`;
-      reply += `📅 **${dayOfWeek}, ${fullDate}** • ⏰ **${fullTime}** (*${tz}*)\n\n`;
+      let reply = `##  Daily Executive Briefing for ${userName}\n`;
+      reply += ` **${dayOfWeek}, ${fullDate}** •  **${fullTime}** (*${tz}*)\n\n`;
       reply += `---\n\n`;
 
       // 1. Pending Tasks Section
-      reply += `### 📋 Priority Tasks (${pendingTasks.length} pending)\n`;
+      reply += `###  Priority Tasks (${pendingTasks.length} pending)\n`;
       if (pendingTasks.length === 0) {
         reply += `*✓ All caught up! No pending tasks on your plate right now.*\n\n`;
       } else {
         for (const t of pendingTasks.slice(0, 5)) {
-          const badge = t.priority === 'urgent' ? '🔴 **[URGENT]**' : t.priority === 'high' ? '🟠 **[HIGH]**' : '🟢';
+          const badge = t.priority === 'urgent' ? ' **[URGENT]**' : t.priority === 'high' ? ' **[HIGH]**' : '';
           const due = t.dueDate ? ` *(Due: ${new Date(t.dueDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })})*` : '';
           reply += `* ${badge} **${t.title}**${due}\n`;
         }
@@ -744,13 +744,13 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       }
 
       // 2. Upcoming Reminders & Alarms Section
-      reply += `### ⏰ Scheduled Alarms & Reminders (${pendingReminders.length} active)\n`;
+      reply += `###  Scheduled Alarms & Reminders (${pendingReminders.length} active)\n`;
       if (pendingReminders.length === 0) {
         reply += `*No alarms or reminders scheduled for today.*\n\n`;
       } else {
         for (const r of pendingReminders.slice(0, 4)) {
           const formatted = new Date(r.dueDateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-          reply += `* 🔔 **${r.title}** — **${formatted}**\n`;
+          reply += `*  **${r.title}** — **${formatted}**\n`;
         }
         reply += `\n`;
       }
@@ -759,27 +759,27 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       if (allHabits.length > 0) {
         const todayStr = new Date().toISOString().split('T')[0];
         const completedToday = allHabits.filter((h) => h.lastCompletedDate?.startsWith(todayStr) || h.history?.some((d) => d.startsWith(todayStr))).length;
-        reply += `### 💪 Daily Habits (${completedToday}/${allHabits.length} checked in today)\n`;
+        reply += `###  Daily Habits (${completedToday}/${allHabits.length} checked in today)\n`;
         for (const h of allHabits.slice(0, 4)) {
           const isDone = h.lastCompletedDate?.startsWith(todayStr) || h.history?.some((d) => d.startsWith(todayStr));
-          reply += `* ${isDone ? '✅' : '⚪'} **${h.title}** (${h.streak || 0}-day streak)\n`;
+          reply += `* ${isDone ? '' : ''} **${h.title}** (${h.streak || 0}-day streak)\n`;
         }
         reply += `\n`;
       }
 
       // 4. Financial Ledger Dues
       if (allLedger.length > 0) {
-        reply += `### 💰 Money Ledger & Dues\n`;
-        if (receivableTotal > 0) reply += `* 🟢 **To Receive:** ₹${receivableTotal.toLocaleString()} (owed to you)\n`;
-        if (payableTotal > 0) reply += `* 🔴 **To Pay:** ₹${payableTotal.toLocaleString()} (you owe)\n`;
+        reply += `###  Money Ledger & Dues\n`;
+        if (receivableTotal > 0) reply += `*  **To Receive:** ₹${receivableTotal.toLocaleString()} (owed to you)\n`;
+        if (payableTotal > 0) reply += `*  **To Pay:** ₹${payableTotal.toLocaleString()} (you owe)\n`;
         reply += `\n`;
       }
 
       // 5. Active Goals
       if (allGoals.length > 0) {
-        reply += `### 🎯 Active Goals & OKRs\n`;
+        reply += `###  Active Goals & OKRs\n`;
         for (const g of allGoals.slice(0, 3)) {
-          reply += `* 🚀 **${g.title}** — ${g.progress}% progress\n`;
+          reply += `*  **${g.title}** — ${g.progress}% progress\n`;
         }
         reply += `\n`;
       }
@@ -862,14 +862,14 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         };
 
         const remFormatted = taskIntent.reminderTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-        reminderMessage = `\n\n⏰ **Reminder Scheduled:** I will alert you at **${remFormatted}** when this task is due.`;
+        reminderMessage = `\n\n **Reminder Scheduled:** I will alert you at **${remFormatted}** when this task is due.`;
       }
 
       const dueFormatted = taskIntent.dueDate
         ? new Date(taskIntent.dueDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
         : 'No specific due date';
 
-      let reply = `### ✅ Task Created Successfully\n\n`;
+      let reply = `###  Task Created Successfully\n\n`;
       reply += `| Field | Details |\n`;
       reply += `| :--- | :--- |\n`;
       reply += `| **Title** | ${taskIntent.title} |\n`;
@@ -961,20 +961,20 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       const pending = tasks.filter((t) => t.status !== 'completed' && t.status !== 'cancelled');
       const completed = tasks.filter((t) => t.status === 'completed');
 
-      let reply = `### 📋 Your Tasks (${pending.length} Pending, ${completed.length} Completed)\n\n`;
+      let reply = `###  Your Tasks (${pending.length} Pending, ${completed.length} Completed)\n\n`;
       if (!pending.length) {
         reply += `*You have no unfinished tasks right now.*\n\n`;
       } else {
         reply += `#### ⏳ Pending Tasks (${pending.length}):\n`;
         for (const t of pending) {
-          const badge = t.priority === 'urgent' ? '🔴 **[URGENT]**' : t.priority === 'high' ? '🟠 **[HIGH]**' : '🟢';
+          const badge = t.priority === 'urgent' ? ' **[URGENT]**' : t.priority === 'high' ? ' **[HIGH]**' : '';
           const due = t.dueDate ? ` *(Due: ${new Date(t.dueDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })})*` : '';
           reply += `* ${badge} **${t.title}**${due}\n`;
         }
       }
 
       if (completed.length > 0) {
-        reply += `\n#### ✅ Completed Tasks (${completed.length}):\n`;
+        reply += `\n####  Completed Tasks (${completed.length}):\n`;
         for (const t of completed.slice(0, 5)) {
           reply += `* ~~${t.title}~~\n`;
         }
@@ -1036,7 +1036,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         const todayHoliday = getHolidayForDate(today);
         if (todayHoliday) {
           return {
-            reply: `### 🏛️ Today is a Government Holiday!\n\n**${todayHoliday.emoji || '🎉'} ${todayHoliday.name}** (${todayHoliday.type.toUpperCase()})\n${todayHoliday.description || ''}`,
+            reply: `###  Today is a Government Holiday!\n\n**${todayHoliday.emoji || ''} ${todayHoliday.name}** (${todayHoliday.type.toUpperCase()})\n${todayHoliday.description || ''}`,
             toolSteps,
           };
         } else {
@@ -1053,7 +1053,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         const tomHoliday = getHolidayForDate(tomorrow);
         if (tomHoliday) {
           return {
-            reply: `### 🏛️ Tomorrow is a Government Holiday!\n\n**${tomHoliday.emoji || '🎉'} ${tomHoliday.name}** (${tomHoliday.type.toUpperCase()})\n${tomHoliday.description || ''}`,
+            reply: `###  Tomorrow is a Government Holiday!\n\n**${tomHoliday.emoji || ''} ${tomHoliday.name}** (${tomHoliday.type.toUpperCase()})\n${tomHoliday.description || ''}`,
             toolSteps,
           };
         } else {
@@ -1064,14 +1064,14 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         }
       }
 
-      let reply = `### 🏛️ Official Government & Public Holidays (${yearToFetch})\n\n`;
+      let reply = `###  Official Government & Public Holidays (${yearToFetch})\n\n`;
       reply += `| Date | Holiday | Type |\n`;
       reply += `| :--- | :--- | :--- |\n`;
       for (const h of holidays) {
         const d = new Date(h.date);
         const formattedDate = d.toLocaleDateString([], { month: 'short', day: 'numeric', weekday: 'short' });
-        const typeBadge = h.type === 'national' ? '🇮🇳 National' : h.type === 'gazetted' ? '🏛️ Gazetted' : '✨ Restricted';
-        reply += `| **${formattedDate}** | ${h.emoji || '🎉'} **${h.name}** | ${typeBadge} |\n`;
+        const typeBadge = h.type === 'national' ? ' National' : h.type === 'gazetted' ? ' Gazetted' : ' Restricted';
+        reply += `| **${formattedDate}** | ${h.emoji || ''} **${h.name}** | ${typeBadge} |\n`;
       }
       reply += `\n*All government holidays are synced in real time with your interactive calendar.*`;
 
@@ -1105,7 +1105,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       const reminders = res.data as any[];
       const pendingReminders = reminders.filter((r) => r.status === 'pending');
 
-      let reply = `### ⏰ Your Scheduled Reminders & Alarms (${pendingReminders.length} active)\n\n`;
+      let reply = `###  Your Scheduled Reminders & Alarms (${pendingReminders.length} active)\n\n`;
       if (!pendingReminders.length) {
         reply += `*You have no upcoming reminders scheduled right now.*\n\n`;
       } else {
@@ -1115,7 +1115,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
             timeStyle: 'short',
           });
           const recBadge = r.recurrence && r.recurrence !== 'none' ? ` *(Repeats: ${r.recurrence})*` : '';
-          reply += `* 🔔 **${r.title}** — Due: **${formattedDate}**${recBadge}\n`;
+          reply += `*  **${r.title}** — Due: **${formattedDate}**${recBadge}\n`;
         }
       }
 
@@ -1224,12 +1224,12 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         });
 
         const entry = res.data;
-        let reply = `### 💰 Money Ledger Updated\n\n`;
+        let reply = `###  Money Ledger Updated\n\n`;
         reply += `| Field | Details |\n`;
         reply += `| :--- | :--- |\n`;
         reply += `| **Person / Entity** | ${entry.personName} |\n`;
         reply += `| **Amount** | ${entry.currency}${entry.amount.toLocaleString()} |\n`;
-        reply += `| **Type** | ${entry.type === 'give' ? '🔴 You Need to Give (Payable)' : '🟢 Owed to You (Receivable)'} |\n`;
+        reply += `| **Type** | ${entry.type === 'give' ? ' You Need to Give (Payable)' : ' Owed to You (Receivable)'} |\n`;
         reply += `| **Status** | Pending |\n\n`;
         reply += `*You can view and manage all debts anytime in the **Money Ledger & Dues** section.*`;
 
@@ -1274,8 +1274,8 @@ Explain what you see clearly, extract any key text/details, and answer the user'
 
         return {
           reply: res.success
-            ? `### ✅ Payment Settled!\n\n${res.message}`
-            : `⚠️ ${res.message}`,
+            ? `###  Payment Settled!\n\n${res.message}`
+            : ` ${res.message}`,
           toolSteps,
         };
       }
@@ -1300,7 +1300,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         const { entries, summary } = res.data;
         const pending = entries.filter((e: any) => e.status === 'pending');
 
-        let reply = `### 💰 Your Financial Dues & Money Ledger\n\n`;
+        let reply = `###  Your Financial Dues & Money Ledger\n\n`;
         reply += `* **Total You Owe (To Give):** \`₹${summary.totalToGive.toLocaleString()}\`\n`;
         reply += `* **Total Owed to You (To Receive):** \`₹${summary.totalToReceive.toLocaleString()}\`\n`;
         reply += `* **Net Financial Balance:** \`${summary.netBalance >= 0 ? '+' : ''}₹${summary.netBalance.toLocaleString()}\`\n\n`;
@@ -1310,7 +1310,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         } else {
           reply += `**Active Dues (${pending.length}):**\n`;
           for (const e of pending) {
-            const badge = e.type === 'give' ? '🔴 You owe' : '🟢 Owes you';
+            const badge = e.type === 'give' ? ' You owe' : ' Owes you';
             reply += `* ${badge} **${e.personName}**: **${e.currency}${e.amount}** ${e.description ? `(*${e.description}*)` : ''}\n`;
           }
         }
@@ -1371,7 +1371,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         requiresConfirmation = true;
         confirmationPayload = res.confirmationPayload;
 
-        let reply = `### 🚀 Pull Request Prepared for \`${res.data.branch}\` → \`${res.data.baseBranch}\`\n\n`;
+        let reply = `###  Pull Request Prepared for \`${res.data.branch}\` → \`${res.data.baseBranch}\`\n\n`;
         reply += `**Title:** ${res.data.title}\n\n`;
         reply += `**Summary:**\n${res.data.summary}\n\n`;
         reply += `**Key Changes:**\n`;
@@ -1379,7 +1379,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
           reply += `* ${ch}\n`;
         }
         reply += `\n**Testing:**\n${res.data.testing}\n\n`;
-        reply += `> ⚠️ **Confirmation Required:** Click below to confirm opening this PR on GitHub.`;
+        reply += `>  **Confirmation Required:** Click below to confirm opening this PR on GitHub.`;
 
         return {
           reply,
@@ -1412,7 +1412,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       };
 
       const commits = res.data as any[];
-      let reply = `### 🐙 GitHub Activity Today (\`alexrivera/videovault-ai\`)\n\n`;
+      let reply = `###  GitHub Activity Today (\`alexrivera/videovault-ai\`)\n\n`;
       reply += `I analyzed your **${commits.length} commits** from today:\n\n`;
       for (const c of commits) {
         reply += `* [\`${c.sha}\`] **${c.message}** *(+${c.insertions} / -${c.deletions} in ${c.filesChanged} files)*\n`;
@@ -1449,7 +1449,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         const { project, tasks, memories } = res.data;
         const pendingTasks = tasks.filter((t: any) => t.status !== 'completed');
 
-        let reply = `### 📁 Project Status: **${project.name}**\n\n`;
+        let reply = `###  Project Status: **${project.name}**\n\n`;
         reply += `${project.description}\n\n`;
         reply += `* **Tech Stack:** ${project.techStack.join(', ')}\n`;
         reply += `* **Repository:** \`${project.repository || 'N/A'}\`\n\n`;
@@ -1464,7 +1464,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         }
 
         if (memories.length > 0) {
-          reply += `\n#### 🧠 Project Memory Context:\n`;
+          reply += `\n####  Project Memory Context:\n`;
           for (const m of memories) {
             reply += `* ${m.content}\n`;
           }
@@ -1503,24 +1503,24 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         status: 'success',
       });
 
-      let reply = `### 📅 Summary of What You Need to Finish This Week\n\n`;
+      let reply = `###  Summary of What You Need to Finish This Week\n\n`;
 
       reply += `#### 1. High-Priority Tasks (${tasks.length})\n`;
       for (const t of tasks) {
-        const badge = t.priority === 'urgent' ? '🔴 **[URGENT]**' : '🟠 **[HIGH]**';
+        const badge = t.priority === 'urgent' ? ' **[URGENT]**' : ' **[HIGH]**';
         reply += `* ${badge} **${t.title}**\n`;
       }
 
       reply += `\n#### 2. Upcoming Scheduled Reminders (${reminders.length})\n`;
       for (const r of reminders) {
         const dateStr = new Date(r.dueDateTime).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-        reply += `* ⏰ **${r.title}** — Due: *${dateStr}*\n`;
+        reply += `*  **${r.title}** — Due: *${dateStr}*\n`;
       }
 
       if (memories.length > 0) {
         reply += `\n#### 3. Important Stored Deadlines\n`;
         for (const m of memories) {
-          reply += `* 📌 **${m.content}**\n`;
+          reply += `*  **${m.content}**\n`;
         }
       }
 
@@ -1565,12 +1565,12 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       };
 
       const w = res.data;
-      let reply = `### 🌤️ Live Weather for **${w.location}, ${w.country}**\n\n`;
+      let reply = `###  Live Weather for **${w.location}, ${w.country}**\n\n`;
       reply += `* **Current Temperature:** **${w.temperature}°C** (${w.condition})\n`;
       reply += `* **Humidity:** ${w.humidity}%\n`;
       reply += `* **Wind Speed:** ${w.windSpeed} km/h\n\n`;
       if (w.forecast && w.forecast.length > 0) {
-        reply += `#### 📅 Multi-Day Forecast\n`;
+        reply += `####  Multi-Day Forecast\n`;
         for (const f of w.forecast) {
           reply += `* **${f.day}:** ${f.tempMax}°C / ${f.tempMin}°C — ${f.condition}\n`;
         }
@@ -1621,7 +1621,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       };
 
       const quotes = res.data as any[];
-      let reply = `### 📈 Real-Time Live Market Intelligence\n\n`;
+      let reply = `###  Real-Time Live Market Intelligence\n\n`;
       for (const q of quotes) {
         const sign = q.changePercent24h >= 0 ? '+' : '';
         reply += `* **${q.symbol}** (${q.name}): **${q.currency}${q.price.toLocaleString('en-US')}** (${sign}${q.changePercent24h}% 24h)\n`;

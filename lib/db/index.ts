@@ -337,7 +337,7 @@ function ensureDbFile(): Schema {
         conversationId: 'conv_welcome_01',
         userId: defaultUserId,
         role: 'assistant',
-        content: `👋 **Welcome to Recall AI**, your personal AI assistant with persistent memory and intelligent tool execution.
+        content: ` **Welcome to Recall AI**, your personal AI assistant with persistent memory and intelligent tool execution.
 
 I can help you manage your daily workflow naturally. Here are a few things you can try:
 

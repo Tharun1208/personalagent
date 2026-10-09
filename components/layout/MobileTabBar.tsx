@@ -1,12 +1,14 @@
 'use client';
 
 import React from 'react';
+import { motion, LayoutGroup } from 'framer-motion';
 import {
-  LayoutDashboard,
+  Home,
   CheckSquare,
   FileText,
   Wallet,
   Calendar,
+  type LucideIcon,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 
@@ -14,90 +16,111 @@ interface MobileTabBarProps {
   onOpenMobileMenu?: () => void;
 }
 
+interface NavItem {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+  activeColor: string; // text & icon color
+  activeBg: string;    // soft background pill
+}
+
 export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {}) {
-  const { activeTab, setActiveTab, tasks, ledgerEntries } = useApp();
+  const { activeTab, setActiveTab } = useApp();
 
-  const pendingTasks = tasks.filter((t) => t.status !== 'completed').length;
-  const pendingLedger = (ledgerEntries || []).filter((l) => l.status === 'pending').length;
-
-  const tabs = [
+  const navItems: NavItem[] = [
     {
       key: 'dashboard',
       label: 'Home',
-      icon: LayoutDashboard,
+      icon: Home,
+      activeColor: 'text-[#5B37B7]',
+      activeBg: 'bg-[#5B37B7]/15',
     },
     {
       key: 'tasks',
       label: 'Tasks',
       icon: CheckSquare,
-      badge: pendingTasks,
-    },
-    {
-      key: 'notes',
-      label: 'Notes',
-      icon: FileText,
+      activeColor: 'text-[#C93B76]',
+      activeBg: 'bg-[#C93B76]/15',
     },
     {
       key: 'ledger',
       label: 'Ledger',
       icon: Wallet,
-      badge: pendingLedger,
+      activeColor: 'text-[#0E9488]',
+      activeBg: 'bg-[#0E9488]/15',
     },
     {
       key: 'calendar',
       label: 'Calendar',
       icon: Calendar,
+      activeColor: 'text-[#0284C7]',
+      activeBg: 'bg-[#0284C7]/15',
     },
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-(--bg-card)/95 backdrop-blur-xl border-t border-(--border-subtle)/60 px-2 py-1.5 flex items-center justify-around select-none safe-area-bottom shadow-lg">
-      {tabs.map((tab) => {
-        const isActive = activeTab === tab.key;
-        const Icon = tab.icon;
+    <div className="md:hidden fixed bottom-5 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none safe-area-bottom select-none">
+      
+      {/* ── Exact Re-creation of original-fd08cffe70a8d2d872c30e33f6165690.gif ── */}
+      <LayoutGroup id="animated-bottom-bar">
+        <nav className="pointer-events-auto relative flex items-center justify-between bg-white px-3 py-2.5 rounded-[32px] shadow-[0_16px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.03)] border border-slate-100 max-w-md w-full">
+          {navItems.map((item) => {
+            const isActive = activeTab === item.key;
+            const Icon = item.icon;
 
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key as any)}
-            className={`relative flex flex-col items-center justify-center py-1 px-2 rounded-2xl transition-all duration-200 cursor-pointer active:scale-90 touch-manipulation flex-1 ${
-              isActive
-                ? 'text-[#4E82EE]'
-                : 'text-(--text-muted) hover:text-(--text-primary)'
-            }`}
-          >
-            {/* Active Pill Glow */}
-            {isActive && (
-              <span className="absolute -top-1 w-6 h-1 rounded-full bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] shadow-xs shadow-blue-500/50" />
-            )}
-
-            <div className="relative">
-              <Icon
-                size={20}
-                className={`transition-transform duration-200 ${
-                  isActive ? 'scale-110 text-[#4E82EE]' : ''
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setActiveTab(item.key as any)}
+                className={`relative flex items-center justify-center py-2.5 rounded-full transition-colors duration-200 cursor-pointer active:scale-95 ${
+                  isActive ? 'px-4' : 'px-3 text-slate-800 hover:text-slate-900'
                 }`}
-              />
+              >
+                {/* Animated Sliding Pill Highlight */}
+                {isActive && (
+                  <motion.div
+                    layoutId="active-nav-pill"
+                    transition={{
+                      type: 'spring',
+                      stiffness: 420,
+                      damping: 32,
+                    }}
+                    className={`absolute inset-0 rounded-full ${item.activeBg}`}
+                  />
+                )}
 
-              {/* Badge Counter */}
-              {tab.badge && tab.badge > 0 ? (
-                <span className="absolute -top-1.5 -right-2 min-w-[15px] h-[15px] px-1 rounded-full bg-rose-500 text-white text-[9px] font-black font-mono flex items-center justify-center shadow-xs">
-                  {tab.badge > 9 ? '9+' : tab.badge}
-                </span>
-              ) : null}
-            </div>
+                {/* Content: Icon + Label (Label expands smoothly when active) */}
+                <div
+                  className={`relative z-10 flex items-center gap-2 ${
+                    isActive ? item.activeColor : 'text-slate-800'
+                  }`}
+                >
+                  <Icon
+                    size={20}
+                    className={`shrink-0 transition-transform duration-200 ${
+                      isActive ? 'stroke-[2.5]' : 'stroke-[2]'
+                    }`}
+                  />
 
-            <span
-              className={`text-[10px] font-semibold mt-0.5 tracking-tight truncate max-w-[56px] ${
-                isActive ? 'font-bold text-[#4E82EE]' : 'text-(--text-muted)'
-              }`}
-            >
-              {tab.label}
-            </span>
-          </button>
-        );
-      })}
-    </nav>
+                  {isActive && (
+                    <motion.span
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: 'auto' }}
+                      exit={{ opacity: 0, width: 0 }}
+                      transition={{ duration: 0.22, ease: 'easeOut' }}
+                      className="text-[13.5px] font-bold tracking-tight whitespace-nowrap overflow-hidden"
+                    >
+                      {item.label}
+                    </motion.span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </nav>
+      </LayoutGroup>
+
+    </div>
   );
 }

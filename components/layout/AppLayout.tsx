@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '@/lib/context/AppContext';
 import Sidebar from '@/components/sidebar/Sidebar';
 import TopNavbar from '@/components/layout/TopNavbar';
-import CalendarView from '@/components/calendar/CalendarView';
+import CalendarLightView from '@/components/calendar/CalendarLightView';
 import TasksView from '@/components/tasks/TasksView';
 import NotesView from '@/components/notes/NotesView';
 import ActivityLogView from '@/components/activity/ActivityLogView';
@@ -13,6 +13,7 @@ import DashboardView from '@/components/dashboard/DashboardView';
 import DynamicAppsView from '@/components/apps/DynamicAppsView';
 import SettingsView from '@/components/settings/SettingsView';
 import LedgerView from '@/components/ledger/LedgerView';
+import AuthModal from '@/components/auth/AuthModal';
 import CommandPalette from '@/components/common/CommandPalette';
 import NotificationDrawer from '@/components/common/NotificationDrawer';
 import NotificationAlertToast from '@/components/common/NotificationAlertToast';
@@ -57,7 +58,7 @@ export default function AppLayout() {
 
   const renderActiveView = () => {
     switch (activeTab) {
-      case 'calendar':  return <CalendarView />;
+      case 'calendar':  return <CalendarLightView />;
       case 'tasks':     return <TasksView />;
       case 'notes':     return <NotesView />;
       case 'ledger':    return <LedgerView />;
@@ -78,23 +79,21 @@ export default function AppLayout() {
     >
 
       {/* Desktop Left Sidebar */}
-      {!sidebarCollapsed && (
-        <div className="hidden md:flex">
-          <Sidebar
-            isCollapsed={sidebarCollapsed}
-            onToggleCollapse={() => setSidebarCollapsed(true)}
-          />
-        </div>
-      )}
+      <div className="hidden md:flex shrink-0">
+        <Sidebar
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((p) => !p)}
+        />
+      </div>
 
 
-      {/* Mobile Drawer Sidebar — full screen, slides in/out */}
+      {/* Mobile Drawer Sidebar — slides in from left */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
             key="sidebar-backdrop"
             onClick={() => setMobileMenuOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 md:hidden"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 md:hidden flex justify-start"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -102,20 +101,15 @@ export default function AppLayout() {
           >
             <motion.div
               onClick={(e) => e.stopPropagation()}
-              className="w-full h-full bg-(--bg-sidebar) shadow-2xl flex flex-col"
+              className="w-[272px] sm:w-[288px] h-full bg-white shadow-2xl flex flex-col relative z-10"
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%', transition: { type: 'tween', duration: 0.22, ease: [0.4, 0, 1, 1] } }}
               transition={{ type: 'spring', stiffness: 380, damping: 36, mass: 0.9 }}
             >
-              <motion.div
-                className="flex-1 overflow-y-auto no-scrollbar"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1, duration: 0.25 }}
-              >
+              <div className="flex-1 overflow-y-auto no-scrollbar h-full">
                 <Sidebar onClose={() => setMobileMenuOpen(false)} />
-              </motion.div>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -142,8 +136,10 @@ export default function AppLayout() {
             </motion.div>
           </AnimatePresence>
         </main>
-        {/* Native Mobile Bottom Navigation Bar */}
-        <MobileTabBar onOpenMobileMenu={() => setMobileMenuOpen(true)} />
+        {/* Native Mobile Bottom Navigation Bar - hidden when sidebar drawer is open */}
+        {!mobileMenuOpen && (
+          <MobileTabBar onOpenMobileMenu={() => setMobileMenuOpen(true)} />
+        )}
       </div>
 
       {/* Global Modals / Drawers / Widgets */}
@@ -162,6 +158,9 @@ export default function AppLayout() {
 
       {/* 4-Digit Security PIN App Lock Screen */}
       <SecurityLockScreen />
+
+      {/* Authentication Modal */}
+      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
     </motion.div>
   );
 }

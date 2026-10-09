@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { Montserrat, JetBrains_Mono, Cormorant_Garamond, Cutive_Mono, IBM_Plex_Sans } from 'next/font/google';
+import { Inter, IBM_Plex_Sans, JetBrains_Mono, Cormorant_Garamond, Cutive_Mono } from 'next/font/google';
 import './globals.css';
 import { AppProvider } from '@/lib/context/AppContext';
 
-const montserrat = Montserrat({
+const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-montserrat',
+  variable: '--font-inter',
   display: 'swap',
 });
 
@@ -64,13 +64,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${montserrat.variable} ${jetbrainsMono.variable} ${cormorantGaramond.variable} ${cutiveMono.variable} ${ibmPlexSans.variable}`}
+      className={`${inter.variable} ${ibmPlexSans.variable} ${jetbrainsMono.variable} ${cormorantGaramond.variable} ${cutiveMono.variable}`}
       suppressHydrationWarning
     >
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Cutive+Mono&family=IBM+Plex+Sans:wdth,wght@75..100,500&display=swap" rel="stylesheet" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wdth,wght@75..100,500&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
+          rel="stylesheet"
+        />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#ffffff" />
         <meta name="mobile-web-app-capable" content="yes" />

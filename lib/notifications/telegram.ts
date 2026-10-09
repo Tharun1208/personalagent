@@ -21,7 +21,7 @@ export async function sendTelegramAlert({
   }
 
   try {
-    const icon = type === 'reminder' ? '⏰' : type === 'morning_briefing' ? '🌅' : '📌';
+    const icon = type === 'reminder' ? '' : type === 'morning_briefing' ? '' : '';
     const text = `${icon} *Recall AI Alert: ${title}*\n\n${message}`;
 
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

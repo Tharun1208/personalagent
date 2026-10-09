@@ -37,7 +37,7 @@ export function generateIcsCalendar(userId: string): string {
     ics.push(`DTSTAMP:${nowStr}`);
     ics.push(`DTSTART:${startStr}`);
     ics.push(`DTEND:${endStr}`);
-    ics.push(`SUMMARY:⏰ ${r.title.replace(/[,;]/g, ' ')}`);
+    ics.push(`SUMMARY: ${r.title.replace(/[,;]/g, ' ')}`);
     if (r.notes) ics.push(`DESCRIPTION:${r.notes.replace(/\n/g, '\\n')}`);
     ics.push(`STATUS:${r.status === 'dismissed' ? 'CANCELLED' : 'CONFIRMED'}`);
     ics.push('BEGIN:VALARM');
@@ -60,7 +60,7 @@ export function generateIcsCalendar(userId: string): string {
     ics.push(`DTSTAMP:${nowStr}`);
     ics.push(`DTSTART:${startStr}`);
     ics.push(`DTEND:${endStr}`);
-    ics.push(`SUMMARY:📋 ${t.title.replace(/[,;]/g, ' ')}`);
+    ics.push(`SUMMARY: ${t.title.replace(/[,;]/g, ' ')}`);
     if (t.description) ics.push(`DESCRIPTION:${t.description.replace(/\n/g, '\\n')}`);
     ics.push(`STATUS:${t.status === 'completed' ? 'COMPLETED' : 'CONFIRMED'}`);
     ics.push('END:VEVENT');

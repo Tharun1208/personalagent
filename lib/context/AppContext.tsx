@@ -536,10 +536,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Initial Theme load - Defaults explicitly to pristine Light Theme
+  // Initial Theme load - Enforces pristine Light Theme
   useEffect(() => {
-    const savedTheme = (localStorage.getItem('recall_theme') as 'light' | 'dark') || 'light';
-    setTheme(savedTheme);
+    setTheme('light');
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('recall_theme', 'light');
+        document.documentElement.classList.remove('dark');
+      } catch {}
+    }
   }, [setTheme]);
 
   const startNewChat = useCallback((initialMessage?: string) => {
@@ -923,7 +928,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .filter((r) => r.status === 'pending' && r.dueDateTime)
         .map((r) => ({
           id: notificationIdFromString(r.id),
-          title: `⏰ ${r.title}`,
+          title: ` ${r.title}`,
           body: r.notes || 'Scheduled reminder',
           fireAt: r.dueDateTime,
         })),
@@ -931,7 +936,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .filter((t) => t.status !== 'completed' && t.status !== 'cancelled' && t.dueDate)
         .map((t) => ({
           id: notificationIdFromString(t.id),
-          title: `📋 Task due: ${t.title}`,
+          title: ` Task due: ${t.title}`,
           body: t.priority && t.priority !== 'medium' ? `${t.priority} priority` : 'Due now',
           fireAt: t.dueDate as string,
         })),
@@ -1228,7 +1233,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           conversationId: activeConversationId || 'error',
           userId: 'system',
           role: 'assistant',
-          content: `⚠️ *Notice:* ${errorContent}`,
+          content: ` *Notice:* ${errorContent}`,
           createdAt: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, errorMsg]);
@@ -1240,7 +1245,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         conversationId: activeConversationId || 'error',
         userId: 'system',
         role: 'assistant',
-        content: `⚠️ *An issue occurred while processing:* ${err.message || 'Please retry.'}`,
+        content: ` *An issue occurred while processing:* ${err.message || 'Please retry.'}`,
         createdAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -1698,7 +1703,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         conversationId: activeConversationId || 'conf',
         userId: 'system',
         role: 'assistant',
-        content: approved ? `✅ **Action Confirmed & Executed:**\n\n${data.message}` : `🚫 **Action Cancelled.**`,
+        content: approved ? ` **Action Confirmed & Executed:**\n\n${data.message}` : ` **Action Cancelled.**`,
         createdAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, confirmNotice]);

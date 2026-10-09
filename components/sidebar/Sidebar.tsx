@@ -2,22 +2,21 @@
 
 import React from 'react';
 import {
-  AudioLines,
-  Flame,
-  Settings,
-  X,
-  Database,
-  CheckCircle2,
-  ChevronRight,
-  ShieldCheck,
   LayoutDashboard,
-  Sparkles,
   CheckSquare,
-  Target,
   FileText,
   Wallet,
-  Boxes,
   Calendar,
+  Settings,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Database,
+  Shield,
+  Activity,
+  Layers,
+  Sparkles,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
@@ -33,55 +32,46 @@ interface NavItem {
   title: string;
   subtitle: string;
   icon: LucideIcon;
-  gradient: string;
-  glow: string;
+  badgeType?: 'tasks' | 'ledger';
 }
 
-// ── Nav Items with Lucide Icons & Theme Gradients ─────────────
-const NAV_ITEMS: NavItem[] = [
+// ── Asklepios v3 Modern Navigation Modules ──
+const MAIN_NAV_ITEMS: NavItem[] = [
   {
     key: 'dashboard',
-    title: 'Executive KPI',
-    subtitle: 'Daily overview & metrics',
+    title: 'Overview',
+    subtitle: 'Daily focus & activity',
     icon: LayoutDashboard,
-    gradient: 'from-blue-600 to-cyan-500',
-    glow: 'shadow-blue-500/25',
   },
   {
     key: 'tasks',
-    title: 'Tasks & Todos',
-    subtitle: 'Action items & priorities',
+    title: 'Tasks & Goals',
+    subtitle: 'Track your priorities',
     icon: CheckSquare,
-    gradient: 'from-emerald-500 to-teal-500',
-    glow: 'shadow-emerald-500/25',
+    badgeType: 'tasks',
   },
   {
     key: 'notes',
-    title: 'Notes & Documents',
-    subtitle: 'Drafts, research & exports',
+    title: 'Notes & Journal',
+    subtitle: 'Ideas and documents',
     icon: FileText,
-    gradient: 'from-amber-500 to-orange-500',
-    glow: 'shadow-amber-500/25',
   },
   {
     key: 'ledger',
-    title: 'Ledger & Spending',
-    subtitle: 'Dues & daily expenses',
+    title: 'Ledger & Dues',
+    subtitle: 'Finances & payables',
     icon: Wallet,
-    gradient: 'from-emerald-600 to-teal-600',
-    glow: 'shadow-teal-500/25',
+    badgeType: 'ledger',
   },
   {
     key: 'calendar',
-    title: 'Calendar & Schedule',
-    subtitle: 'Events & timeline',
+    title: 'Calendar & Plan',
+    subtitle: 'Events & reminders',
     icon: Calendar,
-    gradient: 'from-indigo-600 to-blue-600',
-    glow: 'shadow-indigo-500/25',
   },
 ];
 
-export default function Sidebar({ onClose }: SidebarProps) {
+export default function Sidebar({ onClose, isCollapsed = false, onToggleCollapse }: SidebarProps) {
   const {
     activeTab,
     setActiveTab,
@@ -93,18 +83,21 @@ export default function Sidebar({ onClose }: SidebarProps) {
   const pendingTaskCount = tasks.filter((t) => t.status !== 'completed').length;
   const pendingLedgerCount = (ledgerEntries || []).filter((l) => l.status === 'pending').length;
 
-  const getBadge = (key: string) => {
-    if (key === 'tasks') return pendingTaskCount;
-    if (key === 'ledger') return pendingLedgerCount;
+  const getBadge = (badgeType?: 'tasks' | 'ledger') => {
+    if (badgeType === 'tasks') return pendingTaskCount;
+    if (badgeType === 'ledger') return pendingLedgerCount;
     return 0;
   };
 
   return (
-    <aside className="w-full md:w-[275px] bg-(--bg-sidebar) flex flex-col h-full select-none shrink-0 border-r border-(--border-subtle) font-sans overflow-hidden">
-      
+    <aside
+      className={`h-full select-none shrink-0 flex flex-col font-sans transition-all duration-300 ease-in-out border-r border-slate-200/80 bg-white shadow-xs ${
+        isCollapsed ? 'w-[76px]' : 'w-full md:w-[272px]'
+      }`}
+    >
       {/* ── Brand Header ── */}
-      <div className="shrink-0 p-4 pb-3 border-b border-(--border-subtle)/50">
-        <div className="flex items-center justify-between">
+      <div className="shrink-0 h-16 px-4 flex items-center justify-between border-b border-slate-100">
+        {!isCollapsed ? (
           <div
             onClick={() => {
               setActiveTab('dashboard');
@@ -112,32 +105,61 @@ export default function Sidebar({ onClose }: SidebarProps) {
             }}
             className="flex items-center gap-2.5 cursor-pointer group"
           >
-            <span className="font-bold text-lg tracking-tight text-(--text-primary) group-hover:text-[#4E82EE] transition-colors">
+            <span className="font-bold text-lg tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
               Assistance
             </span>
           </div>
+        ) : (
+          <div
+            onClick={() => {
+              setActiveTab('dashboard');
+              if (onClose) onClose();
+            }}
+            className="w-full flex justify-center cursor-pointer group"
+            title="Assistance"
+          >
+            <span className="font-bold text-lg tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
+              A
+            </span>
+          </div>
+        )}
 
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) transition-colors cursor-pointer md:hidden"
-              title="Close menu"
-            >
-              <X size={18} />
-            </button>
-          )}
-        </div>
+        {/* Mobile close button */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors md:hidden cursor-pointer"
+            title="Close menu"
+          >
+            <X size={18} />
+          </button>
+        )}
+
+        {/* Desktop collapse toggle */}
+        {onToggleCollapse && !onClose && (
+          <button
+            onClick={onToggleCollapse}
+            className={`hidden md:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer ${
+              isCollapsed ? 'mx-auto' : ''
+            }`}
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+        )}
       </div>
 
-      {/* ── Main Navigation List (Scrollable on mobile & desktop) ── */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1 custom-scrollbar">
-        <div className="px-3 pt-0.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-(--text-muted)">
-          Workspace Modules
-        </div>
+      {/* ── Main Navigation ── */}
+      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 custom-scrollbar">
+        {!isCollapsed && (
+          <div className="px-3 pb-1 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+            Menu
+          </div>
+        )}
 
-        {NAV_ITEMS.map((item) => {
+        {MAIN_NAV_ITEMS.map((item) => {
           const isActive = activeTab === item.key;
-          const badge = getBadge(item.key);
+          const badge = getBadge(item.badgeType);
           const Icon = item.icon;
 
           return (
@@ -147,113 +169,130 @@ export default function Sidebar({ onClose }: SidebarProps) {
                 setActiveTab(item.key as any);
                 if (onClose) onClose();
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 cursor-pointer group relative ${
+              title={isCollapsed ? item.title : undefined}
+              className={`w-full flex items-center rounded-2xl transition-all duration-200 cursor-pointer group relative ${
+                isCollapsed
+                  ? 'h-12 justify-center'
+                  : 'px-3.5 py-2.5 gap-3'
+              } ${
                 isActive
-                  ? `bg-gradient-to-r ${item.gradient} text-white shadow-md ${item.glow}`
-                  : 'text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
+                  ? 'bg-indigo-600 text-white font-semibold shadow-md shadow-indigo-600/25'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
               }`}
             >
-              {/* Clean Lucide Icon */}
-              <div className="w-6 h-6 flex items-center justify-center shrink-0">
-                <Icon
-                  size={19}
-                  className={`transition-transform duration-200 group-hover:scale-110 ${
-                    isActive
-                      ? 'text-white'
-                      : 'text-(--text-secondary) group-hover:text-(--text-primary)'
-                  }`}
-                />
+              <div
+                className={`flex items-center justify-center shrink-0 transition-transform duration-200 ${
+                  isActive ? 'text-white' : 'text-slate-500 group-hover:text-indigo-600 group-hover:scale-110'
+                }`}
+              >
+                <Icon size={19} className="stroke-[2.2]" />
               </div>
 
-              {/* Title & Subtitle */}
-              <div className="flex-1 min-w-0">
-                <div
-                  className={`text-[13.5px] font-bold tracking-tight truncate ${
-                    isActive ? 'text-white' : 'text-(--text-primary)'
-                  }`}
-                >
-                  {item.title}
-                </div>
-                <div
-                  className={`text-[11px] truncate font-medium ${
-                    isActive ? 'text-white/85' : 'text-(--text-muted)'
-                  }`}
-                >
-                  {item.subtitle}
-                </div>
-              </div>
+              {!isCollapsed && (
+                <>
+                  <div className="flex-1 min-w-0 text-left">
+                    <div className="text-[13.5px] truncate">
+                      {item.title}
+                    </div>
+                    <div
+                      className={`text-[10.5px] truncate ${
+                        isActive ? 'text-indigo-100/90' : 'text-slate-400'
+                      }`}
+                    >
+                      {item.subtitle}
+                    </div>
+                  </div>
 
-              {/* Counter Badge */}
-              {badge > 0 && (
-                <span
-                  className={`text-[11px] font-mono px-2 py-0.5 rounded-full font-bold shrink-0 shadow-xs ${
-                    isActive
-                      ? 'bg-white text-slate-900'
-                      : 'bg-(--bg-elevated) text-[#4E82EE] border border-[#4E82EE]/30'
-                  }`}
-                >
-                  {badge}
-                </span>
+                  {badge > 0 && (
+                    <span
+                      className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full shrink-0 tracking-tight font-mono ${
+                        isActive
+                          ? 'bg-white text-indigo-700 shadow-xs'
+                          : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                      }`}
+                    >
+                      {badge}
+                    </span>
+                  )}
+                </>
               )}
 
-              {isActive && (
-                <ChevronRight size={15} className="text-white/80 shrink-0" />
+              {/* Collapsed dot badge */}
+              {isCollapsed && badge > 0 && (
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
               )}
             </button>
           );
         })}
       </div>
 
-      {/* ── Quick Tools Row ── */}
-      <div className="p-3 pt-2 border-t border-(--border-subtle)/50 space-y-2 shrink-0 bg-(--bg-card)/30">
-        {/* Cloud Sync Status Pill */}
-        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium">
-          <div className="flex items-center gap-1.5">
-            <Database size={13} className="shrink-0" />
-            <span>Database</span>
+      {/* ── System Status Widget (Asklepios Soft Health & Sync Card) ── */}
+      {!isCollapsed && (
+        <div className="p-3 mx-3 mb-3 rounded-2xl bg-slate-50/80 border border-slate-100 text-slate-600 space-y-2">
+          <div className="flex items-center justify-between text-[11px] font-semibold">
+            <span className="flex items-center gap-1.5 text-slate-700">
+              <Database size={13} className="text-indigo-500" />
+              Local Storage
+            </span>
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Ready
+            </span>
           </div>
-          <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Synced
-          </span>
+          <div className="w-full bg-slate-200/80 h-1.5 rounded-full overflow-hidden">
+            <div className="bg-indigo-600 h-full rounded-full w-[100%]" />
+          </div>
+          <p className="text-[10px] text-slate-400 font-medium">
+            100% offline-ready & private
+          </p>
         </div>
-      </div>
+      )}
 
       {/* ── Footer Profile & Settings ── */}
-      <div className="shrink-0 p-3 border-t border-(--border-subtle) bg-(--bg-sidebar)">
+      <div className="shrink-0 p-3 border-t border-slate-100 bg-white">
         <button
           onClick={() => {
             setActiveTab('settings');
             if (onClose) onClose();
           }}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all cursor-pointer ${
+          title={isCollapsed ? 'Settings' : undefined}
+          className={`w-full flex items-center rounded-2xl transition-all duration-200 cursor-pointer ${
+            isCollapsed
+              ? 'h-12 justify-center'
+              : 'px-3 py-2.5 gap-3'
+          } ${
             activeTab === 'settings'
-              ? 'bg-(--bg-elevated) text-(--text-primary) shadow-sm'
-              : 'hover:bg-(--bg-elevated)/80 text-(--text-secondary) hover:text-(--text-primary)'
+              ? 'bg-slate-100 text-slate-900 font-semibold shadow-xs'
+              : 'hover:bg-slate-50 text-slate-600 hover:text-slate-900'
           }`}
         >
-          {/* Avatar */}
+          {/* Avatar with subtle gradient ring */}
           <div className="relative shrink-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white flex items-center justify-center font-bold text-sm shadow-md shadow-blue-500/20">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-sky-500 text-white flex items-center justify-center font-bold text-sm shadow-xs">
               {user?.name?.[0]?.toUpperCase() || 'U'}
             </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-(--bg-sidebar)" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
           </div>
 
-          {/* User Info */}
-          <div className="text-left min-w-0 flex-1">
-            <div className="text-[13px] font-bold truncate text-(--text-primary)">
-              {user?.name || 'Personal Account'}
-            </div>
-            <div className="text-[11px] text-(--text-muted) truncate font-medium">
-              System Settings & Backup
-            </div>
-          </div>
+          {!isCollapsed && (
+            <>
+              <div className="text-left min-w-0 flex-1">
+                <div className="text-[13px] font-bold truncate text-slate-900">
+                  {user?.name || 'Personal Account'}
+                </div>
+                <div className="text-[11px] text-slate-400 truncate font-medium">
+                  Settings & Preferences
+                </div>
+              </div>
 
-          <Settings size={17} className="text-(--text-muted) shrink-0 hover:rotate-45 transition-transform" />
+              <Settings
+                size={17}
+                className="text-slate-400 group-hover:text-slate-600 shrink-0 transition-transform hover:rotate-45"
+              />
+            </>
+          )}
         </button>
       </div>
-
     </aside>
   );
 }

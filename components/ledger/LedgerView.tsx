@@ -11,7 +11,6 @@ import {
   Clock,
   Trash2,
   Edit2,
-  BellRing,
   X,
   Wallet,
   ShoppingCart,
@@ -24,24 +23,7 @@ import {
   Zap,
   Heart,
   MoreHorizontal,
-  MoreVertical,
-  TrendingDown,
-  TrendingUp,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  Receipt,
-  Printer,
-  CreditCard,
-  History,
-  Share2,
-  FileText,
-  ChevronDown,
-  ChevronUp,
-  Check,
-  Copy,
-  ShieldCheck,
-  Calendar,
+  ArrowRightLeft,
   Sparkles,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
@@ -70,16 +52,16 @@ interface SpendingEntry {
 }
 
 const SPENDING_CATEGORIES = [
-  { key: 'food',      label: 'Food & Dining',    icon: Utensils,      color: '#F59E0B' },
-  { key: 'coffee',    label: 'Coffee & Snacks',   icon: Coffee,        color: '#92400E' },
-  { key: 'transport', label: 'Transport',         icon: Bus,           color: '#3B82F6' },
-  { key: 'shopping',  label: 'Shopping',          icon: ShoppingBag,   color: '#EC4899' },
-  { key: 'groceries', label: 'Groceries',         icon: ShoppingCart,  color: '#10B981' },
-  { key: 'bills',     label: 'Bills & Utilities', icon: Zap,           color: '#8B5CF6' },
-  { key: 'rent',      label: 'Rent & Housing',    icon: Home,          color: '#6B7280' },
-  { key: 'health',    label: 'Health & Medical',  icon: Heart,         color: '#EF4444' },
-  { key: 'phone',     label: 'Phone & Internet',  icon: Smartphone,    color: '#06B6D4' },
-  { key: 'other',     label: 'Other',             icon: MoreHorizontal, color: '#9CA3AF' },
+  { key: 'food',      label: 'Food & Beverages', icon: Utensils,      color: '#A855F7', bg: 'bg-purple-500' },
+  { key: 'coffee',    label: 'Coffee & Snacks',  icon: Coffee,        color: '#F97316', bg: 'bg-orange-500' },
+  { key: 'transport', label: 'Entertainment',    icon: Bus,           color: '#3B82F6', bg: 'bg-blue-500' },
+  { key: 'shopping',  label: 'Shopping',         icon: ShoppingBag,   color: '#EC4899', bg: 'bg-pink-500' },
+  { key: 'groceries', label: 'Investment & Sav', icon: ShoppingCart,  color: '#10B981', bg: 'bg-emerald-500' },
+  { key: 'bills',     label: 'Bills & Utilities',icon: Zap,           color: '#8B5CF6', bg: 'bg-violet-500' },
+  { key: 'rent',      label: 'Rent & Housing',   icon: Home,          color: '#64748B', bg: 'bg-slate-500' },
+  { key: 'health',    label: 'Health & Medical', icon: Heart,         color: '#EF4444', bg: 'bg-rose-500' },
+  { key: 'phone',     label: 'Phone & Internet', icon: Smartphone,    color: '#06B6D4', bg: 'bg-cyan-500' },
+  { key: 'other',     label: 'Other',            icon: MoreHorizontal,color: '#94A3B8', bg: 'bg-slate-400' },
 ] as const;
 
 const getCatMeta = (key: string) =>
@@ -91,1110 +73,22 @@ function loadSpending(): SpendingEntry[] {
   if (typeof window === 'undefined') return [];
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
 }
+
 function saveSpending(data: SpendingEntry[]) {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  window.dispatchEvent(new CustomEvent('spending_updated', { detail: data }));
 }
 
-// ── Helper ─────────────────────────────────────────────────────────────────
-function todayStr() { return new Date().toISOString().split('T')[0]; }
-function fmtDate(d: string) {
-  const dt = new Date(d + 'T00:00:00');
-  return dt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
-}
-function last7Days(): string[] {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (6 - i));
-    return d.toISOString().split('T')[0];
-  });
+function toLocalDateString(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
+function todayStr() { return toLocalDateString(new Date()); }
 
-// ── Spending Panel ─────────────────────────────────────────────────────────────
-function DailySpendingPanel({ currency }: { currency: string }) {
-  const [entries, setEntries] = useState<SpendingEntry[]>(loadSpending);
-  const [spendingView, setSpendingView] = useState<'daily' | 'monthly' | 'analytics'>('daily');
-  const [chartType, setChartType] = useState<'line' | 'bar' | 'donut'>('line');
-  const [showForm, setShowForm] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(todayStr());
-
-  // Guarantee instant load on client mount / hard refresh
-  useEffect(() => {
-    const loaded = loadSpending();
-    if (loaded && loaded.length > 0) {
-      setEntries(loaded);
-    }
-  }, []);
-
-  // Month Report Selector State
-  const now = useMemo(() => new Date(), []);
-  const [reportYear, setReportYear] = useState(() => new Date().getFullYear());
-  const [reportMonth, setReportMonth] = useState(() => new Date().getMonth()); // 0-11
-  const [monthlyFilterCat, setMonthlyFilterCat] = useState<string>('all');
-
-  // Form state
-  const [amount, setAmount]   = useState('');
-  const [cat, setCat]         = useState('food');
-  const [note, setNote]       = useState('');
-  const [formDate, setFormDate] = useState(todayStr());
-  const [editId, setEditId]   = useState<string | null>(null);
-
-  const days = useMemo(() => last7Days(), []);
-
-  // 7-day totals
-  const dailyTotals = useMemo(() => {
-    const map: Record<string, number> = {};
-    days.forEach((d) => { map[d] = 0; });
-    entries.forEach((e) => { if (map[e.date] !== undefined) map[e.date] += e.amount; });
-    return map;
-  }, [entries, days]);
-
-  const maxDay = Math.max(...Object.values(dailyTotals), 1);
-
-  const dayEntries = useMemo(
-    () => entries.filter((e) => e.date === selectedDate).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [entries, selectedDate]
-  );
-
-  const dayTotal = dayEntries.reduce((s, e) => s + e.amount, 0);
-  const todayTotal = entries.filter((e) => e.date === todayStr()).reduce((s, e) => s + e.amount, 0);
-
-  // Category breakdown for selected day
-  const catBreakdown = useMemo(() => {
-    const map: Record<string, number> = {};
-    dayEntries.forEach((e) => { map[e.category] = (map[e.category] || 0) + e.amount; });
-    return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, [dayEntries]);
-
-  // ── Monthly Report Metrics & Calculations ──────────────────────────────────
-  const monthEntries = useMemo(() => {
-    return entries.filter((e) => {
-      const [y, m] = e.date.split('-').map(Number);
-      return y === reportYear && m - 1 === reportMonth;
-    }).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
-  }, [entries, reportYear, reportMonth]);
-
-  const monthTotal = useMemo(() => {
-    return monthEntries.reduce((s, e) => s + e.amount, 0);
-  }, [monthEntries]);
-
-  const daysInReportMonth = new Date(reportYear, reportMonth + 1, 0).getDate();
-
-  // Daily spend across the entire month (1..daysInMonth)
-  const monthlyDailyHistogram = useMemo(() => {
-    const arr = Array.from({ length: daysInReportMonth }, (_, i) => {
-      const dayNum = i + 1;
-      const dayStr = `${reportYear}-${String(reportMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-      const daySpend = monthEntries.filter((e) => e.date === dayStr).reduce((s, e) => s + e.amount, 0);
-      return { dayNum, dayStr, amount: daySpend };
-    });
-    return arr;
-  }, [monthEntries, reportYear, reportMonth, daysInReportMonth]);
-
-  const maxMonthlyDaySpend = Math.max(...monthlyDailyHistogram.map((d) => d.amount), 1);
-
-  const peakDayInfo = useMemo(() => {
-    if (monthEntries.length === 0) return null;
-    let max = { dayStr: '', amount: 0 };
-    monthlyDailyHistogram.forEach((d) => {
-      if (d.amount > max.amount) max = { dayStr: d.dayStr, amount: d.amount };
-    });
-    return max.amount > 0 ? max : null;
-  }, [monthlyDailyHistogram, monthEntries]);
-
-  // Category distribution for selected month
-  const monthlyCategoryDistribution = useMemo(() => {
-    const map: Record<string, { total: number; count: number }> = {};
-    monthEntries.forEach((e) => {
-      if (!map[e.category]) map[e.category] = { total: 0, count: 0 };
-      map[e.category].total += e.amount;
-      map[e.category].count += 1;
-    });
-    return Object.entries(map)
-      .map(([catKey, data]) => ({
-        key: catKey,
-        meta: getCatMeta(catKey),
-        total: data.total,
-        count: data.count,
-        percent: monthTotal > 0 ? Math.round((data.total / monthTotal) * 100) : 0,
-      }))
-      .sort((a, b) => b.total - a.total);
-  }, [monthEntries, monthTotal]);
-
-  const topCategory = monthlyCategoryDistribution[0] || null;
-
-  const averageDailySpend = useMemo(() => {
-    if (monthTotal === 0) return 0;
-    const isCurrentMonth = reportYear === now.getFullYear() && reportMonth === now.getMonth();
-    const divisor = isCurrentMonth ? Math.max(now.getDate(), 1) : daysInReportMonth;
-    return Math.round(monthTotal / divisor);
-  }, [monthTotal, reportYear, reportMonth, daysInReportMonth, now]);
-
-  // Filtered monthly entries for listing
-  const filteredMonthEntries = useMemo(() => {
-    if (monthlyFilterCat === 'all') return monthEntries;
-    return monthEntries.filter((e) => e.category === monthlyFilterCat);
-  }, [monthEntries, monthlyFilterCat]);
-
-  // ── Actions ───────────────────────────────────────────────────────────────
-  const openAdd = (presetDate?: string) => {
-    setEditId(null);
-    setAmount('');
-    setCat('food');
-    setNote('');
-    setFormDate(presetDate || selectedDate || todayStr());
-    setShowForm(true);
-  };
-
-  const openEdit = (e: SpendingEntry) => {
-    setEditId(e.id);
-    setAmount(e.amount.toString());
-    setCat(e.category);
-    setNote(e.note);
-    setFormDate(e.date);
-    setShowForm(true);
-  };
-
-  const handleSubmit = (ev: React.FormEvent) => {
-    ev.preventDefault();
-    const num = parseFloat(amount);
-    if (!num || num <= 0) return;
-    let updated: SpendingEntry[];
-    if (editId) {
-      updated = entries.map((e) =>
-        e.id === editId ? { ...e, amount: num, category: cat, note: note.trim(), date: formDate } : e
-      );
-    } else {
-      const entry: SpendingEntry = {
-        id: `sp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        amount: num,
-        currency,
-        category: cat,
-        note: note.trim(),
-        date: formDate || selectedDate,
-        createdAt: new Date().toISOString(),
-      };
-      updated = [entry, ...entries];
-    }
-    setEntries(updated);
-    saveSpending(updated);
-    setShowForm(false);
-    setAmount('');
-    setNote('');
-  };
-
-  const handleDelete = (id: string) => {
-    const updated = entries.filter((e) => e.id !== id);
-    setEntries(updated);
-    saveSpending(updated);
-  };
-
-  const goDate = (dir: -1 | 1) => {
-    const d = new Date(selectedDate + 'T00:00:00');
-    d.setDate(d.getDate() + dir);
-    setSelectedDate(d.toISOString().split('T')[0]);
-  };
-
-  const handlePrevMonth = () => {
-    if (reportMonth === 0) {
-      setReportMonth(11);
-      setReportYear((y) => y - 1);
-    } else {
-      setReportMonth((m) => m - 1);
-    }
-  };
-
-  const handleNextMonth = () => {
-    if (reportMonth === 11) {
-      setReportMonth(0);
-      setReportYear((y) => y + 1);
-    } else {
-      setReportMonth((m) => m + 1);
-    }
-  };
-
-  // ── SVG Line Chart Path Helpers (7-Day Trend) ─────────────────────────────
-  const linePoints = useMemo(() => {
-    const width = 500;
-    const height = 130;
-    const padX = 24;
-    const padY = 20;
-    const plotW = width - padX * 2;
-    const plotH = height - padY * 2;
-
-    const pts = days.map((d, i) => {
-      const val = dailyTotals[d] || 0;
-      const x = padX + (i / (days.length - 1)) * plotW;
-      const y = padY + (1 - val / maxDay) * plotH;
-      return { x, y, val, date: d };
-    });
-
-    const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-    const areaD = `${pathD} L ${pts[pts.length - 1].x.toFixed(1)} ${height - padY + 10} L ${pts[0].x.toFixed(1)} ${height - padY + 10} Z`;
-
-    return { pts, pathD, areaD, width, height };
-  }, [days, dailyTotals, maxDay]);
-
-  // ── SVG Donut Chart Calculation ──────────────────────────────────────────
-  const donutSlices = useMemo(() => {
-    const radius = 55;
-    const circ = 2 * Math.PI * radius;
-    let accumulated = 0;
-
-    const slices = monthlyCategoryDistribution.map((c) => {
-      const strokeLen = (c.percent / 100) * circ;
-      const offset = -accumulated;
-      accumulated += strokeLen;
-      return {
-        ...c,
-        strokeDasharray: `${strokeLen.toFixed(2)} ${(circ - strokeLen).toFixed(2)}`,
-        strokeDashoffset: offset.toFixed(2),
-      };
-    });
-
-    return { slices, radius, circ };
-  }, [monthlyCategoryDistribution]);
-
-  return (
-    <div className="space-y-6">
-      {/* Top Banner & Sub-View Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-xs text-(--text-muted) font-semibold uppercase tracking-wider">
-            {spendingView === 'monthly' ? `${MONTH_NAMES[reportMonth]} ${reportYear} Total` : "Today's Spending"}
-          </p>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-[#4E82EE]">{currency}</span>
-            <span className="text-3xl font-extrabold text-(--text-primary) tracking-tight">
-              {(spendingView === 'monthly' ? monthTotal : todayTotal).toLocaleString('en-IN')}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Sub Tabs */}
-          <div className="flex items-center gap-1 bg-(--bg-card) border border-(--border-subtle) rounded-xl p-1 shadow-xs">
-            <button
-              onClick={() => setSpendingView('daily')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                spendingView === 'daily'
-                  ? 'bg-[#4E82EE] text-white shadow-xs font-bold'
-                  : 'text-(--text-secondary) hover:text-(--text-primary)'
-              }`}
-            >
-              Daily Log
-            </button>
-            <button
-              onClick={() => setSpendingView('monthly')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                spendingView === 'monthly'
-                  ? 'bg-[#4E82EE] text-white shadow-xs font-bold'
-                  : 'text-(--text-secondary) hover:text-(--text-primary)'
-              }`}
-            >
-              Monthly Report
-            </button>
-            <button
-              onClick={() => setSpendingView('analytics')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                spendingView === 'analytics'
-                  ? 'bg-[#4E82EE] text-white shadow-xs font-bold'
-                  : 'text-(--text-secondary) hover:text-(--text-primary)'
-              }`}
-            >
-              Category Trends
-            </button>
-          </div>
-
-          <button
-            onClick={() => openAdd()}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white font-semibold text-xs shadow-md hover:opacity-90 transition-all cursor-pointer active:scale-95 shrink-0"
-          >
-            <Plus size={15} /> Add Expense
-          </button>
-        </div>
-      </div>
-
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* 1. DAILY LOG VIEW                                                   */}
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {spendingView === 'daily' && (
-        <div className="space-y-5 animate-in fade-in duration-150">
-          {/* Interactive Graph Card (Line / Bar / Donut Switcher) */}
-          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <p className="text-xs font-bold text-(--text-primary) uppercase tracking-wider">
-                  Spending Visualization
-                </p>
-                <p className="text-[11px] text-(--text-muted)">
-                  {chartType === 'line'
-                    ? '7-Day Smooth Spend Curve'
-                    : chartType === 'bar'
-                    ? '7-Day Bar Histogram'
-                    : 'Category Distribution Donut'}
-                </p>
-              </div>
-
-              {/* Chart Mode Toggle */}
-              <div className="flex items-center p-1 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs">
-                <button
-                  onClick={() => setChartType('line')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer flex items-center gap-1 ${
-                    chartType === 'line'
-                      ? 'bg-(--bg-card) text-[#4E82EE] shadow-2xs font-bold'
-                      : 'text-(--text-muted) hover:text-(--text-primary)'
-                  }`}
-                >
-                  <TrendingUp size={13} />
-                  <span>Line</span>
-                </button>
-                <button
-                  onClick={() => setChartType('bar')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer flex items-center gap-1 ${
-                    chartType === 'bar'
-                      ? 'bg-(--bg-card) text-[#4E82EE] shadow-2xs font-bold'
-                      : 'text-(--text-muted) hover:text-(--text-primary)'
-                  }`}
-                >
-                  <CalendarDays size={13} />
-                  <span>Bar</span>
-                </button>
-                <button
-                  onClick={() => setChartType('donut')}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer flex items-center gap-1 ${
-                    chartType === 'donut'
-                      ? 'bg-(--bg-card) text-[#4E82EE] shadow-2xs font-bold'
-                      : 'text-(--text-muted) hover:text-(--text-primary)'
-                  }`}
-                >
-                  <Wallet size={13} />
-                  <span>Donut</span>
-                </button>
-              </div>
-            </div>
-
-            {/* ── 1.A: Line & Area Chart ── */}
-            {chartType === 'line' && (
-              <div className="w-full pt-2">
-                <div className="relative w-full h-36">
-                  <svg
-                    viewBox={`0 0 ${linePoints.width} ${linePoints.height}`}
-                    className="w-full h-full overflow-visible"
-                    preserveAspectRatio="none"
-                  >
-                    <defs>
-                      <linearGradient id="spendAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#4E82EE" stopOpacity="0.35" />
-                        <stop offset="100%" stopColor="#4E82EE" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
-
-                    {/* Gradient Area Fill */}
-                    <path d={linePoints.areaD} fill="url(#spendAreaGrad)" />
-
-                    {/* Main Line Stroke */}
-                    <path
-                      d={linePoints.pathD}
-                      fill="none"
-                      stroke="#4E82EE"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-
-                    {/* Interactive Points */}
-                    {linePoints.pts.map((p) => {
-                      const isSelected = p.date === selectedDate;
-                      return (
-                        <g
-                          key={p.date}
-                          className="cursor-pointer"
-                          onClick={() => setSelectedDate(p.date)}
-                        >
-                          <circle
-                            cx={p.x}
-                            cy={p.y}
-                            r={isSelected ? 6 : 4}
-                            fill={isSelected ? '#4E82EE' : '#ffffff'}
-                            stroke="#4E82EE"
-                            strokeWidth={isSelected ? 3 : 2}
-                            className="transition-all hover:scale-125"
-                          />
-                        </g>
-                      );
-                    })}
-                  </svg>
-                </div>
-
-                {/* Day Labels below chart */}
-                <div className="flex justify-between px-2 pt-1 border-t border-(--border-subtle)">
-                  {days.map((d) => {
-                    const isToday = d === todayStr();
-                    const isSelected = d === selectedDate;
-                    const val = dailyTotals[d] || 0;
-                    return (
-                      <button
-                        key={d}
-                        onClick={() => setSelectedDate(d)}
-                        className="flex flex-col items-center cursor-pointer group"
-                      >
-                        <span className={`text-[10px] font-bold ${isSelected ? 'text-[#4E82EE]' : 'text-(--text-muted)'}`}>
-                          {isToday ? 'Today' : new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' })}
-                        </span>
-                        <span className="text-[9px] font-mono text-(--text-muted) group-hover:text-(--text-primary)">
-                          {val > 0 ? `${currency}${val.toLocaleString('en-IN')}` : '—'}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* ── 1.B: Bar Histogram ── */}
-            {chartType === 'bar' && (
-              <div className="flex items-end gap-2 h-28 pt-2">
-                {days.map((d) => {
-                  const val = dailyTotals[d] || 0;
-                  const pct = (val / maxDay) * 100;
-                  const isToday = d === todayStr();
-                  const isSelected = d === selectedDate;
-                  return (
-                    <button
-                      key={d}
-                      onClick={() => setSelectedDate(d)}
-                      className="flex-1 flex flex-col items-center gap-1 cursor-pointer group"
-                    >
-                      <span className="text-[9px] text-(--text-muted) font-mono">
-                        {val > 0 ? `${currency}${val.toLocaleString('en-IN')}` : ''}
-                      </span>
-                      <div className="w-full rounded-t-lg relative flex items-end" style={{ height: '70px' }}>
-                        <div
-                          className={`w-full rounded-t-lg transition-all duration-300 ${
-                            isSelected
-                              ? 'bg-[#4E82EE]'
-                              : isToday
-                              ? 'bg-[#4E82EE]/60'
-                              : 'bg-(--bg-elevated) group-hover:bg-[#4E82EE]/40'
-                          }`}
-                          style={{ height: `${Math.max(pct, 6)}%` }}
-                        />
-                      </div>
-                      <span className={`text-[9px] font-semibold ${isSelected ? 'text-[#4E82EE]' : 'text-(--text-muted)'}`}>
-                        {isToday ? 'Today' : new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' })}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* ── 1.C: Category Donut Ring ── */}
-            {chartType === 'donut' && (
-              <div className="flex flex-col sm:flex-row items-center justify-around gap-4 py-2">
-                {/* SVG Donut Circle */}
-                <div className="relative w-36 h-36 shrink-0 flex items-center justify-center">
-                  <svg className="w-full h-full -rotate-90" viewBox="0 0 140 140">
-                    <circle
-                      cx="70"
-                      cy="70"
-                      r={donutSlices.radius}
-                      fill="none"
-                      stroke="var(--bg-elevated)"
-                      strokeWidth="16"
-                    />
-                    {donutSlices.slices.map((slice) => (
-                      <circle
-                        key={slice.key}
-                        cx="70"
-                        cy="70"
-                        r={donutSlices.radius}
-                        fill="none"
-                        stroke={slice.meta.color}
-                        strokeWidth="16"
-                        strokeDasharray={slice.strokeDasharray}
-                        strokeDashoffset={slice.strokeDashoffset}
-                        className="transition-all duration-500 hover:opacity-80"
-                      />
-                    ))}
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                    <span className="text-[10px] text-(--text-muted) uppercase font-semibold">Total</span>
-                    <span className="text-sm font-extrabold text-(--text-primary) font-mono">
-                      {currency}{monthTotal.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Donut Legend */}
-                <div className="grid grid-cols-2 gap-2 flex-1 max-w-sm">
-                  {monthlyCategoryDistribution.slice(0, 6).map((item) => (
-                    <div key={item.key} className="flex items-center gap-1.5 text-xs">
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: item.meta.color }} />
-                      <span className="truncate text-(--text-secondary)">{item.meta.label}</span>
-                      <span className="text-[11px] font-mono text-(--text-muted) ml-auto">{item.percent}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Date navigator */}
-          <div className="flex items-center justify-between bg-(--bg-card) border border-(--border-subtle) rounded-2xl px-4 py-3 shadow-xs">
-            <button
-              onClick={() => goDate(-1)}
-              className="p-1.5 rounded-lg hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <div className="text-center">
-              <p className="text-sm font-bold text-(--text-primary)">{fmtDate(selectedDate)}</p>
-              <p className="text-xs text-(--text-muted)">{selectedDate === todayStr() ? 'Today' : selectedDate}</p>
-            </div>
-            <button
-              onClick={() => goDate(1)}
-              disabled={selectedDate >= todayStr()}
-              className="p-1.5 rounded-lg hover:bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary) transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-
-          {/* Day total + category breakdown */}
-          {dayTotal > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="bg-(--bg-card) border border-(--border-subtle) rounded-2xl p-4 shadow-xs">
-                <p className="text-xs text-(--text-muted) font-semibold uppercase tracking-wider mb-1">Day Total</p>
-                <p className="text-2xl font-extrabold text-[#4E82EE]">{currency}{dayTotal.toLocaleString('en-IN')}</p>
-                <p className="text-xs text-(--text-muted) mt-1">{dayEntries.length} transactions recorded</p>
-              </div>
-              <div className="bg-(--bg-card) border border-(--border-subtle) rounded-2xl p-4 space-y-2 shadow-xs">
-                <p className="text-xs text-(--text-muted) font-semibold uppercase tracking-wider">By Category</p>
-                {catBreakdown.map(([key, val]) => {
-                  const meta = getCatMeta(key);
-                  const Icon = meta.icon;
-                  const pct = Math.round((val / dayTotal) * 100);
-                  return (
-                    <div key={key} className="flex items-center gap-2">
-                      <Icon size={12} style={{ color: meta.color }} className="shrink-0" />
-                      <span className="text-[11px] text-(--text-primary) w-24 truncate">{meta.label}</span>
-                      <div className="flex-1 h-2 rounded-full bg-(--bg-elevated) overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, background: meta.color }} />
-                      </div>
-                      <span className="text-[10px] text-(--text-muted) w-16 text-right font-mono">
-                        {currency}{val.toLocaleString('en-IN')}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Entries list for selected date */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-(--text-primary)">
-                {dayEntries.length === 0 ? 'No expenses' : `${dayEntries.length} expense${dayEntries.length > 1 ? 's' : ''} on this day`}
-              </p>
-            </div>
-            {dayEntries.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-(--border-subtle) p-10 text-center space-y-2 bg-(--bg-card)">
-                <ShoppingCart size={28} className="text-(--text-muted) mx-auto" />
-                <p className="text-sm font-semibold text-(--text-muted)">No expenses recorded for this day</p>
-                <p className="text-xs text-(--text-muted)">Tap &ldquo;Add Expense&rdquo; to record what you spent.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {dayEntries.map((e) => {
-                  const meta = getCatMeta(e.category);
-                  const Icon = meta.icon;
-                  return (
-                    <div key={e.id} className="flex items-center gap-3 bg-(--bg-card) border border-(--border-subtle) rounded-2xl px-4 py-3 shadow-xs group">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${meta.color}18` }}>
-                        <Icon size={18} style={{ color: meta.color }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-(--text-primary) capitalize">{meta.label}</p>
-                        {e.note && <p className="text-xs text-(--text-muted) truncate">{e.note}</p>}
-                      </div>
-                      <p className="text-sm font-bold text-[#4E82EE] shrink-0 font-mono">
-                        {currency}{e.amount.toLocaleString('en-IN')}
-                      </p>
-                      <div className="flex items-center gap-1.5 pl-2 border-l border-(--border-subtle) ml-1">
-                        <button
-                          onClick={() => openEdit(e)}
-                          className="p-1.5 rounded-lg bg-(--bg-elevated) border border-(--border-subtle) text-(--text-secondary) hover:text-[#4E82EE] transition-all cursor-pointer"
-                          title="Edit expense"
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(e.id)}
-                          className="p-1.5 rounded-lg text-(--text-muted) hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer"
-                          title="Delete expense"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* 2. MONTHLY REPORT VIEW                                              */}
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {spendingView === 'monthly' && (
-        <div className="space-y-6 animate-in fade-in duration-150">
-          {/* Month Navigator Header */}
-          <div className="flex items-center justify-between bg-(--bg-card) border border-(--border-subtle) rounded-2xl px-5 py-3 shadow-xs">
-            <button
-              onClick={handlePrevMonth}
-              className="p-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
-              title="Previous Month"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="text-center">
-              <h2 className="text-base sm:text-lg font-bold text-(--text-primary)">
-                {MONTH_NAMES[reportMonth]} {reportYear}
-              </h2>
-              <p className="text-xs text-(--text-muted)">
-                {monthEntries.length} total transaction{monthEntries.length === 1 ? '' : 's'}
-              </p>
-            </div>
-            <button
-              onClick={handleNextMonth}
-              className="p-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
-              title="Next Month"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-
-          {/* 4 Summary Metric Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Total Spent */}
-            <div className="bg-(--bg-card) border border-(--border-subtle) p-4 rounded-2xl shadow-xs space-y-1">
-              <span className="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">Total Spent</span>
-              <p className="text-2xl font-bold text-(--text-primary) font-mono">
-                {currency}{monthTotal.toLocaleString('en-IN')}
-              </p>
-              <p className="text-[11px] text-(--text-muted)">in {MONTH_NAMES[reportMonth]}</p>
-            </div>
-
-            {/* Daily Average */}
-            <div className="bg-(--bg-card) border border-(--border-subtle) p-4 rounded-2xl shadow-xs space-y-1">
-              <span className="text-[11px] font-semibold text-[#4E82EE] uppercase tracking-wider">Daily Average</span>
-              <p className="text-2xl font-bold text-[#4E82EE] font-mono">
-                {currency}{averageDailySpend.toLocaleString('en-IN')}
-              </p>
-              <p className="text-[11px] text-(--text-muted)">per active day</p>
-            </div>
-
-            {/* Highest Day */}
-            <div className="bg-(--bg-card) border border-(--border-subtle) p-4 rounded-2xl shadow-xs space-y-1">
-              <span className="text-[11px] font-semibold text-rose-500 uppercase tracking-wider">Peak Spend Day</span>
-              <p className="text-2xl font-bold text-rose-500 font-mono">
-                {peakDayInfo ? `${currency}${peakDayInfo.amount.toLocaleString('en-IN')}` : '—'}
-              </p>
-              <p className="text-[11px] text-(--text-muted)">
-                {peakDayInfo ? fmtDate(peakDayInfo.dayStr) : 'No spends'}
-              </p>
-            </div>
-
-            {/* Top Category */}
-            <div className="bg-(--bg-card) border border-(--border-subtle) p-4 rounded-2xl shadow-xs space-y-1">
-              <span className="text-[11px] font-semibold text-emerald-500 uppercase tracking-wider">Top Category</span>
-              <p className="text-xl font-bold text-(--text-primary) truncate">
-                {topCategory ? topCategory.meta.label : '—'}
-              </p>
-              <p className="text-[11px] text-(--text-muted)">
-                {topCategory ? `${topCategory.percent}% of month spend` : 'No category data'}
-              </p>
-            </div>
-          </div>
-
-          {/* 30-Day Histogram Bar Graph */}
-          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-2xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-(--text-primary)">
-                  Full Month Daily Distribution
-                </h3>
-                <p className="text-xs text-(--text-muted)">
-                  Visual daily timeline for {MONTH_NAMES[reportMonth]} {reportYear}
-                </p>
-              </div>
-              <span className="text-xs font-mono px-2 py-1 rounded-md bg-(--bg-elevated) text-(--text-secondary)">
-                Peak: {currency}{maxMonthlyDaySpend > 1 ? maxMonthlyDaySpend.toLocaleString('en-IN') : 0}
-              </span>
-            </div>
-
-            {/* Graph Bars */}
-            <div className="flex items-end gap-1 h-32 pt-4 overflow-x-auto pb-2 custom-scrollbar">
-              {monthlyDailyHistogram.map(({ dayNum, dayStr, amount: dayAmount }) => {
-                const heightPct = (dayAmount / maxMonthlyDaySpend) * 100;
-                const hasSpend = dayAmount > 0;
-                const isSelected = selectedDate === dayStr;
-
-                return (
-                  <button
-                    key={dayStr}
-                    onClick={() => {
-                      setSelectedDate(dayStr);
-                      setSpendingView('daily');
-                    }}
-                    title={`${fmtDate(dayStr)}: ${currency}${dayAmount.toLocaleString('en-IN')}`}
-                    className="flex-1 min-w-[14px] flex flex-col items-center gap-1 group cursor-pointer"
-                  >
-                    <div className="w-full h-24 flex items-end justify-center">
-                      <div
-                        className={`w-full rounded-t-sm transition-all duration-200 ${
-                          isSelected
-                            ? 'bg-[#4E82EE]'
-                            : hasSpend
-                            ? 'bg-[#4E82EE]/70 group-hover:bg-[#4E82EE]'
-                            : 'bg-(--bg-elevated) group-hover:bg-[#4E82EE]/30'
-                        }`}
-                        style={{ height: `${Math.max(heightPct, 4)}%` }}
-                      />
-                    </div>
-                    <span className="text-[9px] text-(--text-muted) font-mono">{dayNum}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Category Breakdown & Spend Distribution */}
-          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-2xl p-5 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold text-(--text-primary)">
-              Category Breakdown & Shares
-            </h3>
-
-            {monthlyCategoryDistribution.length === 0 ? (
-              <p className="text-xs text-(--text-muted) py-4 text-center">
-                No spending recorded for this month.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {monthlyCategoryDistribution.map((item) => {
-                  const Icon = item.meta.icon;
-                  return (
-                    <div key={item.key} className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-6 h-6 rounded-lg flex items-center justify-center"
-                            style={{ background: `${item.meta.color}20` }}
-                          >
-                            <Icon size={13} style={{ color: item.meta.color }} />
-                          </span>
-                          <span className="font-semibold text-(--text-primary)">{item.meta.label}</span>
-                          <span className="text-[10px] text-(--text-muted)">({item.count} items)</span>
-                        </div>
-                        <div className="flex items-center gap-2 font-mono">
-                          <span className="text-xs font-bold text-(--text-primary)">
-                            {currency}{item.total.toLocaleString('en-IN')}
-                          </span>
-                          <span className="text-[11px] text-(--text-muted) w-10 text-right">
-                            {item.percent}%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="h-2 rounded-full bg-(--bg-elevated) overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-300"
-                          style={{ width: `${item.percent}%`, background: item.meta.color }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Monthly Transactions List */}
-          <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-(--text-primary)">
-                {MONTH_NAMES[reportMonth]} Transactions ({filteredMonthEntries.length})
-              </h3>
-
-              {/* Filter by Category */}
-              <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
-                <button
-                  onClick={() => setMonthlyFilterCat('all')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-                    monthlyFilterCat === 'all'
-                      ? 'bg-[#4E82EE]/15 text-[#4E82EE]'
-                      : 'text-(--text-muted) hover:bg-(--bg-elevated)'
-                  }`}
-                >
-                  All
-                </button>
-                {monthlyCategoryDistribution.map((c) => (
-                  <button
-                    key={c.key}
-                    onClick={() => setMonthlyFilterCat(c.key)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-all whitespace-nowrap ${
-                      monthlyFilterCat === c.key
-                        ? 'bg-[#4E82EE]/15 text-[#4E82EE]'
-                        : 'text-(--text-muted) hover:bg-(--bg-elevated)'
-                    }`}
-                  >
-                    {c.meta.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {filteredMonthEntries.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-(--border-subtle) p-8 text-center bg-(--bg-card)">
-                <p className="text-xs text-(--text-muted)">No entries match the selected filter.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {filteredMonthEntries.map((e) => {
-                  const meta = getCatMeta(e.category);
-                  const Icon = meta.icon;
-                  return (
-                    <div
-                      key={e.id}
-                      className="flex items-center gap-3 bg-(--bg-card) border border-(--border-subtle) rounded-2xl px-4 py-3 shadow-xs group"
-                    >
-                      <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                        style={{ background: `${meta.color}18` }}
-                      >
-                        <Icon size={18} style={{ color: meta.color }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-(--text-primary) capitalize">{meta.label}</p>
-                          <span className="text-[10px] text-(--text-muted) font-mono">{fmtDate(e.date)}</span>
-                        </div>
-                        {e.note && <p className="text-xs text-(--text-muted) truncate">{e.note}</p>}
-                      </div>
-                      <p className="text-sm font-bold text-[#4E82EE] shrink-0 font-mono">
-                        {currency}{e.amount.toLocaleString('en-IN')}
-                      </p>
-                      <div className="flex items-center gap-1.5 pl-2 border-l border-(--border-subtle) ml-1">
-                        <button
-                          onClick={() => openEdit(e)}
-                          className="p-1.5 rounded-lg bg-(--bg-elevated) border border-(--border-subtle) text-(--text-secondary) hover:text-[#4E82EE] transition-all cursor-pointer"
-                          title="Edit"
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(e.id)}
-                          className="p-1.5 rounded-lg text-(--text-muted) hover:text-rose-500 hover:bg-rose-500/10 transition-all cursor-pointer"
-                          title="Delete"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* 3. CATEGORY TRENDS & ALL-TIME ANALYTICS                             */}
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {spendingView === 'analytics' && (
-        <div className="space-y-6 animate-in fade-in duration-150">
-          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-2xl p-5 shadow-xs">
-            <h3 className="text-sm font-bold text-(--text-primary) mb-1">All-Time Category Analytics</h3>
-            <p className="text-xs text-(--text-muted) mb-4">Cumulative distribution across all logged expenses</p>
-
-            {entries.length === 0 ? (
-              <p className="text-xs text-(--text-muted) text-center py-6">No expenses logged yet.</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {SPENDING_CATEGORIES.map(({ key, label, icon: Icon, color }) => {
-                  const catSpends = entries.filter((e) => e.category === key);
-                  const catTotal = catSpends.reduce((s, e) => s + e.amount, 0);
-                  const totalAll = entries.reduce((s, e) => s + e.amount, 0);
-                  const pct = totalAll > 0 ? Math.round((catTotal / totalAll) * 100) : 0;
-
-                  return (
-                    <div
-                      key={key}
-                      className="p-4 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div
-                          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                          style={{ background: `${color}20` }}
-                        >
-                          <Icon size={18} style={{ color }} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-(--text-primary) truncate">{label}</p>
-                          <p className="text-[10px] text-(--text-muted)">{catSpends.length} records · {pct}%</p>
-                        </div>
-                      </div>
-                      <p className="text-sm font-bold text-(--text-primary) font-mono">
-                        {currency}{catTotal.toLocaleString('en-IN')}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* Add / Edit Expense Modal                                            */}
-      {/* ─────────────────────────────────────────────────────────────────── */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-start justify-center p-4 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
-          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-md shadow-2xl p-6 animate-top-modal">
-            <div className="flex items-center justify-between pb-4 border-b border-(--border-subtle) mb-4">
-              <h2 className="app-modal-title">
-                {editId ? 'Edit Expense' : 'Add Expense'}
-              </h2>
-              <button
-                onClick={() => setShowForm(false)}
-                className="p-1.5 rounded-full text-(--text-muted) hover:bg-(--bg-elevated) cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Amount */}
-              <div>
-                <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5">Amount *</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted) font-semibold text-sm">
-                    {currency}
-                  </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    autoFocus
-                    placeholder="0.00"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) text-lg font-bold focus:outline-none focus:border-[#4E82EE]"
-                  />
-                </div>
-              </div>
-
-              {/* Date */}
-              <div>
-                <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5">Date</label>
-                <input
-                  type="date"
-                  value={formDate}
-                  onChange={(e) => setFormDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) focus:outline-none focus:border-[#4E82EE] text-xs font-mono"
-                />
-              </div>
-
-              {/* Category grid */}
-              <div>
-                <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5">Category</label>
-                <div className="grid grid-cols-5 gap-2">
-                  {SPENDING_CATEGORIES.map(({ key, label, icon: Icon, color }) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setCat(key)}
-                      className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all cursor-pointer ${
-                        cat === key
-                          ? 'border-[#4E82EE] bg-[#4E82EE]/10'
-                          : 'border-(--border-subtle) hover:bg-(--bg-elevated)'
-                      }`}
-                    >
-                      <Icon
-                        size={16}
-                        style={{ color: cat === key ? color : undefined }}
-                        className={cat !== key ? 'text-(--text-muted)' : ''}
-                      />
-                      <span className="text-[9px] text-center leading-tight text-(--text-muted) hidden sm:block">
-                        {label.split(' ')[0]}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-[#4E82EE] font-semibold mt-1.5">{getCatMeta(cat).label}</p>
-              </div>
-
-              {/* Note */}
-              <div>
-                <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5">Note (optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Lunch at office, Auto to metro..."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) focus:outline-none focus:border-[#4E82EE] text-sm"
-                />
-              </div>
-
-              {/* Buttons */}
-              <div className="flex items-center gap-2 pt-1">
-                {editId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleDelete(editId);
-                      setShowForm(false);
-                    }}
-                    className="p-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 font-semibold text-sm cursor-pointer transition-colors flex items-center justify-center shrink-0"
-                    title="Delete this expense"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) font-semibold text-sm cursor-pointer hover:bg-(--bg-card) transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white font-bold text-sm shadow-md hover:opacity-90 transition-all cursor-pointer"
-                >
-                  {editId ? 'Update' : 'Add'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// MAIN LedgerView
-// ─────────────────────────────────────────────────────────────────────────────
 export default function LedgerView() {
   const {
     ledgerEntries,
@@ -1203,34 +97,175 @@ export default function LedgerView() {
     settleLedgerEntry,
     recordPartialPayment,
     deleteLedgerEntry,
-    createReminder,
     showToast,
-    showConfirm,
   } = useApp();
 
-  // Top-level tabs
-  const [mainTab, setMainTab] = useState<'dues' | 'spending'>('dues');
-
+  // Strictly 2 tabs: Dues & Ledger OR Daily Expenses
+  const [activeTab, setActiveTab] = useState<'investment' | 'expenses'>('investment');
   const [activeFilter, setActiveFilter] = useState<'all' | 'give' | 'receive' | 'settled'>('all');
-  const [searchQuery, setSearchQuery]   = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [isModalOpen, setIsModalOpen]   = useState(false);
+
+  // Modal states
+  const [isDueModalOpen, setIsDueModalOpen] = useState(false);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<LedgerEntry | null>(null);
   const [showSimplifiedGraph, setShowSimplifiedGraph] = useState(false);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Partial Payment Modal State
   const [partialPaymentEntry, setPartialPaymentEntry] = useState<LedgerEntry | null>(null);
   const [partialAmount, setPartialAmount] = useState('');
   const [partialNote, setPartialNote] = useState('');
 
-  // Receipt & Statement Modal State
-  const [receiptEntry, setReceiptEntry] = useState<LedgerEntry | null>(null);
-  const [copiedReceipt, setCopiedReceipt] = useState(false);
-  const [expandedHistoryIds, setExpandedHistoryIds] = useState<Record<string, boolean>>({});
+  // Daily spending data
+  const [spendingEntries, setSpendingEntries] = useState<SpendingEntry[]>(loadSpending);
 
-  const toggleHistory = (id: string) => {
-    setExpandedHistoryIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  // Add / Edit Due form state
+  const [personName, setPersonName] = useState('');
+  const [dueAmount, setDueAmount] = useState('');
+  const [dueCurrency, setDueCurrency] = useState('₹');
+  const [dueType, setDueType] = useState<LedgerType>('give');
+  const [dueCategory, setDueCategory] = useState('personal');
+  const [dueDate, setDueDate] = useState('');
+  const [dueDescription, setDueDescription] = useState('');
+
+  // Add Expense form state
+  const [expAmount, setExpAmount] = useState('');
+  const [expCategory, setExpCategory] = useState('food');
+  const [expNote, setExpNote] = useState('');
+  const [expDate, setExpDate] = useState(todayStr());
+
+  useEffect(() => {
+    const handleSync = () => setSpendingEntries(loadSpending());
+    window.addEventListener('spending_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('spending_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
+  // Stats calculation
+  const stats = useMemo(() => {
+    const pending = (ledgerEntries || []).filter((e) => e.status === 'pending');
+    const totalGive = pending.filter((e) => e.type === 'give').reduce((s, e) => s + (e.amount - (e.paidAmount || 0)), 0);
+    const totalReceive = pending.filter((e) => e.type === 'receive').reduce((s, e) => s + (e.amount - (e.paidAmount || 0)), 0);
+    const net = totalReceive - totalGive;
+    const settledCount = (ledgerEntries || []).filter((e) => e.status === 'settled').length;
+
+    // Daily spending total for today
+    const tStr = todayStr();
+    const todaySpend = spendingEntries
+      .filter((e) => e.date === tStr || (e.createdAt && e.createdAt.startsWith(tStr)))
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    return { totalGive, totalReceive, net, pendingCount: pending.length, settledCount, todaySpend };
+  }, [ledgerEntries, spendingEntries]);
+
+  // DSA Debt Simplification
+  const simplifiedSettlement = useMemo(() => {
+    const pending = (ledgerEntries || []).filter((e) => e.status === 'pending');
+    return DebtGraph.simplifyDebts(pending, 'You');
+  }, [ledgerEntries]);
+
+  // Filtered Dues Entries
+  const filteredEntries = useMemo(() => {
+    return (ledgerEntries || []).filter((entry) => {
+      if (activeFilter === 'give' && (entry.type !== 'give' || entry.status === 'settled')) return false;
+      if (activeFilter === 'receive' && (entry.type !== 'receive' || entry.status === 'settled')) return false;
+      if (activeFilter === 'settled' && entry.status !== 'settled') return false;
+      if (activeFilter === 'all' && entry.status === 'settled') return false;
+      if (selectedCategory !== 'all' && entry.category?.toLowerCase() !== selectedCategory.toLowerCase()) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        if (!entry.personName.toLowerCase().includes(q) && !entry.description?.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [ledgerEntries, activeFilter, selectedCategory, searchQuery]);
+
+  // Handlers
+  const handleOpenAddDue = () => {
+    setEditingEntry(null);
+    setPersonName('');
+    setDueAmount('');
+    setDueCurrency('₹');
+    setDueType('give');
+    setDueCategory('personal');
+    setDueDate('');
+    setDueDescription('');
+    setIsDueModalOpen(true);
+  };
+
+  const handleOpenEditDue = (entry: LedgerEntry) => {
+    setEditingEntry(entry);
+    setPersonName(entry.personName);
+    setDueAmount(entry.amount.toString());
+    setDueCurrency(entry.currency || '₹');
+    setDueType(entry.type);
+    setDueCategory(entry.category || 'personal');
+    setDueDate(entry.dueDate ? entry.dueDate.split('T')[0] : '');
+    setDueDescription(entry.description || '');
+    setIsDueModalOpen(true);
+  };
+
+  const handleSaveDue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!personName.trim() || !dueAmount) return;
+    const num = parseFloat(dueAmount);
+    if (isNaN(num) || num <= 0) return;
+
+    if (editingEntry) {
+      await updateLedgerEntry(editingEntry.id, {
+        personName: personName.trim(),
+        amount: num,
+        type: dueType,
+        currency: dueCurrency,
+        category: dueCategory,
+        dueDate: dueDate || undefined,
+        description: dueDescription.trim() || undefined,
+      });
+    } else {
+      await createLedgerEntry(personName.trim(), num, dueType, {
+        currency: dueCurrency,
+        category: dueCategory,
+        dueDate: dueDate || undefined,
+        description: dueDescription.trim() || undefined,
+      });
+    }
+
+    setIsDueModalOpen(false);
+  };
+
+  const handleSaveExpense = (e: React.FormEvent) => {
+    e.preventDefault();
+    const num = parseFloat(expAmount);
+    if (isNaN(num) || num <= 0) return;
+
+    const newEntry: SpendingEntry = {
+      id: `sp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      amount: num,
+      currency: '₹',
+      category: expCategory,
+      note: expNote.trim(),
+      date: expDate || todayStr(),
+      createdAt: new Date().toISOString(),
+    };
+
+    const updated = [newEntry, ...spendingEntries];
+    setSpendingEntries(updated);
+    saveSpending(updated);
+    setIsExpenseModalOpen(false);
+    setExpAmount('');
+    setExpNote('');
+    showToast(`Logged ₹${num} for ${getCatMeta(expCategory).label}`, 'success');
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    const updated = spendingEntries.filter((e) => e.id !== id);
+    setSpendingEntries(updated);
+    saveSpending(updated);
+    showToast('Expense removed', 'info');
   };
 
   const handleOpenPartialPayment = (entry: LedgerEntry) => {
@@ -1243,619 +278,484 @@ export default function LedgerView() {
   const handlePartialPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!partialPaymentEntry) return;
-    const numAmount = parseFloat(partialAmount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      showToast('Please enter a valid payment amount', 'warning');
-      return;
-    }
-    const remaining = Math.max(0, partialPaymentEntry.amount - (partialPaymentEntry.paidAmount || 0));
-    if (numAmount > remaining) {
-      showToast(`Amount exceeds remaining balance of ${partialPaymentEntry.currency}${remaining}`, 'warning');
-      return;
-    }
+    const num = parseFloat(partialAmount);
+    if (isNaN(num) || num <= 0) return;
 
-    await recordPartialPayment(partialPaymentEntry.id, numAmount, partialNote);
-    showToast(`Recorded payment of ${partialPaymentEntry.currency}${numAmount} for ${partialPaymentEntry.personName}`, 'success');
+    await recordPartialPayment(partialPaymentEntry.id, num, partialNote);
+    showToast(`Logged payment of ${partialPaymentEntry.currency}${num}`, 'success');
     setPartialPaymentEntry(null);
-    setPartialAmount('');
-    setPartialNote('');
-  };
-
-  const copyReceiptText = (entry: LedgerEntry) => {
-    const paid = entry.paidAmount || 0;
-    const remaining = Math.max(0, entry.amount - paid);
-    const paymentsList = (entry.payments || [])
-      .map((p, idx) => `  ${idx + 1}. ${entry.currency}${p.amount} on ${new Date(p.date).toLocaleDateString()} ${p.note ? `(${p.note})` : ''}`)
-      .join('\n');
-
-    const text = `=== PERSONAL AGENT LEDGER STATEMENT ===
-Transaction ID: ${entry.id}
-Counterparty: ${entry.personName}
-Type: ${entry.type === 'give' ? 'You Owe' : 'Owed to You'}
-Status: ${entry.status.toUpperCase()}
-Total Amount: ${entry.currency}${entry.amount}
-Paid to Date: ${entry.currency}${paid}
-Remaining Balance: ${entry.currency}${remaining}
-Due Date: ${entry.dueDate ? new Date(entry.dueDate).toLocaleDateString() : 'N/A'}
-Created Date: ${new Date(entry.createdAt).toLocaleDateString()}
-
-Payment History:
-${paymentsList || '  No partial payments logged yet.'}
-=======================================`;
-
-    navigator.clipboard.writeText(text);
-    setCopiedReceipt(true);
-    setTimeout(() => setCopiedReceipt(false), 2500);
-    showToast('Statement copied to clipboard!', 'success');
-  };
-
-  useEffect(() => {
-    const handleCloseMenu = () => setOpenMenuId(null);
-    window.addEventListener('click', handleCloseMenu);
-    return () => window.removeEventListener('click', handleCloseMenu);
-  }, []);
-
-  // Modal Form State
-  const [personName, setPersonName] = useState('');
-  const [amount, setAmount]         = useState('');
-  const [currency, setCurrency]     = useState('₹');
-  const [type, setType]             = useState<LedgerType>('give');
-  const [category, setCategory]     = useState('personal');
-  const [dueDate, setDueDate]       = useState('');
-  const [description, setDescription] = useState('');
-
-  const stats = useMemo(() => {
-    const pending = ledgerEntries.filter((e) => e.status === 'pending');
-    const totalGive    = pending.filter((e) => e.type === 'give').reduce((s, e) => s + (e.amount - (e.paidAmount || 0)), 0);
-    const totalReceive = pending.filter((e) => e.type === 'receive').reduce((s, e) => s + (e.amount - (e.paidAmount || 0)), 0);
-    const net = totalReceive - totalGive;
-    const settledCount = ledgerEntries.filter((e) => e.status === 'settled').length;
-    return { totalGive, totalReceive, net, pendingCount: pending.length, settledCount };
-  }, [ledgerEntries]);
-
-  const simplifiedSettlement = useMemo(() => {
-    const pending = ledgerEntries.filter((e) => e.status === 'pending');
-    return DebtGraph.simplifyDebts(pending, 'You');
-  }, [ledgerEntries]);
-
-  const handleOpenAdd = () => {
-    setEditingEntry(null); setPersonName(''); setAmount(''); setCurrency('₹');
-    setType('give'); setCategory('personal'); setDueDate(''); setDescription('');
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEdit = (entry: LedgerEntry) => {
-    setEditingEntry(entry); setPersonName(entry.personName);
-    setAmount(entry.amount.toString()); setCurrency(entry.currency || '₹');
-    setType(entry.type); setCategory(entry.category || 'personal');
-    setDueDate(entry.dueDate ? entry.dueDate.split('T')[0] : '');
-    setDescription(entry.description || ''); setIsModalOpen(true);
-  };
-
-  const filteredEntries = useMemo(() => {
-    return ledgerEntries.filter((entry) => {
-      if (activeFilter === 'give'     && (entry.type !== 'give'    || entry.status === 'settled')) return false;
-      if (activeFilter === 'receive'  && (entry.type !== 'receive' || entry.status === 'settled')) return false;
-      if (activeFilter === 'settled'  && entry.status !== 'settled') return false;
-      if (activeFilter === 'all'      && entry.status === 'settled') return false;
-      if (selectedCategory !== 'all'  && entry.category?.toLowerCase() !== selectedCategory.toLowerCase()) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        if (!entry.personName.toLowerCase().includes(q) &&
-            !entry.description?.toLowerCase().includes(q) &&
-            !entry.category?.toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
-  }, [ledgerEntries, activeFilter, selectedCategory, searchQuery]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!personName.trim() || !amount) return;
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) return;
-    if (editingEntry) {
-      await updateLedgerEntry(editingEntry.id, { personName: personName.trim(), amount: numAmount, type, currency, category, dueDate: dueDate || undefined, description: description.trim() || undefined });
-    } else {
-      await createLedgerEntry(personName.trim(), numAmount, type, { currency, category, dueDate: dueDate || undefined, description: description.trim() || undefined });
-    }
-    setEditingEntry(null); setPersonName(''); setAmount(''); setDescription(''); setDueDate(''); setIsModalOpen(false);
-  };
-
-  const handleSetReminderForDue = async (entry: LedgerEntry) => {
-    const defaultTime = entry.dueDate ? new Date(entry.dueDate).toISOString() : new Date(Date.now() + 86400000).toISOString();
-    const title = entry.type === 'give' ? `Pay ${entry.currency}${entry.amount} to ${entry.personName}` : `Collect ${entry.currency}${entry.amount} from ${entry.personName}`;
-    await createReminder(title, defaultTime, 'none');
-    showToast(`Reminder set for "${title}"`, 'success');
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto bg-(--bg-primary) text-(--text-primary)">
-      <div className="max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-32 sm:pb-36 md:pb-12 space-y-6">
+    <div className="flex-1 flex flex-col h-full overflow-y-auto no-scrollbar bg-[#F8FAFC] text-slate-900 font-sans select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 pb-32 md:pb-16 space-y-6">
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#4E82EE] via-[#9B72CF] to-[#F27878] flex items-center justify-center text-white shadow-md">
-              <HandCoins size={22} />
-            </div>
-            <div>
-              <h1 className="app-page-title">Money Ledger</h1>
-              <p className="app-page-subtitle">Track dues, debts, and daily spending</p>
-            </div>
-          </div>
-          {mainTab === 'dues' && (
-            <button
-              onClick={handleOpenAdd}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white font-semibold text-sm shadow-md hover:opacity-95 transition-all cursor-pointer active:scale-95 shrink-0"
-            >
-              <Plus size={16} /> Add Debt / Due
-            </button>
-          )}
-        </div>
-
-        {/* Main Tabs */}
-        <div className="flex items-center gap-1 bg-(--bg-card) border border-(--border-subtle) rounded-2xl p-1.5 w-fit">
+        {/* ── 1. Main 2-Way Segmented Tab Switcher (Dues vs Daily Expenses) ── */}
+        <div className="p-1.5 rounded-2xl bg-slate-200/70 border border-slate-300/60 flex items-center gap-1.5 shadow-2xs">
           <button
-            onClick={() => setMainTab('dues')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-              mainTab === 'dues'
-                ? 'bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] text-white shadow-sm'
-                : 'text-(--text-muted) hover:text-(--text-primary)'
+            type="button"
+            onClick={() => setActiveTab('investment')}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activeTab === 'investment'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Wallet size={15} /> Dues & Debts
+            <Wallet size={15} />
+            <span>Dues & Ledger</span>
           </button>
+
           <button
-            onClick={() => setMainTab('spending')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-              mainTab === 'spending'
-                ? 'bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white shadow-sm'
-                : 'text-(--text-muted) hover:text-(--text-primary)'
+            type="button"
+            onClick={() => setActiveTab('expenses')}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              activeTab === 'expenses'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <ShoppingCart size={15} /> Daily Spending
+            <ShoppingCart size={15} />
+            <span>Daily Expenses</span>
           </button>
         </div>
 
-        {/* ── DAILY SPENDING TAB ── */}
-        {mainTab === 'spending' && <DailySpendingPanel currency="₹" />}
+        {/* ───────────────────────────────────────────────────────────── */}
+        {/* TAB 1: DUES & LEDGER (SHOWS ONLY DUES & BORROW/LEND DATA)     */}
+        {/* ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'investment' && (
+          <div className="space-y-4">
+            {/* Quick Action Buttons for Dues */}
+            <div className="grid grid-cols-4 gap-2.5 sm:gap-4">
+              <button
+                type="button"
+                onClick={handleOpenAddDue}
+                className="p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/80 shadow-xs flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer group"
+              >
+                <div className="w-8 h-8 rounded-full bg-orange-100 text-[#EA580C] group-hover:bg-[#EA580C] group-hover:text-white flex items-center justify-center transition-colors shadow-xs">
+                  <Plus size={16} />
+                </div>
+                <span className="text-xs font-semibold text-slate-700">Add Due</span>
+              </button>
 
-        {/* ── DUES & DEBTS TAB ── */}
-        {mainTab === 'dues' && (
-          <>
-            {/* Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) p-5 shadow-xs flex flex-col justify-between">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <span className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">You Need to Give</span>
-                    <div className="text-2xl sm:text-3xl font-bold text-rose-500">₹{stats.totalGive.toLocaleString()}</div>
-                  </div>
-                  <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
-                    <ArrowUpRight size={20} />
-                  </div>
+              <button
+                type="button"
+                onClick={() => setActiveFilter('receive')}
+                className="p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/80 shadow-xs flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer group"
+              >
+                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white flex items-center justify-center transition-colors shadow-xs">
+                  <ArrowDownLeft size={16} />
                 </div>
-                <p className="text-[11px] text-(--text-muted) mt-3">Total money you owe to others.</p>
-              </div>
-              <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) p-5 shadow-xs flex flex-col justify-between">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <span className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Owed to You</span>
-                    <div className="text-2xl sm:text-3xl font-bold text-emerald-500">₹{stats.totalReceive.toLocaleString()}</div>
-                  </div>
-                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-                    <ArrowDownLeft size={20} />
-                  </div>
+                <span className="text-xs font-semibold text-slate-700">Receive</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveFilter('give')}
+                className="p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/80 shadow-xs flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer group"
+              >
+                <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 group-hover:bg-rose-500 group-hover:text-white flex items-center justify-center transition-colors shadow-xs">
+                  <ArrowUpRight size={16} />
                 </div>
-                <p className="text-[11px] text-(--text-muted) mt-3">Money others owe you.</p>
-              </div>
-              <div className="rounded-3xl bg-(--bg-card) border border-(--border-subtle) p-5 shadow-xs flex flex-col justify-between">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <span className="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Net Balance</span>
-                    <div className={`text-2xl sm:text-3xl font-bold ${stats.net >= 0 ? 'text-[#4E82EE]' : 'text-rose-500'}`}>
-                      {stats.net >= 0 ? '+' : ''}₹{stats.net.toLocaleString()}
-                    </div>
-                  </div>
-                  <div className="w-10 h-10 rounded-2xl bg-[#4E82EE]/10 text-[#4E82EE] flex items-center justify-center">
-                    <Wallet size={20} />
-                  </div>
+                <span className="text-xs font-semibold text-slate-700">You Owe</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowSimplifiedGraph(!showSimplifiedGraph)}
+                className="p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/80 shadow-xs flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer group"
+              >
+                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 group-hover:bg-purple-500 group-hover:text-white flex items-center justify-center transition-colors shadow-xs">
+                  <ArrowRightLeft size={16} />
                 </div>
-                <p className="text-[11px] text-(--text-muted) mt-3">
-                  {stats.net >= 0 ? '✓ Positive net balance.' : '⚠️ You owe more than you are owed.'}
-                </p>
-              </div>
+                <span className="text-xs font-semibold text-slate-700">Settle</span>
+              </button>
             </div>
 
-            {/* Smart Debt Settlement */}
-            {simplifiedSettlement.transactions.length > 0 && (
-              <div className="bg-(--bg-card) p-4 rounded-2xl border border-(--border-subtle) shadow-xs">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center font-bold text-sm shrink-0">⚡</div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-xs sm:text-sm font-bold text-(--text-primary)">
-                          DSA Smart Debt Settlement
-                        </h3>
-                        <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 text-[10px] font-mono whitespace-nowrap">
-                          O(V log V)
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-(--text-muted) truncate">
-                        Simplified to <strong className="text-(--text-primary)">{simplifiedSettlement.simplifiedTransactionsCount} optimal payment(s)</strong>.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowSimplifiedGraph(!showSimplifiedGraph)}
-                    className="px-3.5 py-1.5 rounded-xl bg-(--bg-elevated) hover:bg-indigo-500/15 text-indigo-500 text-xs font-semibold cursor-pointer transition-colors shrink-0 self-start sm:self-auto"
-                  >
-                    {showSimplifiedGraph ? 'Hide Plan' : 'View Plan'}
-                  </button>
-                </div>
-                {showSimplifiedGraph && (
-                  <div className="mt-3 pt-3 border-t border-(--border-subtle) grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {simplifiedSettlement.transactions.map((t, idx) => (
-                      <div key={idx} className="p-3 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">{t.from}</span>
-                          <span className="text-(--text-muted)">pays</span>
-                          <span className="font-semibold">{t.to}</span>
-                        </div>
-                        <span className="font-bold text-emerald-500 font-mono">{t.currency}{t.amount.toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Filter + Search */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-(--bg-card) p-3 rounded-2xl border border-(--border-subtle)">
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+            {/* Filter Pills & Search */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                 {[
-                  { key: 'all',     label: `Active (${stats.pendingCount})`,       cls: 'bg-gradient-to-r from-[#4E82EE] to-[#9B72CF] text-white shadow-xs' },
-                  { key: 'give',    label: 'To Give',                              cls: 'bg-rose-600 text-white shadow-xs' },
-                  { key: 'receive', label: 'To Receive',                           cls: 'bg-emerald-600 text-white shadow-xs' },
-                  { key: 'settled', label: `Settled (${stats.settledCount})`,      cls: 'bg-(--bg-elevated) text-(--text-primary) border border-(--border-subtle)' },
-                ].map(({ key, label, cls }) => (
+                  { key: 'all', label: `Active (${stats.pendingCount})` },
+                  { key: 'give', label: `You Owe (₹${stats.totalGive.toLocaleString()})` },
+                  { key: 'receive', label: `Owed to You (₹${stats.totalReceive.toLocaleString()})` },
+                  { key: 'settled', label: `Settled (${stats.settledCount})` },
+                ].map((f) => (
                   <button
-                    key={key}
-                    onClick={() => setActiveFilter(key as any)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${activeFilter === key ? cls : 'text-(--text-secondary) hover:bg-(--bg-elevated)'}`}
+                    key={f.key}
+                    type="button"
+                    onClick={() => setActiveFilter(f.key as any)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      activeFilter === f.key
+                        ? 'bg-[#EA580C] text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
                   >
-                    {label}
+                    {f.label}
                   </button>
                 ))}
               </div>
-              <div className="relative min-w-[220px]">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted)" />
+
+              <div className="relative min-w-[200px]">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  type="text" placeholder="Search person or note..."
-                  value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs text-(--text-primary) placeholder:text-(--text-muted) focus:outline-none focus:border-[#4E82EE]"
+                  type="text"
+                  placeholder="Search person or note..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#EA580C] focus:bg-white"
                 />
               </div>
             </div>
 
-            {/* Entries */}
-            {filteredEntries.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-(--border-subtle) bg-(--bg-card) p-12 text-center space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-[#4E82EE]/10 text-[#4E82EE] flex items-center justify-center mx-auto"><HandCoins size={24} /></div>
-                <h3 className="font-semibold text-base">No Dues in This View</h3>
-                <p className="text-xs text-(--text-secondary) max-w-sm mx-auto">
-                  {searchQuery ? 'No matching entries found.' : 'Add a debt or due using the button above.'}
-                </p>
+            {/* Smart Debt Simplification Panel */}
+            {showSimplifiedGraph && simplifiedSettlement.transactions.length > 0 && (
+              <div className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <Sparkles size={16} className="text-[#EA580C]" />
+                    <span>Optimized Debt Settlement Plan (DSA Graph)</span>
+                  </h3>
+                  <span className="text-xs text-slate-400 font-mono">
+                    {simplifiedSettlement.simplifiedTransactionsCount} optimal transfers
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  {simplifiedSettlement.transactions.map((t, idx) => (
+                    <div key={idx} className="p-3 rounded-2xl bg-slate-50 border border-slate-200/70 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900">{t.from}</span>
+                        <span className="text-slate-400">pays</span>
+                        <span className="font-bold text-slate-900">{t.to}</span>
+                      </div>
+                      <span className="font-bold text-emerald-600 font-mono">{t.currency}{t.amount.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            )}
+
+            {/* Entries List */}
+            {filteredEntries.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 {filteredEntries.map((entry) => {
                   const isGive = entry.type === 'give';
                   const isSettled = entry.status === 'settled';
                   const paid = entry.paidAmount || 0;
                   const remaining = Math.max(0, entry.amount - paid);
-                  const paidPct = Math.min(100, Math.round((paid / entry.amount) * 100));
-                  const payments = entry.payments || [];
-                  const isHistoryOpen = !!expandedHistoryIds[entry.id];
 
                   return (
                     <div
                       key={entry.id}
-                      className={`rounded-3xl bg-(--bg-card) border p-5 shadow-xs flex flex-col justify-between gap-4 relative transition-all card-lift animate-fade-in-up ${
-                        isSettled
-                          ? 'border-(--border-subtle) opacity-80 bg-(--bg-card)/80'
-                          : isGive
-                          ? 'border-(--border-subtle) hover:border-rose-500/40 shadow-xs'
-                          : 'border-(--border-subtle) hover:border-emerald-500/40 shadow-xs'
-                      }`}
+                      className="p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs hover:border-slate-300 hover:shadow-md transition-all flex flex-col justify-between gap-4 group"
                     >
-                      <div className="space-y-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <h3 className="app-card-title truncate text-base font-bold text-(--text-primary)">
-                              {entry.personName}
-                            </h3>
-                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                              <span
-                                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
-                                  isSettled
-                                    ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                                    : isGive
-                                    ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                    : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                                }`}
-                              >
-                                {isSettled ? '✓ Fully Settled' : isGive ? 'You Owe' : 'Owed to You'}
-                              </span>
-                              {entry.category && (
-                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-(--bg-elevated) text-(--text-muted) capitalize border border-(--border-subtle)">
-                                  {entry.category}
-                                </span>
-                              )}
-                            </div>
+                      <div className="space-y-2.5">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="text-base font-bold text-slate-900">{entry.personName}</h3>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              {entry.dueDate ? `Due ${new Date(entry.dueDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : 'No due date'}
+                            </p>
                           </div>
-
-                          <div className="text-right shrink-0">
-                            <div
-                              className={`text-xl sm:text-2xl font-black flex items-baseline justify-end gap-0.5 tracking-tight ${
-                                isSettled
-                                  ? 'text-(--text-muted)'
-                                  : isGive
-                                  ? 'text-rose-600 dark:text-rose-400'
-                                  : 'text-emerald-600 dark:text-emerald-400'
-                              }`}
-                            >
-                              <span className="text-base sm:text-lg opacity-85">{entry.currency}</span>
-                              <span>{entry.amount.toLocaleString('en-IN')}</span>
-                            </div>
+                          <div className="text-right">
+                            <span className={`text-xl font-extrabold font-mono ${isGive ? 'text-rose-600' : 'text-emerald-600'}`}>
+                              {isGive ? '-' : '+'}₹{entry.amount.toLocaleString()}
+                            </span>
                             {paid > 0 && !isSettled && (
-                              <p className="text-[11px] font-mono text-(--text-muted) mt-0.5">
-                                Left: <span className="font-bold text-rose-500 dark:text-rose-400">{entry.currency}{remaining.toLocaleString('en-IN')}</span>
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                ₹{remaining.toLocaleString()} left
                               </p>
                             )}
                           </div>
                         </div>
 
-                        {/* Partial Payment Progress Bar */}
-                        {paid > 0 && (
-                          <div className="p-2.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) space-y-1.5">
-                            <div className="flex items-center justify-between text-[11px] font-mono">
-                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                                Paid: {entry.currency}{paid.toLocaleString('en-IN')} ({paidPct}%)
-                              </span>
-                              <span className="text-(--text-muted)">
-                                {isSettled ? 'Complete' : `Due: ${entry.currency}${remaining.toLocaleString('en-IN')}`}
-                              </span>
-                            </div>
-                            <div className="h-2 w-full bg-(--bg-card) rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all duration-300 ${
-                                  isSettled ? 'bg-blue-500' : 'bg-emerald-500'
-                                }`}
-                                style={{ width: `${paidPct}%` }}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Payment History Accordion */}
-                        {payments.length > 0 && (
-                          <div className="border-t border-(--border-subtle) pt-2">
-                            <button
-                              type="button"
-                              onClick={() => toggleHistory(entry.id)}
-                              className="w-full flex items-center justify-between text-xs text-(--text-muted) hover:text-(--text-primary) py-1 font-medium transition-colors cursor-pointer"
-                            >
-                              <span className="flex items-center gap-1.5">
-                                <History size={13} className="text-[#4E82EE]" />
-                                Payment History ({payments.length})
-                              </span>
-                              {isHistoryOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            </button>
-
-                            {isHistoryOpen && (
-                              <div className="mt-2 space-y-1.5 animate-in fade-in duration-150">
-                                {payments.map((p) => (
-                                  <div
-                                    key={p.id}
-                                    className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-(--bg-elevated) text-xs"
-                                  >
-                                    <div className="min-w-0 pr-2">
-                                      <p className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">
-                                        +{entry.currency}{p.amount.toLocaleString('en-IN')}
-                                      </p>
-                                      {p.note && <p className="text-[10px] text-(--text-muted) truncate">{p.note}</p>}
-                                    </div>
-                                    <span className="text-[10px] text-(--text-muted) shrink-0 font-mono">
-                                      {new Date(p.date).toLocaleDateString()}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                        {entry.description && (
+                          <p className="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                            {entry.description}
+                          </p>
                         )}
                       </div>
 
-                      {/* Card Footer Actions */}
-                      <div className="pt-3 border-t border-(--border-subtle) flex items-center justify-between gap-2 text-xs">
-                        <div className="flex items-center gap-1.5 text-(--text-muted) text-[11px] font-cutive">
-                          {entry.dueDate ? (
-                            <>
-                              <Clock size={12} className="text-[#4E82EE]" />
-                              <span>Due: {new Date(entry.dueDate).toLocaleDateString()}</span>
-                            </>
-                          ) : (
-                            <span>Created: {new Date(entry.createdAt).toLocaleDateString()}</span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          {/* Receipt Action Button */}
-                          <button
-                            type="button"
-                            onClick={() => setReceiptEntry(entry)}
-                            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary) font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-                            title="Printable Statement / Receipt"
-                          >
-                            <Receipt size={14} className="text-[#9B72CF]" />
-                            <span className="hidden sm:inline">Receipt</span>
-                          </button>
-
+                      {/* Card Actions */}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                        <div className="flex items-center gap-2">
                           {!isSettled && (
                             <button
                               type="button"
                               onClick={() => handleOpenPartialPayment(entry)}
-                              className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-                              title="Record Partial Payment"
+                              className="px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition-colors cursor-pointer"
                             >
-                              <CreditCard size={13} />
-                              <span>Pay Partial</span>
+                              Partial Pay
                             </button>
                           )}
-
-                          {/* 3-Dots Options Menu */}
-                          <div className="relative">
+                          {!isSettled && (
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenMenuId(openMenuId === entry.id ? null : entry.id);
-                              }}
-                              className="p-1.5 sm:p-2 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary) transition-all cursor-pointer active:scale-95 shadow-2xs"
-                              title="More options"
+                              onClick={() => settleLedgerEntry(entry.id)}
+                              className="px-3 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold transition-colors cursor-pointer border border-emerald-200"
                             >
-                              <MoreVertical size={15} />
+                              Settle
                             </button>
+                          )}
+                        </div>
 
-                            {openMenuId === entry.id && (
-                              <div
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute right-0 bottom-full mb-1.5 sm:bottom-auto sm:top-full sm:mt-1.5 w-48 rounded-2xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-1.5 z-40 space-y-0.5 animate-in fade-in zoom-in-95 duration-150"
-                              >
-                                {!isSettled && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setOpenMenuId(null);
-                                        settleLedgerEntry(entry.id);
-                                      }}
-                                      className="w-full px-3 py-2 rounded-xl hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
-                                    >
-                                      <CheckCircle2 size={15} className="text-emerald-500" />
-                                      <span>Settle Full Due</span>
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setOpenMenuId(null);
-                                        handleSetReminderForDue(entry);
-                                      }}
-                                      className="w-full px-3 py-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-primary) font-semibold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
-                                    >
-                                      <BellRing size={15} className="text-[#4E82EE]" />
-                                      <span>Set Reminder</span>
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setOpenMenuId(null);
-                                        handleOpenEdit(entry);
-                                      }}
-                                      className="w-full px-3 py-2 rounded-xl hover:bg-(--bg-elevated) text-(--text-primary) font-semibold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
-                                    >
-                                      <Edit2 size={15} className="text-amber-500" />
-                                      <span>Edit Due</span>
-                                    </button>
-                                  </>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenMenuId(null);
-                                    showConfirm({
-                                      title: 'Remove Record',
-                                      message: `Remove ${entry.personName} (${entry.currency}${entry.amount}) from dues ledger?`,
-                                      confirmText: 'Remove',
-                                      type: 'danger',
-                                      onConfirm: () => deleteLedgerEntry(entry.id),
-                                    });
-                                  }}
-                                  className="w-full px-3 py-2 rounded-xl hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold text-xs flex items-center gap-2.5 transition-colors cursor-pointer text-left"
-                                >
-                                  <Trash2 size={15} className="text-rose-500" />
-                                  <span>Delete Record</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditDue(entry)}
+                            className="p-1.5 rounded-lg hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                            title="Edit entry"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteLedgerEntry(entry.id)}
+                            className="p-1.5 rounded-lg hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Delete entry"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
+            ) : (
+              <div className="py-12 rounded-3xl bg-white border border-dashed border-slate-200 text-center space-y-2 shadow-xs">
+                <p className="text-sm font-bold text-slate-700">No dues recorded in this view</p>
+                <p className="text-xs text-slate-400">Add entries to track what you owe or are owed.</p>
+                <button
+                  type="button"
+                  onClick={handleOpenAddDue}
+                  className="mt-2 px-4 py-2 rounded-full bg-[#EA580C] text-white text-xs font-bold cursor-pointer hover:bg-[#C2410C]"
+                >
+                  + Add Debt / Due
+                </button>
+              </div>
             )}
-          </>
+          </div>
         )}
-      </div>
 
-      {/* Add/Edit Dues Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-start justify-center p-4 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
-          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-lg shadow-2xl p-6 relative animate-top-modal">
-            <div className="flex items-center justify-between pb-4 border-b border-(--border-subtle)">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-[#4E82EE]/20 text-[#4E82EE] flex items-center justify-center"><HandCoins size={16} /></div>
-                <h2 className="app-modal-title">{editingEntry ? 'Edit Due / Debt' : 'Add Due / Debt'}</h2>
-              </div>
-              <button onClick={() => setIsModalOpen(false)} className="p-1.5 rounded-full text-(--text-muted) hover:bg-(--bg-elevated) cursor-pointer"><X size={18} /></button>
-            </div>
-            <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => setType('give')} className={`py-2.5 px-3 rounded-2xl font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${type === 'give' ? 'bg-rose-600 text-white border-rose-600' : 'bg-(--bg-elevated) text-(--text-secondary) border-(--border-subtle)'}`}>
-                  <ArrowUpRight size={14} /> I Owe
-                </button>
-                <button type="button" onClick={() => setType('receive')} className={`py-2.5 px-3 rounded-2xl font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${type === 'receive' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-(--bg-elevated) text-(--text-secondary) border-(--border-subtle)'}`}>
-                  <ArrowDownLeft size={14} /> Owed to Me
-                </button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* ───────────────────────────────────────────────────────────── */}
+        {/* TAB 2: DAILY EXPENSES (SHOWS ONLY DAILY EXPENSE DATA)          */}
+        {/* ───────────────────────────────────────────────────────────── */}
+        {activeTab === 'expenses' && (
+          <div className="space-y-5">
+            {/* Daily Spending Consumption Bar - ONLY here on expenses tab */}
+            <div className="p-5 sm:p-6 rounded-3xl bg-white border border-slate-200/80 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <label className="block text-xs font-semibold text-(--text-secondary) mb-1">Person / Entity *</label>
-                  <input type="text" required placeholder="e.g. Rahul, Landlord" value={personName} onChange={(e) => setPersonName(e.target.value)} className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) focus:outline-none focus:border-[#4E82EE]" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-(--text-secondary) mb-1">Amount *</label>
-                  <div className="flex gap-2">
-                    <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="px-2.5 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) focus:outline-none">
-                      <option value="₹">₹</option><option value="$">$</option><option value="€">€</option><option value="£">£</option>
-                    </select>
-                    <input type="number" step="0.01" required placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) focus:outline-none focus:border-[#4E82EE]" />
+                  <p className="text-xs text-slate-400 font-semibold">Today's Expense Total</p>
+                  <div className="text-2xl font-bold text-slate-900 mt-0.5">
+                    ₹{stats.todaySpend.toLocaleString()} <span className="text-xs font-normal text-slate-400">Goal: ₹1,300 / day</span>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsExpenseModalOpen(true)}
+                  className="px-3.5 py-1.5 rounded-full bg-[#EA580C] hover:bg-[#C2410C] text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+                >
+                  + Add Spend
+                </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+              {/* Multi-Colored Segmented Progress Bar */}
+              <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden flex gap-0.5 p-0.5">
+                <div className="h-full rounded-full bg-emerald-500 w-[45%]" />
+                <div className="h-full rounded-full bg-blue-500 w-[25%]" />
+                <div className="h-full rounded-full bg-purple-500 w-[20%]" />
+                <div className="h-full rounded-full bg-amber-500 w-[10%]" />
+              </div>
+
+              {/* Category Badges */}
+              <div className="flex items-center gap-4 text-xs font-medium text-slate-600 flex-wrap pt-1">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <span>Food</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                  <span>Shopping</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+                  <span>Bills</span>
+                </span>
+              </div>
+            </div>
+
+            {/* List of Logged Daily Expenses */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <label className="block text-xs font-semibold text-(--text-secondary) mb-1">Category</label>
-                  <CustomSelect
-                    value={category}
-                    onChange={(val) => setCategory(val)}
-                    options={LEDGER_CATEGORIES}
+                  <h2 className="text-base font-bold text-slate-900">Expense History</h2>
+                  <p className="text-xs text-slate-400">{spendingEntries.length} logged expense items</p>
+                </div>
+              </div>
+
+              {spendingEntries.length > 0 ? (
+                <div className="space-y-2.5">
+                  {spendingEntries.map((item) => {
+                    const meta = getCatMeta(item.category);
+                    const Icon = meta.icon;
+                    return (
+                      <div
+                        key={item.id}
+                        className="p-4 rounded-2xl bg-white border border-slate-200/80 hover:border-slate-300 shadow-xs flex items-center justify-between gap-4 transition-all"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <div
+                            className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs"
+                            style={{ backgroundColor: meta.color }}
+                          >
+                            <Icon size={18} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-900 truncate">{item.note || meta.label}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">{meta.label} · {item.date}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-base font-mono font-bold text-slate-900">
+                            -₹{item.amount.toLocaleString()}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteExpense(item.id)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-12 rounded-3xl bg-white border border-dashed border-slate-200 text-center space-y-2 shadow-xs">
+                  <p className="text-sm font-bold text-slate-700">No daily expenses logged yet</p>
+                  <p className="text-xs text-slate-400">Log your daily coffee, food, or shopping spending.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* ── Modal: Add / Edit Due ── */}
+      {isDueModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setIsDueModalOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 space-y-4 text-xs animate-in fade-in zoom-in-95 text-slate-900"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                {editingEntry ? 'Edit Due / Debt' : 'Add Debt / Due'}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsDueModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDue} className="space-y-4">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Person Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. John Doe, Landlord"
+                  value={personName}
+                  onChange={(e) => setPersonName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:bg-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Amount (₹) *</label>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    placeholder="0.00"
+                    value={dueAmount}
+                    onChange={(e) => setDueAmount(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Type</label>
+                  <select
+                    value={dueType}
+                    onChange={(e) => setDueType(e.target.value as any)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:outline-none focus:bg-white"
+                  >
+                    <option value="give">You Owe (Give)</option>
+                    <option value="receive">Owed to You (Receive)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Due Date</label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:outline-none focus:bg-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-(--text-secondary) mb-1">Due Date</label>
-                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) focus:outline-none" />
+                  <label className="block text-slate-700 font-bold mb-1">Category</label>
+                  <select
+                    value={dueCategory}
+                    onChange={(e) => setDueCategory(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:outline-none focus:bg-white"
+                  >
+                    {LEDGER_CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
-              <div className="pt-3 border-t border-(--border-subtle) flex items-center justify-end gap-2">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) font-semibold cursor-pointer hover:bg-(--bg-card) transition-colors">Cancel</button>
-                <button type="submit" className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white font-bold shadow-md hover:opacity-95 transition-all cursor-pointer">
-                  {editingEntry ? 'Update' : 'Save'}
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Note / Description</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Dinner split, loan"
+                  value={dueDescription}
+                  onChange={(e) => setDueDescription(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:outline-none focus:bg-white"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDueModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-full bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold shadow-md cursor-pointer"
+                >
+                  Save Due
                 </button>
               </div>
             </form>
@@ -1863,125 +763,159 @@ ${paymentsList || '  No partial payments logged yet.'}
         </div>
       )}
 
-      {/* Partial Payment Modal */}
-      {partialPaymentEntry && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-start justify-center p-4 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
-          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-md shadow-2xl p-6 relative animate-top-modal">
-            <div className="flex items-center justify-between pb-4 border-b border-(--border-subtle)">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                  <CreditCard size={16} />
-                </div>
-                <div>
-                  <h2 className="app-modal-title">Record Payment</h2>
-                  <p className="text-[11px] text-(--text-muted)">{partialPaymentEntry.personName}</p>
-                </div>
-              </div>
+      {/* ── Modal: Add Daily Expense ── */}
+      {isExpenseModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setIsExpenseModalOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 space-y-4 text-xs animate-in fade-in zoom-in-95 text-slate-900"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                Log Daily Expense
+              </h2>
               <button
-                onClick={() => setPartialPaymentEntry(null)}
-                className="p-1.5 rounded-full text-(--text-muted) hover:bg-(--bg-elevated) cursor-pointer"
+                type="button"
+                onClick={() => setIsExpenseModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
-            {/* Summary card */}
-            <div className="my-4 p-3.5 rounded-2xl bg-(--bg-elevated) border border-(--border-subtle) grid grid-cols-2 gap-2 text-center">
+            <form onSubmit={handleSaveExpense} className="space-y-4">
               <div>
-                <span className="text-[10px] text-(--text-muted) uppercase">Total Amount</span>
-                <p className="text-base font-bold text-(--text-primary) font-mono">
-                  {partialPaymentEntry.currency}{partialPaymentEntry.amount.toLocaleString('en-IN')}
-                </p>
-              </div>
-              <div>
-                <span className="text-[10px] text-(--text-muted) uppercase">Remaining Balance</span>
-                <p className="text-base font-bold text-rose-500 font-mono">
-                  {partialPaymentEntry.currency}
-                  {Math.max(0, partialPaymentEntry.amount - (partialPaymentEntry.paidAmount || 0)).toLocaleString('en-IN')}
-                </p>
-              </div>
-            </div>
-
-            <form onSubmit={handlePartialPaymentSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5">
-                  Payment Amount ({partialPaymentEntry.currency}) *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-(--text-muted) font-semibold text-sm">
-                    {partialPaymentEntry.currency}
-                  </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    autoFocus
-                    placeholder="0.00"
-                    value={partialAmount}
-                    onChange={(e) => setPartialAmount(e.target.value)}
-                    className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) text-base font-bold focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                {/* Quick Presets */}
-                <div className="flex items-center gap-1.5 mt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const rem = Math.max(0, partialPaymentEntry.amount - (partialPaymentEntry.paidAmount || 0));
-                      setPartialAmount((rem * 0.25).toFixed(2));
-                    }}
-                    className="flex-1 py-1 rounded-lg bg-(--bg-elevated) border border-(--border-subtle) hover:bg-emerald-500/10 text-[10px] font-semibold text-(--text-secondary) hover:text-emerald-500"
-                  >
-                    25%
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const rem = Math.max(0, partialPaymentEntry.amount - (partialPaymentEntry.paidAmount || 0));
-                      setPartialAmount((rem * 0.5).toFixed(2));
-                    }}
-                    className="flex-1 py-1 rounded-lg bg-(--bg-elevated) border border-(--border-subtle) hover:bg-emerald-500/10 text-[10px] font-semibold text-(--text-secondary) hover:text-emerald-500"
-                  >
-                    50%
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const rem = Math.max(0, partialPaymentEntry.amount - (partialPaymentEntry.paidAmount || 0));
-                      setPartialAmount(rem.toString());
-                    }}
-                    className="flex-1 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold text-emerald-600 dark:text-emerald-400"
-                  >
-                    Full Balance
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5">
-                  Payment Note (optional)
-                </label>
+                <label className="block text-slate-700 font-bold mb-1">Amount (₹) *</label>
                 <input
-                  type="text"
-                  placeholder="e.g. GPay ref #1234, Cash given..."
-                  value={partialNote}
-                  onChange={(e) => setPartialNote(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) focus:outline-none focus:border-emerald-500 text-xs"
+                  type="number"
+                  step="any"
+                  required
+                  placeholder="0.00"
+                  value={expAmount}
+                  onChange={(e) => setExpAmount(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:bg-white"
                 />
               </div>
 
-              <div className="pt-3 border-t border-(--border-subtle) flex items-center justify-end gap-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Category</label>
+                  <select
+                    value={expCategory}
+                    onChange={(e) => setExpCategory(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:outline-none focus:bg-white"
+                  >
+                    {SPENDING_CATEGORIES.map((c) => (
+                      <option key={c.key} value={c.key}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={expDate}
+                    onChange={(e) => setExpDate(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:outline-none focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Note</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Starbucks coffee, Groceries"
+                  value={expNote}
+                  onChange={(e) => setExpNote(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:outline-none focus:bg-white"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setPartialPaymentEntry(null)}
-                  className="px-4 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) font-semibold cursor-pointer hover:bg-(--bg-card) transition-colors"
+                  onClick={() => setIsExpenseModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md transition-all cursor-pointer"
+                  className="flex-1 py-2.5 rounded-full bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold shadow-md cursor-pointer"
+                >
+                  Log Expense
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Partial Payment ── */}
+      {partialPaymentEntry && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setPartialPaymentEntry(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 space-y-4 text-xs animate-in fade-in zoom-in-95 text-slate-900"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                Log Partial Payment
+              </h2>
+              <button
+                type="button"
+                onClick={() => setPartialPaymentEntry(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handlePartialPaymentSubmit} className="space-y-4">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Payment Amount for {partialPaymentEntry.personName}
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  required
+                  value={partialAmount}
+                  onChange={(e) => setPartialAmount(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Payment Note (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Installment 1, GPay"
+                  value={partialNote}
+                  onChange={(e) => setPartialNote(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:outline-none focus:bg-white"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPartialPaymentEntry(null)}
+                  className="flex-1 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-full bg-[#EA580C] hover:bg-[#C2410C] text-white font-bold shadow-md cursor-pointer"
                 >
                   Record Payment
                 </button>
@@ -1991,272 +925,6 @@ ${paymentsList || '  No partial payments logged yet.'}
         </div>
       )}
 
-      {/* Printable Receipt & Statement Generator Modal */}
-      {receiptEntry && (() => {
-        const paidAmount = receiptEntry.paidAmount || (receiptEntry.status === 'settled' ? receiptEntry.amount : 0);
-        const remainingBalance = Math.max(0, receiptEntry.amount - paidAmount);
-        const percentSettled = receiptEntry.amount > 0 ? Math.min(100, Math.round((paidAmount / receiptEntry.amount) * 100)) : 100;
-        const payments = receiptEntry.payments || [];
-        const isReceivable = receiptEntry.type === 'receive';
-
-        return (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-start justify-center p-3 sm:p-6 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
-            {/* Modal Box */}
-            <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden text-(--text-primary) animate-top-modal">
-              {/* Modal Top Actions (Hidden when printing) */}
-              <div className="px-5 sm:px-6 py-4 border-b border-(--border-subtle) flex items-center justify-between gap-3 bg-(--bg-elevated)/60 print:hidden">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white flex items-center justify-center shrink-0 shadow-xs">
-                    <Receipt size={16} />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-bold text-(--text-primary) truncate">Transaction Statement</h3>
-                    <p className="text-[11px] text-(--text-muted) truncate font-medium">Official Ledger Receipt</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => copyReceiptText(receiptEntry)}
-                    className="px-3 py-1.5 rounded-xl bg-(--bg-card) hover:bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-                    title="Copy formatted text"
-                  >
-                    {copiedReceipt ? (
-                      <>
-                        <Check size={13} className="text-emerald-500" />
-                        <span className="text-emerald-500 font-bold">Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={13} />
-                        <span>Copy</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-blue-500/20 hover:opacity-95 active:scale-95"
-                  >
-                    <Printer size={13} />
-                    <span>Print / PDF</span>
-                  </button>
-
-                  <button
-                    onClick={() => setReceiptEntry(null)}
-                    className="p-1.5 rounded-xl text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) transition-colors cursor-pointer"
-                    title="Close"
-                  >
-                    <X size={17} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Printable Receipt Body */}
-              <div id="printable-receipt" className="p-5 sm:p-7 space-y-5 bg-(--bg-card) print:bg-white print:text-slate-900 print:p-8">
-                {/* 1. Header & ID Stamp */}
-                <div className="flex items-start justify-between gap-4 pb-4 border-b border-(--border-subtle) print:border-slate-200">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-black tracking-widest text-[#4E82EE] print:text-blue-600 uppercase">
-                        PERSONAL AGENT
-                      </span>
-                      <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-[#4E82EE]/10 text-[#4E82EE] border border-[#4E82EE]/20 print:border-blue-200">
-                        OFFICIAL STATEMENT
-                      </span>
-                    </div>
-                    <h2 className="text-lg sm:text-xl font-black text-(--text-primary) print:text-slate-900 tracking-tight mt-1">
-                      Ledger Receipt
-                    </h2>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <div className="text-[11px] font-mono font-bold text-(--text-secondary) print:text-slate-600">
-                      REF #{receiptEntry.id.replace('ledg_', '').toUpperCase().slice(0, 10)}
-                    </div>
-                    <div className="text-[10px] text-(--text-muted) print:text-slate-400 mt-0.5">
-                      {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Counterparty Card */}
-                <div className="p-4 rounded-2xl bg-(--bg-elevated) print:bg-slate-50 border border-(--border-subtle) print:border-slate-200 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white font-black text-lg flex items-center justify-center shrink-0 shadow-xs">
-                      {receiptEntry.personName[0]?.toUpperCase() || 'P'}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-[10px] font-bold text-(--text-muted) print:text-slate-500 uppercase tracking-wider">
-                        Counterparty
-                      </div>
-                      <div className="text-base font-bold text-(--text-primary) print:text-slate-900 truncate">
-                        {receiptEntry.personName}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <span
-                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
-                        isReceivable
-                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                          : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-                      }`}
-                    >
-                      {isReceivable ? 'Incoming · Owed to You' : 'Outgoing · You Owe'}
-                    </span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                        receiptEntry.status === 'settled'
-                          ? 'bg-blue-500/15 text-blue-500'
-                          : paidAmount > 0
-                          ? 'bg-amber-500/15 text-amber-500'
-                          : 'bg-slate-500/15 text-slate-400'
-                      }`}
-                    >
-                      {receiptEntry.status === 'settled'
-                        ? '✓ Fully Settled'
-                        : paidAmount > 0
-                        ? '⏳ Partially Paid'
-                        : '⏱️ Pending'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 3. Hero Balance Card & Breakdown */}
-                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-(--bg-card) to-(--bg-elevated) print:bg-white border border-(--border-subtle) print:border-slate-200 space-y-4 shadow-xs">
-                  <div className="flex items-center justify-between pb-3 border-b border-(--border-subtle) print:border-slate-200">
-                    <div>
-                      <span className="text-[10px] font-bold text-(--text-muted) print:text-slate-500 uppercase tracking-wider">
-                        Outstanding Balance
-                      </span>
-                      <div
-                        className={`text-2xl sm:text-3xl font-black tracking-tight mt-0.5 ${
-                          remainingBalance === 0
-                            ? 'text-emerald-500'
-                            : isReceivable
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-rose-600 dark:text-rose-400'
-                        }`}
-                      >
-                        {receiptEntry.currency}
-                        {remainingBalance.toLocaleString('en-IN', { minimumFractionDigits: 0 })}
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-[10px] font-bold text-(--text-muted) print:text-slate-500 uppercase tracking-wider">
-                        Settled
-                      </span>
-                      <div className="text-base sm:text-lg font-bold text-emerald-500 mt-0.5">
-                        {percentSettled}%
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Visual Progress Bar */}
-                  <div className="space-y-1.5">
-                    <div className="w-full bg-(--bg-elevated) print:bg-slate-100 h-2 rounded-full overflow-hidden border border-(--border-subtle) print:border-slate-200">
-                      <div
-                        className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-300"
-                        style={{ width: `${percentSettled}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-[10px] text-(--text-secondary) print:text-slate-600 font-medium">
-                      <span>Total: {receiptEntry.currency}{receiptEntry.amount.toLocaleString('en-IN')}</span>
-                      <span>Paid: {receiptEntry.currency}{paidAmount.toLocaleString('en-IN')}</span>
-                    </div>
-                  </div>
-
-                  {/* Metadata Row */}
-                  <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-                    <div className="p-2.5 rounded-xl bg-(--bg-card) print:bg-slate-50 border border-(--border-subtle) print:border-slate-200">
-                      <span className="text-[10px] text-(--text-muted) print:text-slate-500 font-semibold uppercase block">
-                        Due Date
-                      </span>
-                      <span className="font-bold text-(--text-primary) print:text-slate-900 text-xs mt-0.5 block">
-                        {receiptEntry.dueDate
-                          ? new Date(receiptEntry.dueDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
-                          : 'No due date'}
-                      </span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-(--bg-card) print:bg-slate-50 border border-(--border-subtle) print:border-slate-200">
-                      <span className="text-[10px] text-(--text-muted) print:text-slate-500 font-semibold uppercase block">
-                        Record Date
-                      </span>
-                      <span className="font-bold text-(--text-primary) print:text-slate-900 text-xs mt-0.5 block">
-                        {new Date(receiptEntry.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. Payment Installments Log */}
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-(--text-primary) print:text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                      <History size={13} className="text-[#4E82EE]" />
-                      <span>Payment History</span>
-                    </h4>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-(--bg-elevated) print:bg-slate-100 text-(--text-muted) border border-(--border-subtle)">
-                      {payments.length} {payments.length === 1 ? 'installment' : 'installments'}
-                    </span>
-                  </div>
-
-                  {payments.length === 0 ? (
-                    <div className="p-3.5 rounded-2xl bg-(--bg-elevated) print:bg-slate-50 border border-(--border-subtle) print:border-slate-200 text-center text-xs text-(--text-muted) print:text-slate-500">
-                      {receiptEntry.status === 'settled'
-                        ? 'Settled in full in a single payment transaction.'
-                        : 'No partial payments recorded yet.'}
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-(--border-subtle) print:border-slate-200 overflow-hidden divide-y divide-(--border-subtle) print:divide-slate-200">
-                      {payments.map((p, idx) => (
-                        <div
-                          key={p.id || idx}
-                          className="p-3 bg-(--bg-card) print:bg-white flex items-center justify-between gap-3 text-xs"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="w-5 h-5 rounded-full bg-(--bg-elevated) print:bg-slate-100 text-(--text-muted) print:text-slate-600 font-bold text-[10px] flex items-center justify-center shrink-0">
-                              {idx + 1}
-                            </span>
-                            <div className="min-w-0">
-                              <div className="font-bold text-(--text-primary) print:text-slate-900">
-                                {new Date(p.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </div>
-                              {p.note && (
-                                <div className="text-[11px] text-(--text-muted) print:text-slate-500 truncate">
-                                  {p.note}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="font-bold font-mono text-emerald-600 dark:text-emerald-400 print:text-emerald-700 shrink-0 text-sm">
-                            +{receiptEntry.currency}{p.amount.toLocaleString('en-IN')}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 5. Footer & Verification Stamp */}
-                <div className="pt-4 border-t border-(--border-subtle) print:border-slate-200 flex items-center justify-between gap-2 text-[10px] text-(--text-muted) print:text-slate-400">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck size={13} className="text-emerald-500" />
-                    <span>Encrypted Client-Side Ledger Statement</span>
-                  </div>
-                  <span className="font-mono font-bold">Personal Agent v2.5</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }

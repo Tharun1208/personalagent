@@ -101,15 +101,15 @@ export async function getLiveWeather(locationQuery: string = 'Bengaluru'): Promi
     const weatherData = await weatherRes.json();
 
     const codeToCondition = (code: number) => {
-      if (code === 0) return 'Clear Sky ☀️';
-      if (code === 1 || code === 2) return 'Partly Cloudy ⛅';
-      if (code === 3) return 'Overcast ☁️';
-      if (code >= 45 && code <= 48) return 'Foggy 🌫️';
-      if (code >= 51 && code <= 67) return 'Rain / Drizzle 🌧️';
-      if (code >= 71 && code <= 77) return 'Snow ❄️';
-      if (code >= 80 && code <= 82) return 'Showers 🌦️';
-      if (code >= 95) return 'Thunderstorm ⛈️';
-      return 'Clear 🌤️';
+      if (code === 0) return 'Clear Sky';
+      if (code === 1 || code === 2) return 'Partly Cloudy';
+      if (code === 3) return 'Overcast';
+      if (code >= 45 && code <= 48) return 'Foggy';
+      if (code >= 51 && code <= 67) return 'Rain / Drizzle';
+      if (code >= 71 && code <= 77) return 'Snow';
+      if (code >= 80 && code <= 82) return 'Showers';
+      if (code >= 95) return 'Thunderstorm';
+      return 'Clear';
     };
 
     const current = weatherData.current;
@@ -141,13 +141,13 @@ export async function getLiveWeather(locationQuery: string = 'Bengaluru'): Promi
       location: locationQuery || 'Bengaluru',
       country: 'India',
       temperature: 26,
-      condition: 'Partly Cloudy ⛅',
+      condition: 'Partly Cloudy',
       humidity: 62,
       windSpeed: 14,
       forecast: [
-        { day: 'Today', tempMax: 28, tempMin: 20, condition: 'Partly Cloudy ⛅' },
-        { day: 'Tomorrow', tempMax: 29, tempMin: 20, condition: 'Sunny ☀️' },
-        { day: 'Thu', tempMax: 27, tempMin: 19, condition: 'Light Rain 🌧️' },
+        { day: 'Today', tempMax: 28, tempMin: 20, condition: 'Partly Cloudy' },
+        { day: 'Tomorrow', tempMax: 29, tempMin: 20, condition: 'Sunny' },
+        { day: 'Thu', tempMax: 27, tempMin: 19, condition: 'Light Rain' },
       ],
     };
   }

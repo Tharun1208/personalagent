@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { db, ensureDbReady } from '@/lib/db';
+import { sendTelegramAlert } from '@/lib/notifications/telegram';
 
 export async function GET(req: NextRequest) {
   try {
@@ -26,6 +27,16 @@ export async function GET(req: NextRequest) {
             actionUrl: '/reminders',
             createdAt: new Date().toISOString(),
           });
+
+          if (user.preferences?.telegramBotToken && user.preferences?.telegramChatId) {
+            sendTelegramAlert({
+              botToken: user.preferences.telegramBotToken,
+              chatId: user.preferences.telegramChatId,
+              title: rem.title || 'Reminder',
+              message: rem.notes || `Your reminder "${rem.title || 'Reminder'}" is due now!`,
+              type: 'reminder',
+            }).catch(() => {});
+          }
         }
       }
     }

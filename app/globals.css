@@ -1,16 +1,32 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-ibm-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: var(--font-ibm-plex-sans), "IBM Plex Sans", var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: var(--font-cormorant), "Cormorant Garamond", serif;
   --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", monospace;
   --font-cutive: var(--font-cutive-mono), "Cutive Mono", monospace;
   --font-ibm: var(--font-ibm-plex-sans), "IBM Plex Sans", sans-serif;
+  --font-inter: var(--font-inter), "Inter", sans-serif;
+}
+
+.ibm-plex-sans-500 {
+  font-family: "IBM Plex Sans", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-style: normal;
+  font-variation-settings: "wdth" 100;
+}
+
+.inter-regular {
+  font-family: "Inter", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
 }
 
 @layer base {
   body {
-    font-family: var(--font-ibm-plex-sans), "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+    font-family: var(--font-ibm-plex-sans), "IBM Plex Sans", var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
   }
 
   :root {
@@ -43,36 +59,6 @@
     --code-header-bg: #1e293b;
   }
 
-  .dark {
-    --bg-primary: #131314;
-    --bg-secondary: #1e1f20;
-    --bg-sidebar: #1e1f20;
-    --bg-card: #1e1f20;
-    --bg-elevated: #282a2c;
-    --bg-bubble-user: #282a2c;
-    --bg-composer: #1e1f20;
-    --text-primary: #f8fafc;
-    --text-secondary: #cbd5e1;
-    --text-muted: #94a3b8;
-    --border-subtle: #282a2c;
-    --border-medium: #3c4043;
-    --border-composer: #3c4043;
-    --accent: #a8c7fa;
-    --accent-hover: #d3e3fd;
-    --accent-contrast: #041e49;
-    --send-btn-bg: #a8c7fa;
-    --send-btn-text: #041e49;
-    --brand-indigo: #4e82ee;
-    --brand-emerald: #10a37f;
-    --brand-amber: #f59e0b;
-    --brand-rose: #f87171;
-    --memory-badge-bg: #072711;
-    --memory-badge-text: #6ee7b7;
-    --memory-badge-border: #137333;
-    --code-bg: #1e1f20;
-    --code-header-bg: #282a2c;
-  }
-
   html,
   body {
     background-color: var(--bg-primary);
@@ -100,6 +86,17 @@
     transform: translateZ(0);
     will-change: transform, opacity;
     backface-visibility: hidden;
+  }
+
+  /* Hide scrollbar utility */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
   }
 
   code,
@@ -499,11 +496,6 @@ select,
   font-weight: 500;
 }
 
-.dark select,
-.dark .app-select {
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-}
-
 select option {
   background-color: var(--bg-card);
   color: var(--text-primary);
@@ -535,9 +527,6 @@ select option {
   transform: translateY(-2px);
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
 }
-.dark .card-lift:hover {
-  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.4), 0 8px 12px -6px rgba(0, 0, 0, 0.3);
-}
 
 /* Glassmorphism panel */
 .glass-panel {
@@ -545,12 +534,6 @@ select option {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(226, 232, 240, 0.8);
-}
-.dark .glass-panel {
-  background: rgba(30, 31, 32, 0.8);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* Mobile Bottom Navigation Bar Safe Clearance - Ensures no content is ever hidden behind bottom bar */

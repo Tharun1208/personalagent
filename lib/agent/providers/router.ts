@@ -217,7 +217,7 @@ export async function routeLLMRequest({
   let fallbackReply = fallbackContent || "I'm ready to assist you. Ask me anything, or schedule tasks and reminders.";
   if (attachments && attachments.length > 0) {
     const attSummaries = attachments.map(a => `• **${a.name}** (${a.type}): ${a.extractedText ? a.extractedText.slice(0, 300) + '...' : 'Uploaded successfully.'}`).join('\n');
-    fallbackReply = `### 📄 Analyzed Uploaded Files\n\nI have received and processed your attachments:\n\n${attSummaries}\n\nHow would you like me to analyze or use these files?`;
+    fallbackReply = `###  Analyzed Uploaded Files\n\nI have received and processed your attachments:\n\n${attSummaries}\n\nHow would you like me to analyze or use these files?`;
   }
 
   return {
