@@ -14,6 +14,7 @@ import {
   AlarmClock,
   ListTodo,
   Trash2,
+  Edit2,
   MapPin,
   Zap,
   Download,
@@ -21,6 +22,7 @@ import {
   Search,
   HelpCircle,
   Settings,
+  RotateCw,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import {
@@ -49,14 +51,25 @@ export function toLocalDateString(d: Date): string {
 }
 
 export default function CalendarView() {
-  const { tasks, reminders, createTask, createReminder, toggleTask, deleteReminder } = useApp();
+  const {
+    tasks,
+    reminders,
+    createTask,
+    updateTask,
+    deleteTask,
+    createReminder,
+    updateReminder,
+    deleteReminder,
+    toggleTask,
+    showToast,
+    showConfirm,
+  } = useApp();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<CalendarViewMode>('month');
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [viewModeDropdownOpen, setViewModeDropdownOpen] = useState(false);
   const datePickerAnchorRef = useRef<HTMLDivElement>(null);
   const viewModeAnchorRef = useRef<HTMLDivElement>(null);
-  
 
   // Day Details Modal state
   const [isDayDetailsModalOpen, setIsDayDetailsModalOpen] = useState(false);
@@ -71,6 +84,86 @@ export default function CalendarView() {
   const [modalRecurrence, setModalRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
   const [modalLocation, setModalLocation] = useState('');
 
+  // Edit Event / Task Modal states
+  const [editingItem, setEditingItem] = useState<{
+    id: string;
+    title: string;
+    type: 'task' | 'reminder';
+    dateTime: Date;
+    priority: string;
+    status: string;
+    original: any;
+    isRecurring?: boolean;
+  } | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editTime, setEditTime] = useState('10:00');
+  const [editPriority, setEditPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+  const [editRecurrence, setEditRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
+  const [editNotes, setEditNotes] = useState('');
+
+  const handleOpenEditItem = (item: any) => {
+    setEditingItem(item);
+    setEditTitle(item.title);
+    const d = item.dateTime instanceof Date ? item.dateTime : new Date(item.dateTime);
+    setEditDate(toLocalDateString(d));
+    setEditTime(`${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`);
+    setEditPriority((item.priority as any) || 'medium');
+    setEditRecurrence((item.original?.recurrence as any) || 'none');
+    setEditNotes(item.original?.notes || item.original?.description || '');
+  };
+
+  const handleSaveEditItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem || !editTitle.trim()) return;
+
+    const [h, m] = editTime.split(':').map(Number);
+    const eventDateTime = new Date(editDate);
+    eventDateTime.setHours(h || 10, m || 0, 0, 0);
+
+    if (editingItem.type === 'task') {
+      await updateTask(editingItem.original.id, {
+        title: editTitle.trim(),
+        priority: editPriority,
+        dueDate: eventDateTime.toISOString(),
+        description: editNotes.trim() || undefined,
+      });
+      showToast(`Task "${editTitle.trim()}" updated successfully!`, 'success');
+    } else {
+      await updateReminder(editingItem.original.id, {
+        title: editTitle.trim(),
+        dueDateTime: eventDateTime.toISOString(),
+        recurrence: editRecurrence,
+        priority: editPriority as any,
+        notes: editNotes.trim() || undefined,
+      });
+      showToast(`Event / Reminder "${editTitle.trim()}" updated successfully!`, 'success');
+    }
+
+    setEditingItem(null);
+  };
+
+  const handleDeleteItem = (item: any) => {
+    showConfirm({
+      title: item.type === 'task' ? 'Delete Task' : 'Delete Calendar Event',
+      message: `Are you sure you want to delete "${item.title}"?`,
+      confirmText: 'Delete',
+      type: 'danger',
+      onConfirm: async () => {
+        if (item.type === 'task') {
+          await deleteTask(item.original.id);
+          showToast(`Task "${item.title}" deleted`, 'info');
+        } else {
+          await deleteReminder(item.original.id);
+          showToast(`Event "${item.title}" deleted`, 'info');
+        }
+        if (editingItem?.id === item.id) {
+          setEditingItem(null);
+        }
+      },
+    });
+  };
+
   // Current time tracker for red line indicator in Week/Day views
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -79,7 +172,7 @@ export default function CalendarView() {
     return () => clearInterval(timer);
   }, []);
 
-  // Combined timeline items
+  // Combined timeline items with recurring repeat expansion
   const timelineItems = useMemo(() => {
     const items: Array<{
       id: string;
@@ -89,8 +182,10 @@ export default function CalendarView() {
       priority: string;
       status: string;
       original: any;
+      isRecurring?: boolean;
     }> = [];
 
+    // 1. Task deadlines
     tasks.forEach((t) => {
       if (t.dueDate) {
         items.push({
@@ -105,20 +200,65 @@ export default function CalendarView() {
       }
     });
 
+    // 2. Reminders / Events with Recurrence Expansion
+    const windowStart = new Date(selectedDate.getFullYear() - 1, 0, 1).getTime();
+    const windowEnd = new Date(selectedDate.getFullYear() + 2, 11, 31).getTime();
+
     reminders.forEach((r) => {
+      const baseDate = new Date(r.dueDateTime);
+      if (isNaN(baseDate.getTime())) return;
+
+      // Base reminder event
       items.push({
         id: r.id,
         title: r.title,
         type: 'reminder',
-        dateTime: new Date(r.dueDateTime),
+        dateTime: baseDate,
         priority: r.priority || 'high',
         status: r.status,
         original: r,
       });
+
+      // Expand repeating occurrences forward across future dates
+      if (r.recurrence && r.recurrence !== 'none') {
+        let cur = new Date(baseDate);
+        let count = 0;
+        const maxOccurrences = 365;
+
+        while (count < maxOccurrences) {
+          count++;
+          if (r.recurrence === 'daily') {
+            cur = new Date(cur.getTime() + 86400000);
+          } else if (r.recurrence === 'weekly') {
+            cur = new Date(cur.getTime() + 7 * 86400000);
+          } else if (r.recurrence === 'monthly') {
+            const nextM = new Date(cur);
+            nextM.setMonth(nextM.getMonth() + 1);
+            cur = nextM;
+          } else {
+            break;
+          }
+
+          if (cur.getTime() > windowEnd) break;
+
+          if (cur.getTime() >= windowStart) {
+            items.push({
+              id: `${r.id}_rec_${cur.getTime()}`,
+              title: r.title,
+              type: 'reminder',
+              dateTime: new Date(cur),
+              priority: r.priority || 'high',
+              status: r.status,
+              original: r,
+              isRecurring: true,
+            });
+          }
+        }
+      }
     });
 
     return items.sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime());
-  }, [tasks, reminders]);
+  }, [tasks, reminders, selectedDate]);
 
   // Selected Day Items
   const selectedDayItems = useMemo(() => {
@@ -1103,20 +1243,32 @@ export default function CalendarView() {
                       <div className="flex items-center gap-1.5 shrink-0">
                         {item.type === 'task' && (
                           <button
-                            onClick={() => toggleTask(item.id, item.status)}
-                            className="px-3 py-1 rounded-full bg-(--bg-card) border border-(--border-subtle) text-xs font-semibold text-(--text-primary) hover:border-emerald-500 transition-all cursor-pointer shadow-2xs"
+                            type="button"
+                            onClick={() => toggleTask(item.original.id, item.status)}
+                            className="px-2.5 py-1 rounded-xl bg-(--bg-card) border border-(--border-subtle) text-xs font-semibold text-(--text-primary) hover:border-emerald-500 transition-all cursor-pointer shadow-2xs"
                           >
                             {isCompleted ? '✓ Done' : 'Mark Done'}
                           </button>
                         )}
-                        {item.type === 'reminder' && (
-                          <button
-                            onClick={() => deleteReminder(item.id)}
-                            className="p-1.5 rounded-full text-(--text-muted) hover:text-red-500 hover:bg-(--bg-card) transition-colors cursor-pointer"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDayDetailsModalOpen(false);
+                            handleOpenEditItem(item);
+                          }}
+                          className="p-1.5 rounded-xl bg-(--bg-card) hover:bg-(--bg-elevated) border border-(--border-subtle) text-(--text-secondary) hover:text-[#4E82EE] transition-colors cursor-pointer"
+                          title="Edit"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteItem(item)}
+                          className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 transition-colors cursor-pointer"
+                          title="Delete"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
                     </div>
                   );
@@ -1302,6 +1454,162 @@ export default function CalendarView() {
                   <Check size={15} />
                   <span>Save Event</span>
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Calendar Event / Task Modal ─────────────────────── */}
+      {editingItem && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150 text-(--text-primary)">
+            <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                  editingItem.type === 'task' ? 'bg-[#8e24aa]/15 text-[#8e24aa]' : 'bg-[#1a73e8]/15 text-[#1a73e8]'
+                }`}>
+                  {editingItem.type === 'task' ? <ListTodo size={16} /> : <CalendarIcon size={16} />}
+                </div>
+                <div>
+                  <h2 className="app-modal-title">
+                    {editingItem.type === 'task' ? 'Edit Task Deadline' : 'Edit Calendar Event'}
+                  </h2>
+                  <p className="app-card-subtitle">Modify schedule, priority, or recurrence</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingItem(null)}
+                className="p-1.5 rounded-full text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditItem} className="space-y-4">
+              {/* Title input */}
+              <div>
+                <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Event / Task title..."
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-sm text-(--text-primary) focus:outline-hidden focus:border-[#4E82EE]"
+                />
+              </div>
+
+              {/* Date & Time Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-sm text-(--text-primary) focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-sm text-(--text-primary) focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Priority & Recurrence */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
+                    Priority
+                  </label>
+                  <select
+                    value={editPriority}
+                    onChange={(e) => setEditPriority(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-primary) focus:outline-hidden"
+                  >
+                    <option value="low">Low Priority</option>
+                    <option value="medium">Medium Priority</option>
+                    <option value="high">High Priority</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+
+                {editingItem.type === 'reminder' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
+                      Recurrence
+                    </label>
+                    <select
+                      value={editRecurrence}
+                      onChange={(e) => setEditRecurrence(e.target.value as any)}
+                      className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-primary) focus:outline-hidden"
+                    >
+                      <option value="none">Does not repeat</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Description / Notes */}
+              <div>
+                <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
+                  Notes / Location (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="Additional details..."
+                  className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs text-(--text-primary) focus:outline-hidden resize-none"
+                />
+              </div>
+
+              {/* Modal Buttons (Delete on left, Cancel & Save on right) */}
+              <div className="flex items-center justify-between pt-3 border-t border-(--border-subtle) gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteItem(editingItem)}
+                  className="p-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 font-semibold text-xs cursor-pointer flex items-center gap-1.5 transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 size={14} />
+                  <span>Delete</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingItem(null)}
+                    className="px-4 py-2.5 rounded-xl bg-(--bg-elevated) text-xs font-semibold text-(--text-secondary) hover:bg-(--bg-card) border border-(--border-subtle) transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold hover:opacity-95 shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                  >
+                    <Check size={15} />
+                    <span>Save Changes</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
