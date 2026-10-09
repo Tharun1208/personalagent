@@ -38,6 +38,11 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
+  Check,
+  Copy,
+  ShieldCheck,
+  Calendar,
+  Sparkles,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { LedgerEntry, LedgerType } from '@/types';
@@ -1211,6 +1216,7 @@ export default function LedgerView() {
 
   // Receipt & Statement Modal State
   const [receiptEntry, setReceiptEntry] = useState<LedgerEntry | null>(null);
+  const [copiedReceipt, setCopiedReceipt] = useState(false);
   const [expandedHistoryIds, setExpandedHistoryIds] = useState<Record<string, boolean>>({});
 
   const toggleHistory = (id: string) => {
@@ -1268,6 +1274,8 @@ ${paymentsList || '  No partial payments logged yet.'}
 =======================================`;
 
     navigator.clipboard.writeText(text);
+    setCopiedReceipt(true);
+    setTimeout(() => setCopiedReceipt(false), 2500);
     showToast('Statement copied to clipboard!', 'success');
   };
 
@@ -1977,152 +1985,271 @@ ${paymentsList || '  No partial payments logged yet.'}
       )}
 
       {/* Printable Receipt & Statement Generator Modal */}
-      {receiptEntry && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-xl shadow-2xl p-6 sm:p-8 relative animate-in zoom-in-95 text-slate-900 dark:text-slate-100 my-auto">
-            {/* Action Bar (Hidden on print) */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800 mb-6 print:hidden">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                  <Receipt size={16} />
-                </div>
-                <h2 className="text-base font-bold">Transaction Statement</h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => copyReceiptText(receiptEntry)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                  title="Copy formatted text"
-                >
-                  <Share2 size={13} />
-                  <span>Copy</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-                >
-                  <Printer size={13} />
-                  <span>Print / PDF</span>
-                </button>
-                <button
-                  onClick={() => setReceiptEntry(null)}
-                  className="p-1.5 rounded-full text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            </div>
+      {receiptEntry && (() => {
+        const paidAmount = receiptEntry.paidAmount || (receiptEntry.status === 'settled' ? receiptEntry.amount : 0);
+        const remainingBalance = Math.max(0, receiptEntry.amount - paidAmount);
+        const percentSettled = receiptEntry.amount > 0 ? Math.min(100, Math.round((paidAmount / receiptEntry.amount) * 100)) : 100;
+        const payments = receiptEntry.payments || [];
+        const isReceivable = receiptEntry.type === 'receive';
 
-            {/* Printable Receipt Container */}
-            <div id="printable-receipt" className="space-y-6">
-              {/* Receipt Header */}
-              <div className="flex items-start justify-between border-b pb-4 border-slate-200 dark:border-slate-800">
-                <div>
-                  <h1 className="text-xl font-black tracking-tight text-indigo-600 dark:text-indigo-400">
-                    PERSONAL AGENT
-                  </h1>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Official Ledger Statement</p>
-                </div>
-                <div className="text-right font-mono text-xs">
-                  <p className="font-semibold text-slate-700 dark:text-slate-300">ID: {receiptEntry.id.slice(0, 12)}</p>
-                  <p className="text-slate-400">{new Date().toLocaleDateString()}</p>
-                </div>
-              </div>
-
-              {/* Transaction Summary Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-xs">
-                <div>
-                  <span className="text-slate-400 uppercase text-[10px] font-semibold">Counterparty</span>
-                  <p className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 text-sm">{receiptEntry.personName}</p>
-                </div>
-                <div>
-                  <span className="text-slate-400 uppercase text-[10px] font-semibold">Type</span>
-                  <p className="font-bold text-slate-800 dark:text-slate-200 mt-0.5">
-                    {receiptEntry.type === 'give' ? 'You Owe' : 'Owed to You'}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-slate-400 uppercase text-[10px] font-semibold">Status</span>
-                  <p className={`font-bold mt-0.5 ${receiptEntry.status === 'settled' ? 'text-blue-500' : 'text-emerald-500'}`}>
-                    {receiptEntry.status.toUpperCase()}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-slate-400 uppercase text-[10px] font-semibold">Due Date</span>
-                  <p className="font-bold text-slate-800 dark:text-slate-200 mt-0.5">
-                    {receiptEntry.dueDate ? new Date(receiptEntry.dueDate).toLocaleDateString() : 'None'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Amount Breakdown */}
-              <div className="space-y-2 border-y py-4 border-slate-200 dark:border-slate-800 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Initial Total Amount:</span>
-                  <span className="font-bold font-mono text-sm">{receiptEntry.currency}{receiptEntry.amount.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Total Settled / Paid:</span>
-                  <span className="font-bold font-mono text-emerald-600 dark:text-emerald-400">
-                    {receiptEntry.currency}{(receiptEntry.paidAmount || (receiptEntry.status === 'settled' ? receiptEntry.amount : 0)).toLocaleString('en-IN')}
-                  </span>
-                </div>
-                <div className="flex justify-between pt-2 border-t border-dashed border-slate-200 dark:border-slate-800 text-sm">
-                  <span className="font-bold text-slate-900 dark:text-white">Outstanding Balance:</span>
-                  <span className="font-black font-mono text-rose-600 dark:text-rose-400">
-                    {receiptEntry.currency}
-                    {Math.max(0, receiptEntry.amount - (receiptEntry.paidAmount || (receiptEntry.status === 'settled' ? receiptEntry.amount : 0))).toLocaleString('en-IN')}
-                  </span>
-                </div>
-              </div>
-
-              {/* Payment History Table */}
-              <div>
-                <h4 className="text-xs font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-wider">
-                  Payment Installments
-                </h4>
-                {(!receiptEntry.payments || receiptEntry.payments.length === 0) ? (
-                  <p className="text-xs text-slate-400 italic py-2">
-                    {receiptEntry.status === 'settled' ? 'Settled in full via one-time settlement.' : 'No partial payments logged yet.'}
-                  </p>
-                ) : (
-                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                        <tr>
-                          <th className="py-2 px-3 font-semibold">#</th>
-                          <th className="py-2 px-3 font-semibold">Date</th>
-                          <th className="py-2 px-3 font-semibold">Note</th>
-                          <th className="py-2 px-3 font-semibold text-right">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
-                        {receiptEntry.payments.map((p, idx) => (
-                          <tr key={p.id}>
-                            <td className="py-2 px-3 text-slate-400">{idx + 1}</td>
-                            <td className="py-2 px-3">{new Date(p.date).toLocaleDateString()}</td>
-                            <td className="py-2 px-3 font-sans text-slate-500">{p.note || '-'}</td>
-                            <td className="py-2 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
-                              {receiptEntry.currency}{p.amount.toLocaleString('en-IN')}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
+            {/* Modal Box */}
+            <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden my-auto text-(--text-primary) animate-in zoom-in-95 duration-200">
+              {/* Modal Top Actions (Hidden when printing) */}
+              <div className="px-5 sm:px-6 py-4 border-b border-(--border-subtle) flex items-center justify-between gap-3 bg-(--bg-elevated)/60 print:hidden">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Receipt size={16} />
                   </div>
-                )}
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-(--text-primary) truncate">Transaction Statement</h3>
+                    <p className="text-[11px] text-(--text-muted) truncate font-medium">Official Ledger Receipt</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => copyReceiptText(receiptEntry)}
+                    className="px-3 py-1.5 rounded-xl bg-(--bg-card) hover:bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                    title="Copy formatted text"
+                  >
+                    {copiedReceipt ? (
+                      <>
+                        <Check size={13} className="text-emerald-500" />
+                        <span className="text-emerald-500 font-bold">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={13} />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-blue-500/20 hover:opacity-95 active:scale-95"
+                  >
+                    <Printer size={13} />
+                    <span>Print / PDF</span>
+                  </button>
+
+                  <button
+                    onClick={() => setReceiptEntry(null)}
+                    className="p-1.5 rounded-xl text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) transition-colors cursor-pointer"
+                    title="Close"
+                  >
+                    <X size={17} />
+                  </button>
+                </div>
               </div>
 
-              {/* Footer */}
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 text-[10px] text-slate-400 text-center">
-                Generated securely by Personal Agent • Client-side private ledger
+              {/* Printable Receipt Body */}
+              <div id="printable-receipt" className="p-5 sm:p-7 space-y-5 bg-(--bg-card) print:bg-white print:text-slate-900 print:p-8">
+                {/* 1. Header & ID Stamp */}
+                <div className="flex items-start justify-between gap-4 pb-4 border-b border-(--border-subtle) print:border-slate-200">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black tracking-widest text-[#4E82EE] print:text-blue-600 uppercase">
+                        PERSONAL AGENT
+                      </span>
+                      <span className="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-[#4E82EE]/10 text-[#4E82EE] border border-[#4E82EE]/20 print:border-blue-200">
+                        OFFICIAL STATEMENT
+                      </span>
+                    </div>
+                    <h2 className="text-lg sm:text-xl font-black text-(--text-primary) print:text-slate-900 tracking-tight mt-1">
+                      Ledger Receipt
+                    </h2>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div className="text-[11px] font-mono font-bold text-(--text-secondary) print:text-slate-600">
+                      REF #{receiptEntry.id.replace('ledg_', '').toUpperCase().slice(0, 10)}
+                    </div>
+                    <div className="text-[10px] text-(--text-muted) print:text-slate-400 mt-0.5">
+                      {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Counterparty Card */}
+                <div className="p-4 rounded-2xl bg-(--bg-elevated) print:bg-slate-50 border border-(--border-subtle) print:border-slate-200 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#4E82EE] to-[#9B72CF] text-white font-black text-lg flex items-center justify-center shrink-0 shadow-xs">
+                      {receiptEntry.personName[0]?.toUpperCase() || 'P'}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold text-(--text-muted) print:text-slate-500 uppercase tracking-wider">
+                        Counterparty
+                      </div>
+                      <div className="text-base font-bold text-(--text-primary) print:text-slate-900 truncate">
+                        {receiptEntry.personName}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                        isReceivable
+                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                          : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                      }`}
+                    >
+                      {isReceivable ? 'Incoming · Owed to You' : 'Outgoing · You Owe'}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                        receiptEntry.status === 'settled'
+                          ? 'bg-blue-500/15 text-blue-500'
+                          : paidAmount > 0
+                          ? 'bg-amber-500/15 text-amber-500'
+                          : 'bg-slate-500/15 text-slate-400'
+                      }`}
+                    >
+                      {receiptEntry.status === 'settled'
+                        ? '✓ Fully Settled'
+                        : paidAmount > 0
+                        ? '⏳ Partially Paid'
+                        : '⏱️ Pending'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3. Hero Balance Card & Breakdown */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-(--bg-card) to-(--bg-elevated) print:bg-white border border-(--border-subtle) print:border-slate-200 space-y-4 shadow-xs">
+                  <div className="flex items-center justify-between pb-3 border-b border-(--border-subtle) print:border-slate-200">
+                    <div>
+                      <span className="text-[10px] font-bold text-(--text-muted) print:text-slate-500 uppercase tracking-wider">
+                        Outstanding Balance
+                      </span>
+                      <div
+                        className={`text-2xl sm:text-3xl font-black tracking-tight mt-0.5 ${
+                          remainingBalance === 0
+                            ? 'text-emerald-500'
+                            : isReceivable
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-rose-600 dark:text-rose-400'
+                        }`}
+                      >
+                        {receiptEntry.currency}
+                        {remainingBalance.toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <span className="text-[10px] font-bold text-(--text-muted) print:text-slate-500 uppercase tracking-wider">
+                        Settled
+                      </span>
+                      <div className="text-base sm:text-lg font-bold text-emerald-500 mt-0.5">
+                        {percentSettled}%
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Visual Progress Bar */}
+                  <div className="space-y-1.5">
+                    <div className="w-full bg-(--bg-elevated) print:bg-slate-100 h-2 rounded-full overflow-hidden border border-(--border-subtle) print:border-slate-200">
+                      <div
+                        className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-300"
+                        style={{ width: `${percentSettled}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-(--text-secondary) print:text-slate-600 font-medium">
+                      <span>Total: {receiptEntry.currency}{receiptEntry.amount.toLocaleString('en-IN')}</span>
+                      <span>Paid: {receiptEntry.currency}{paidAmount.toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+
+                  {/* Metadata Row */}
+                  <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+                    <div className="p-2.5 rounded-xl bg-(--bg-card) print:bg-slate-50 border border-(--border-subtle) print:border-slate-200">
+                      <span className="text-[10px] text-(--text-muted) print:text-slate-500 font-semibold uppercase block">
+                        Due Date
+                      </span>
+                      <span className="font-bold text-(--text-primary) print:text-slate-900 text-xs mt-0.5 block">
+                        {receiptEntry.dueDate
+                          ? new Date(receiptEntry.dueDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+                          : 'No due date'}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-(--bg-card) print:bg-slate-50 border border-(--border-subtle) print:border-slate-200">
+                      <span className="text-[10px] text-(--text-muted) print:text-slate-500 font-semibold uppercase block">
+                        Record Date
+                      </span>
+                      <span className="font-bold text-(--text-primary) print:text-slate-900 text-xs mt-0.5 block">
+                        {new Date(receiptEntry.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Payment Installments Log */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-(--text-primary) print:text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <History size={13} className="text-[#4E82EE]" />
+                      <span>Payment History</span>
+                    </h4>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-(--bg-elevated) print:bg-slate-100 text-(--text-muted) border border-(--border-subtle)">
+                      {payments.length} {payments.length === 1 ? 'installment' : 'installments'}
+                    </span>
+                  </div>
+
+                  {payments.length === 0 ? (
+                    <div className="p-3.5 rounded-2xl bg-(--bg-elevated) print:bg-slate-50 border border-(--border-subtle) print:border-slate-200 text-center text-xs text-(--text-muted) print:text-slate-500">
+                      {receiptEntry.status === 'settled'
+                        ? 'Settled in full in a single payment transaction.'
+                        : 'No partial payments recorded yet.'}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-(--border-subtle) print:border-slate-200 overflow-hidden divide-y divide-(--border-subtle) print:divide-slate-200">
+                      {payments.map((p, idx) => (
+                        <div
+                          key={p.id || idx}
+                          className="p-3 bg-(--bg-card) print:bg-white flex items-center justify-between gap-3 text-xs"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="w-5 h-5 rounded-full bg-(--bg-elevated) print:bg-slate-100 text-(--text-muted) print:text-slate-600 font-bold text-[10px] flex items-center justify-center shrink-0">
+                              {idx + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="font-bold text-(--text-primary) print:text-slate-900">
+                                {new Date(p.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </div>
+                              {p.note && (
+                                <div className="text-[11px] text-(--text-muted) print:text-slate-500 truncate">
+                                  {p.note}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="font-bold font-mono text-emerald-600 dark:text-emerald-400 print:text-emerald-700 shrink-0 text-sm">
+                            +{receiptEntry.currency}{p.amount.toLocaleString('en-IN')}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 5. Footer & Verification Stamp */}
+                <div className="pt-4 border-t border-(--border-subtle) print:border-slate-200 flex items-center justify-between gap-2 text-[10px] text-(--text-muted) print:text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck size={13} className="text-emerald-500" />
+                    <span>Encrypted Client-Side Ledger Statement</span>
+                  </div>
+                  <span className="font-mono font-bold">Personal Agent v2.5</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
