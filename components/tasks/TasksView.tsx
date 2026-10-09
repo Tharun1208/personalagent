@@ -184,40 +184,40 @@ export default function TasksView() {
   ], [allTasksList]);
 
   return (
-    <div className="flex-1 min-h-screen w-full bg-[#F4F5F8] text-slate-900 flex justify-center items-start sm:py-6 sm:px-4 overflow-y-auto font-sans select-none pb-24 md:pb-12">
+    <div className="flex-1 min-h-screen w-full bg-[#F4F5F8] text-slate-900 flex justify-center items-start pt-4 sm:pt-6 px-3 sm:px-4 overflow-y-auto font-sans select-none pb-28 md:pb-16">
       {/* Responsive Container */}
-      <div className="w-full max-w-4xl space-y-4 sm:space-y-5 px-3 sm:px-0">
+      <div className="w-full max-w-4xl space-y-4 sm:space-y-6">
         
         {/* ───────────────────────────────────────────────────────────── */}
         {/* 1. TOP HEADER BAR: CLEAN TITLE & ACTION BUTTONS               */}
         {/* ───────────────────────────────────────────────────────────── */}
-        <div className="p-5 sm:p-6 rounded-[28px] bg-white border border-slate-100 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-tight flex items-center gap-2">
+        <div className="p-6 sm:p-7 rounded-[30px] bg-white border border-slate-100/80 shadow-[0_4px_24px_rgba(0,0,0,0.03)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col gap-1.5">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-tight flex items-center gap-2.5">
               <span>Task Manager</span>
-              <CheckSquare size={18} className="text-[#1C73E8]" />
+              <CheckSquare size={22} className="text-[#1C73E8]" />
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 font-medium">
+            <p className="text-xs sm:text-sm text-slate-500 font-medium">
               Organize your to-dos, daily focus, and ongoing projects
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto pt-1 sm:pt-0">
+          <div className="flex items-center gap-3 w-full sm:w-auto pt-2 sm:pt-0">
             {/* View Switcher Button */}
             <button
               type="button"
               onClick={() => setViewLayout((p) => (p === 'mobile_card' ? 'kanban' : 'mobile_card'))}
-              className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer active:scale-98"
+              className="flex-1 sm:flex-initial px-4 sm:px-5 py-3 rounded-2xl bg-slate-100/90 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer active:scale-98 min-h-[44px]"
               title={viewLayout === 'mobile_card' ? 'Switch to Kanban View' : 'Switch to List View'}
             >
               {viewLayout === 'mobile_card' ? (
                 <>
-                  <LayoutGrid size={16} />
+                  <LayoutGrid size={17} />
                   <span>Kanban</span>
                 </>
               ) : (
                 <>
-                  <List size={16} />
+                  <List size={17} />
                   <span>List</span>
                 </>
               )}
@@ -227,74 +227,74 @@ export default function TasksView() {
             <button
               type="button"
               onClick={() => setIsAddOpen(true)}
-              className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-[#1C73E8] hover:bg-[#1557B0] text-white text-xs sm:text-sm font-bold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
+              className="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-[#1C73E8] hover:bg-[#1557B0] text-white text-xs sm:text-sm font-bold shadow-sm shadow-[#1C73E8]/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 min-h-[44px]"
             >
-              <Plus size={16} strokeWidth={2.5} />
+              <Plus size={18} strokeWidth={2.5} />
               <span>New Task</span>
             </button>
           </div>
         </div>
 
         {/* ───────────────────────────────────────────────────────────── */}
-        {/* 2. THREE REAL TASK METRIC CARDS (INCREASED HEIGHT & SPACING)  */}
+        {/* 2. THREE REAL TASK METRIC CARDS (BIGGER & MORE SPACIOUS)      */}
         {/* ───────────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-3 gap-3 sm:gap-4">
           
           {/* Card 1: Active To-Dos */}
-          <div className="p-4 sm:p-5 min-h-[125px] sm:min-h-[135px] rounded-[24px] bg-white border border-slate-100 shadow-2xs flex flex-col justify-between">
+          <div className="p-5 sm:p-6 min-h-[145px] sm:min-h-[160px] rounded-[28px] bg-white border border-slate-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Pending
                 </span>
-                <Clock size={14} className="text-indigo-600" strokeWidth={2.5} />
+                <Clock size={16} className="text-indigo-600" strokeWidth={2.5} />
               </div>
             </div>
-            <div className="mt-3">
-              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono">
+            <div className="mt-4">
+              <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 font-mono">
                 {totalCount - completedCount}
               </span>
-              <p className="text-[11px] sm:text-xs text-slate-400 truncate mt-1">
+              <p className="text-xs sm:text-[13px] text-slate-400 font-medium truncate mt-1.5">
                 Active to-dos
               </p>
             </div>
           </div>
 
           {/* Card 2: Completed */}
-          <div className="p-4 sm:p-5 min-h-[125px] sm:min-h-[135px] rounded-[24px] bg-white border border-slate-100 shadow-2xs flex flex-col justify-between">
+          <div className="p-5 sm:p-6 min-h-[145px] sm:min-h-[160px] rounded-[28px] bg-white border border-slate-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Completed
                 </span>
-                <CheckCircle2 size={14} className="text-emerald-600" strokeWidth={2.5} />
+                <CheckCircle2 size={16} className="text-emerald-600" strokeWidth={2.5} />
               </div>
             </div>
-            <div className="mt-3">
-              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono">
+            <div className="mt-4">
+              <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 font-mono">
                 {completedCount}
               </span>
-              <p className="text-[11px] sm:text-xs text-slate-400 truncate mt-1">
+              <p className="text-xs sm:text-[13px] text-slate-400 font-medium truncate mt-1.5">
                 Finished tasks
               </p>
             </div>
           </div>
 
           {/* Card 3: Completion Rate */}
-          <div className="p-4 sm:p-5 min-h-[125px] sm:min-h-[135px] rounded-[24px] bg-white border border-slate-100 shadow-2xs flex flex-col justify-between">
+          <div className="p-5 sm:p-6 min-h-[145px] sm:min-h-[160px] rounded-[28px] bg-white border border-slate-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                   Progress
                 </span>
-                <TrendingUp size={14} className="text-[#1C73E8]" strokeWidth={2.5} />
+                <TrendingUp size={16} className="text-[#1C73E8]" strokeWidth={2.5} />
               </div>
             </div>
-            <div className="mt-3">
-              <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono">
+            <div className="mt-4">
+              <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 font-mono">
                 {progressPercent}%
               </span>
-              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden mt-2">
+              <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden mt-2.5">
                 <div
                   className="bg-[#1C73E8] h-full rounded-full transition-all duration-500"
                   style={{ width: `${progressPercent}%` }}
@@ -308,7 +308,7 @@ export default function TasksView() {
         {/* ───────────────────────────────────────────────────────────── */}
         {/* 3. SEGMENTED TABS & TASK LIST CONTAINER                       */}
         {/* ───────────────────────────────────────────────────────────── */}
-        <div className="bg-white rounded-[28px] border border-slate-100 shadow-2xs overflow-hidden flex flex-col">
+        <div className="bg-white rounded-[30px] border border-slate-100/80 shadow-[0_4px_24px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col">
           
           {/* Segmented Filter Tab Bar */}
           <div className="border-b border-slate-100 flex items-stretch bg-slate-50/50">
@@ -400,16 +400,16 @@ export default function TasksView() {
                       <div
                         key={task.id}
                         onClick={() => handleOpenEdit(task)}
-                        className="bg-white rounded-[26px] p-6 sm:p-7 min-h-[135px] sm:min-h-[145px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all duration-200 cursor-pointer group flex flex-col justify-between"
+                        className="bg-white rounded-[28px] p-6 sm:p-8 min-h-[150px] sm:min-h-[165px] border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all duration-200 cursor-pointer group flex flex-col justify-between"
                       >
                         {/* Top Line: Title & Status Badge */}
-                        <div className="flex items-center justify-between gap-3">
-                          <h3 className="text-[17px] font-bold text-slate-800 tracking-tight truncate group-hover:text-[#1C73E8] transition-colors">
+                        <div className="flex items-start sm:items-center justify-between gap-3">
+                          <h3 className="text-lg sm:text-[19px] font-bold text-slate-800 tracking-tight leading-snug group-hover:text-[#1C73E8] transition-colors">
                             {task.title}
                           </h3>
                           <span
-                            className={`text-xs sm:text-[13px] font-bold shrink-0 ${
-                              isDone ? 'text-emerald-600' : 'text-amber-600'
+                            className={`text-xs sm:text-[13px] font-bold shrink-0 px-2.5 py-1 rounded-full ${
+                              isDone ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50'
                             }`}
                           >
                             {isDone ? 'Completed' : 'On-going'}
@@ -418,28 +418,28 @@ export default function TasksView() {
 
                         {/* Middle Line: Description Snippet */}
                         {task.description && (
-                          <p className="text-sm text-slate-500 font-normal leading-relaxed line-clamp-2 mt-2.5">
+                          <p className="text-sm sm:text-base text-slate-500 font-normal leading-relaxed line-clamp-2 mt-3">
                             {task.description}
                           </p>
                         )}
 
                         {/* Bottom Line: Date Range & Quick Actions */}
-                        <div className="flex items-center justify-between mt-4 pt-1">
-                          <p className="text-xs text-slate-400 font-normal">
+                        <div className="flex items-center justify-between mt-5 pt-1 border-t border-slate-50">
+                          <p className="text-xs sm:text-sm text-slate-400 font-medium">
                             {formatDisplayDateRange(task)}
                           </p>
 
-                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center gap-2 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleToggleStatus(task);
                               }}
-                              className="p-1 rounded-md text-slate-400 hover:text-[#1C73E8]"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-[#1C73E8] hover:bg-slate-50 transition-colors"
                               title={isDone ? 'Mark as on-going' : 'Mark as completed'}
                             >
-                              {isDone ? <CheckCircle2 size={18} className="text-emerald-500" /> : <Circle size={18} />}
+                              {isDone ? <CheckCircle2 size={20} className="text-emerald-500" /> : <Circle size={20} />}
                             </button>
                           </div>
                         </div>
