@@ -99,6 +99,7 @@ interface AppContextType {
   deleteMemory: (id: string) => Promise<void>;
   updateMemory: (id: string, patch: Partial<Memory>) => Promise<void>;
   createTask: (title: string, priority?: string, dueDate?: string, projectId?: string) => Promise<void>;
+  updateTask: (id: string, patch: Partial<Task>) => Promise<void>;
   toggleTask: (id: string, currentStatus: string) => Promise<void>;
   updateTaskStatus: (id: string, status: Task['status']) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
@@ -1416,6 +1417,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateTask = async (id: string, patch: Partial<Task>) => {
+    const now = new Date().toISOString();
+    setTasks((prev) => {
+      const updated = prev.map((t) => (t.id === id ? { ...t, ...patch, updatedAt: now } : t));
+      try { localStorage.setItem('recall_tasks', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    try {
+      const res = await apiFetch(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const data = await safeJson(res);
+      if (data?.task) {
+        setTasks((prev) => {
+          const updated = prev.map((t) => (t.id === id ? data.task : t));
+          try { localStorage.setItem('recall_tasks', JSON.stringify(updated)); } catch {}
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.warn('Task update background sync notice:', err);
+    }
+  };
+
   const updateTaskStatus = async (id: string, status: Task['status']) => {
     const now = new Date().toISOString();
     // Instant optimistic update in UI state
@@ -1957,6 +1985,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deleteMemory,
         updateMemory,
         createTask,
+        updateTask,
         toggleTask,
         updateTaskStatus,
         deleteTask,

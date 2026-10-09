@@ -11,6 +11,8 @@ import {
   Circle,
   Clock,
   Trash2,
+  Edit2,
+  MoreVertical,
   Filter,
   X,
   AlertCircle,
@@ -134,17 +136,64 @@ function groupTasksByDate(tasksList: Task[]): DateTaskGroup[] {
 }
 
 export default function TasksView() {
-  const { tasks, createTask, toggleTask, updateTaskStatus, deleteTask, refreshAll } = useApp();
+  const { tasks, createTask, updateTask, toggleTask, updateTaskStatus, deleteTask, refreshAll, showToast, showConfirm } = useApp();
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
 
-  // Form states
+  // Create Form states
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('high');
   const [dueDate, setDueDate] = useState('');
+
+  // Edit Task State
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editPriority, setEditPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editSubtasks, setEditSubtasks] = useState<SubTask[]>([]);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+
+  const handleOpenEdit = (task: Task) => {
+    setEditingTask(task);
+    setEditTitle(task.title);
+    setEditDescription(task.description || '');
+    setEditPriority((task.priority as any) || 'medium');
+    setEditDueDate(task.dueDate ? (task.dueDate.includes('T') ? task.dueDate.slice(0, 16) : task.dueDate) : '');
+    setEditSubtasks(task.subtasks || []);
+    setNewSubtaskTitle('');
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTask || !editTitle.trim()) return;
+
+    await updateTask(editingTask.id, {
+      title: editTitle.trim(),
+      description: editDescription.trim() || undefined,
+      priority: editPriority,
+      dueDate: editDueDate || undefined,
+      subtasks: editSubtasks,
+    });
+    showToast(`Task "${editTitle.trim()}" updated successfully!`, 'success');
+    setEditingTask(null);
+  };
+
+  const handleDeleteTask = (task: Task) => {
+    showConfirm({
+      title: 'Delete Task',
+      message: `Are you sure you want to permanently delete "${task.title}"?`,
+      confirmText: 'Delete Task',
+      type: 'danger',
+      onConfirm: async () => {
+        await deleteTask(task.id);
+        showToast(`Task "${task.title}" deleted`, 'info');
+      },
+    });
+  };
 
   const filteredTasks = tasks.filter((t) => {
     const matchesSearch =
@@ -500,13 +549,23 @@ export default function TasksView() {
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-1.5 shrink-0">
                             <button
-                              onClick={() => deleteTask(task.id)}
-                              className="p-2 text-rose-500/80 hover:text-rose-500 rounded-xl hover:bg-rose-500/10 transition-colors cursor-pointer"
+                              type="button"
+                              onClick={() => handleOpenEdit(task)}
+                              className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-[#4E82EE] font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                              title="Edit task"
+                            >
+                              <Edit2 size={13} />
+                              <span className="hidden sm:inline">Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTask(task)}
+                              className="p-1.5 sm:px-2 sm:py-1.5 rounded-xl text-rose-500/80 hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer"
                               title="Delete task"
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </div>
@@ -579,6 +638,19 @@ export default function TasksView() {
                   autoFocus
                   required
                   className="w-full px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-sm font-medium focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5 uppercase tracking-wider">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Additional details..."
+                  rows={2}
+                  className="w-full px-4 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-medium focus:outline-none focus:border-indigo-500 resize-none"
                 />
               </div>
 
@@ -684,6 +756,231 @@ export default function TasksView() {
                 >
                   Save Task
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {editingTask && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in overflow-y-auto">
+          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 my-auto">
+            <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[#4E82EE]/20 text-[#4E82EE] flex items-center justify-center">
+                  <Edit2 size={15} />
+                </div>
+                <div>
+                  <h3 className="app-modal-title">Edit Task</h3>
+                  <p className="text-[11px] text-(--text-muted)">Update details or manage subtasks</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingTask(null)}
+                className="p-1 rounded-full text-(--text-muted) hover:text-(--text-primary)"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5 uppercase tracking-wider">
+                  Title *
+                </label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Task title..."
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-sm font-medium focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5 uppercase tracking-wider">
+                  Description
+                </label>
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Task description / notes..."
+                  rows={2}
+                  className="w-full px-4 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-medium focus:outline-none focus:border-indigo-500 resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-(--text-secondary) mb-2 uppercase tracking-wider">
+                  Priority
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { id: 'low', label: 'Low', activeClass: 'border-slate-400 bg-slate-500/20 text-slate-200 ring-2 ring-slate-500/40 font-bold' },
+                    { id: 'medium', label: 'Medium', activeClass: 'border-blue-500 bg-blue-500/20 text-blue-400 ring-2 ring-blue-500/40 font-bold' },
+                    { id: 'high', label: 'High', activeClass: 'border-amber-500 bg-amber-500/20 text-amber-400 ring-2 ring-amber-500/40 font-bold' },
+                    { id: 'urgent', label: 'Urgent', activeClass: 'border-rose-500 bg-rose-500/20 text-rose-400 ring-2 ring-rose-500/40 font-bold' },
+                  ].map((p) => {
+                    const isSelected = editPriority === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setEditPriority(p.id as any)}
+                        className={`py-2 px-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer text-center ${
+                          isSelected
+                            ? p.activeClass
+                            : 'border-(--border-subtle) bg-(--bg-elevated) text-(--text-muted) hover:text-(--text-primary)'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-(--text-secondary) mb-1.5 uppercase tracking-wider">
+                  Due Date & Time
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-[10px] font-semibold text-(--text-muted) uppercase mb-1 block">Date</span>
+                    <input
+                      type="date"
+                      value={editDueDate ? editDueDate.split('T')[0] : ''}
+                      onChange={(e) => {
+                        const time = editDueDate && editDueDate.includes('T') ? editDueDate.split('T')[1] : '18:00';
+                        setEditDueDate(e.target.value ? `${e.target.value}T${time}` : '');
+                      }}
+                      className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-medium text-(--text-primary) focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-semibold text-(--text-muted) uppercase mb-1 block">Time</span>
+                    <input
+                      type="time"
+                      value={editDueDate && editDueDate.includes('T') ? editDueDate.split('T')[1].slice(0, 5) : '18:00'}
+                      onChange={(e) => {
+                        const date = editDueDate && editDueDate.includes('T') ? editDueDate.split('T')[0] : new Date().toISOString().split('T')[0];
+                        setEditDueDate(`${date}T${e.target.value}`);
+                      }}
+                      className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-medium text-(--text-primary) focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Subtasks in Edit Mode */}
+              <div className="space-y-2 pt-1 border-t border-(--border-subtle)">
+                <label className="block text-xs font-semibold text-(--text-secondary) uppercase tracking-wider">
+                  Subtasks ({editSubtasks.length})
+                </label>
+                {editSubtasks.map((sub, idx) => (
+                  <div key={sub.id || idx} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={sub.completed}
+                      onChange={(e) => {
+                        setEditSubtasks((prev) =>
+                          prev.map((s, i) => (i === idx ? { ...s, completed: e.target.checked } : s))
+                        );
+                      }}
+                      className="rounded text-indigo-600 cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={sub.title}
+                      onChange={(e) => {
+                        setEditSubtasks((prev) =>
+                          prev.map((s, i) => (i === idx ? { ...s, title: e.target.value } : s))
+                        );
+                      }}
+                      className="flex-1 px-3 py-1.5 rounded-lg bg-(--bg-elevated) border border-(--border-subtle) text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setEditSubtasks((prev) => prev.filter((_, i) => i !== idx))}
+                      className="p-1 text-rose-500 hover:bg-rose-500/10 rounded-md"
+                      title="Remove subtask"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+
+                <div className="flex gap-2 pt-1">
+                  <input
+                    type="text"
+                    placeholder="Add a new subtask..."
+                    value={newSubtaskTitle}
+                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (newSubtaskTitle.trim()) {
+                          setEditSubtasks((prev) => [
+                            ...prev,
+                            { id: `sub_${Date.now()}`, title: newSubtaskTitle.trim(), completed: false },
+                          ]);
+                          setNewSubtaskTitle('');
+                        }
+                      }
+                    }}
+                    className="flex-1 px-3 py-1.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newSubtaskTitle.trim()) {
+                        setEditSubtasks((prev) => [
+                          ...prev,
+                          { id: `sub_${Date.now()}`, title: newSubtaskTitle.trim(), completed: false },
+                        ]);
+                        setNewSubtaskTitle('');
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-(--bg-elevated) hover:bg-indigo-500/10 text-xs font-semibold rounded-xl border border-(--border-subtle)"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between pt-3 border-t border-(--border-subtle) gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const taskToDelete = editingTask;
+                    setEditingTask(null);
+                    handleDeleteTask(taskToDelete);
+                  }}
+                  className="p-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 font-semibold text-xs cursor-pointer flex items-center gap-1.5"
+                  title="Delete this task"
+                >
+                  <Trash2 size={14} />
+                  <span>Delete</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingTask(null)}
+                    className="px-4 py-2.5 rounded-xl bg-(--bg-elevated) text-xs font-semibold text-(--text-secondary) hover:bg-(--bg-primary) border border-(--border-subtle) transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#4E82EE] via-[#9B72CF] to-[#F27878] text-white text-xs font-bold hover:opacity-95 active:scale-95 transition-all cursor-pointer shadow-md shadow-blue-500/20"
+                  >
+                    Save Changes
+                  </button>
+                </div>
               </div>
             </form>
           </div>
