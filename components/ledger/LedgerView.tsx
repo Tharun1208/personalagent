@@ -1059,8 +1059,8 @@ function DailySpendingPanel({ currency }: { currency: string }) {
       {/* Add / Edit Expense Modal                                            */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
-          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-t-3xl sm:rounded-3xl w-full max-w-md shadow-2xl p-6 animate-in slide-in-from-bottom-4 sm:zoom-in-95">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-start justify-center p-4 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
+          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-md shadow-2xl p-6 animate-top-modal">
             <div className="flex items-center justify-between pb-4 border-b border-(--border-subtle) mb-4">
               <h2 className="app-modal-title">
                 {editId ? 'Edit Expense' : 'Add Expense'}
@@ -1795,8 +1795,8 @@ ${paymentsList || '  No partial payments logged yet.'}
 
       {/* Add/Edit Dues Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-lg shadow-2xl p-6 relative animate-in zoom-in-95">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-start justify-center p-4 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
+          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-lg shadow-2xl p-6 relative animate-top-modal">
             <div className="flex items-center justify-between pb-4 border-b border-(--border-subtle)">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-[#4E82EE]/20 text-[#4E82EE] flex items-center justify-center"><HandCoins size={16} /></div>
@@ -1858,8 +1858,8 @@ ${paymentsList || '  No partial payments logged yet.'}
 
       {/* Partial Payment Modal */}
       {partialPaymentEntry && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-md shadow-2xl p-6 relative animate-in zoom-in-95">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-start justify-center p-4 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
+          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-md shadow-2xl p-6 relative animate-top-modal">
             <div className="flex items-center justify-between pb-4 border-b border-(--border-subtle)">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
@@ -1993,9 +1993,9 @@ ${paymentsList || '  No partial payments logged yet.'}
         const isReceivable = receiptEntry.type === 'receive';
 
         return (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-start justify-center p-3 sm:p-6 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
             {/* Modal Box */}
-            <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden my-auto text-(--text-primary) animate-in zoom-in-95 duration-200">
+            <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden text-(--text-primary) animate-top-modal">
               {/* Modal Top Actions (Hidden when printing) */}
               <div className="px-5 sm:px-6 py-4 border-b border-(--border-subtle) flex items-center justify-between gap-3 bg-(--bg-elevated)/60 print:hidden">
                 <div className="flex items-center gap-2.5 min-w-0">

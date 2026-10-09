@@ -119,8 +119,8 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-[420px] bg-(--bg-card) border border-(--border-subtle) rounded-[28px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[60] flex items-start justify-center p-4 pt-10 sm:pt-14 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+      <div className="relative w-full max-w-[420px] bg-(--bg-card) border border-(--border-subtle) rounded-[28px] shadow-2xl overflow-hidden animate-top-modal">
 
         {/* ── Close Button ─────────────────────────────────────────────── */}
         <button

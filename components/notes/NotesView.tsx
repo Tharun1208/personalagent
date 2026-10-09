@@ -450,8 +450,8 @@ export default function NotesView() {
 
       {/* ── Create / Edit Note Modal ── */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-(--bg-card) border border-(--border-subtle) rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-4 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
+          <div className="w-full max-w-2xl bg-(--bg-card) border border-(--border-subtle) rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh] animate-top-modal">
             {/* Modal Header */}
             <div className="p-4 md:p-5 border-b border-(--border-subtle) flex items-center justify-between bg-(--bg-sidebar)">
               <div className="flex items-center gap-2.5">

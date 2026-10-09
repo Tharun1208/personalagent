@@ -85,10 +85,10 @@ export default function CustomConfirmModal({ dialog, onClose }: CustomConfirmMod
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-12 sm:pt-16 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md bg-(--bg-card) border border-(--border-subtle) rounded-3xl shadow-2xl p-6 overflow-hidden animate-in zoom-in-95 duration-200 text-(--text-primary)"
+        className="w-full max-w-md bg-(--bg-card) border border-(--border-subtle) rounded-3xl shadow-2xl p-6 overflow-hidden animate-top-modal text-(--text-primary)"
       >
         <div className="flex items-start gap-4">
           {getIcon()}

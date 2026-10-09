@@ -613,8 +613,8 @@ export default function TasksView() {
 
       {/* New Task Modal */}
       {isAddOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-start justify-center p-4 pt-10 sm:pt-14 z-50 animate-in fade-in overflow-y-auto">
+          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-top-modal">
             <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3">
               <h3 className="app-modal-title">Create New Task</h3>
               <button
@@ -764,8 +764,8 @@ export default function TasksView() {
 
       {/* Edit Task Modal */}
       {editingTask && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in overflow-y-auto">
-          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 my-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-start justify-center p-4 pt-10 sm:pt-14 z-50 animate-in fade-in overflow-y-auto">
+          <div className="bg-(--bg-card) border border-(--border-subtle) rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-top-modal">
             <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-[#4E82EE]/20 text-[#4E82EE] flex items-center justify-center">

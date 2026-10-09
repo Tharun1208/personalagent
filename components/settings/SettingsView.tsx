@@ -548,8 +548,8 @@ export default function SettingsView() {
       {/* DIALOG 1: Edit Profile Name (WhatsApp Style Modal)             */}
       {/* ───────────────────────────────────────────────────────────── */}
       {isEditProfileOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="w-full max-w-sm rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-start justify-center p-4 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
+          <div className="w-full max-w-sm rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-4 animate-top-modal">
             <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3">
               <h3 className="text-base font-bold text-(--text-primary)">Edit Profile Name</h3>
               <button
@@ -601,8 +601,8 @@ export default function SettingsView() {
       {/* DIALOG 2: 4-Digit Passcode PIN Manager                         */}
       {/* ───────────────────────────────────────────────────────────── */}
       {isPinModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="w-full max-w-sm rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-start justify-center p-4 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
+          <div className="w-full max-w-sm rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-4 animate-top-modal">
             <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3">
               <div className="flex items-center gap-2">
                 <Lock size={16} className="text-emerald-500" />
@@ -794,8 +794,8 @@ export default function SettingsView() {
       {/* DIALOG 3: Backup Vault Modal (WhatsApp Chat Backup Style)     */}
       {/* ───────────────────────────────────────────────────────────── */}
       {isBackupModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="w-full max-w-sm rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-start justify-center p-4 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
+          <div className="w-full max-w-sm rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-4 animate-top-modal">
             <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3">
               <div className="flex items-center gap-2">
                 <Database size={16} className="text-teal-500" />

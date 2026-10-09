@@ -1158,8 +1158,8 @@ export default function CalendarView() {
 
       {/* ── Day Details Modal (Google Calendar View Details) ────────────── */}
       {isDayDetailsModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="w-full max-w-lg rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150 max-h-[85vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-start justify-center p-4 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-4 animate-top-modal max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3 shrink-0">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#1a73e8]">
@@ -1295,8 +1295,8 @@ export default function CalendarView() {
 
       {/* ── Event Creation Modal (Google Calendar Style) ─────────── */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="w-full max-w-lg rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-start justify-center p-4 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-5 animate-top-modal">
             <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-[#1a73e8]/15 text-[#1a73e8] flex items-center justify-center">
@@ -1462,8 +1462,8 @@ export default function CalendarView() {
 
       {/* ── Edit Calendar Event / Task Modal ─────────────────────── */}
       {editingItem && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="w-full max-w-lg rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-5 animate-in zoom-in-95 duration-150 text-(--text-primary)">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-start justify-center p-4 pt-10 sm:pt-14 overflow-y-auto animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-(--bg-card) border border-(--border-subtle) shadow-2xl p-6 space-y-5 animate-top-modal text-(--text-primary)">
             <div className="flex items-center justify-between border-b border-(--border-subtle) pb-3">
               <div className="flex items-center gap-2.5">
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
