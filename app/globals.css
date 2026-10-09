@@ -406,6 +406,83 @@ button:active:not(:disabled),
   transform: scale(0.965);
 }
 
+/* ── Modern Button System ── */
+.app-btn-primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 50%, #8b5cf6 100%);
+  color: #ffffff;
+  font-weight: 700;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 14px -2px rgba(79, 70, 229, 0.35);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.app-btn-primary:hover:not(:disabled) {
+  opacity: 0.96;
+  box-shadow: 0 6px 20px -2px rgba(79, 70, 229, 0.45);
+  transform: translateY(-1px);
+}
+.app-btn-primary:active:not(:disabled) {
+  transform: scale(0.965);
+}
+
+.app-btn-secondary {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  font-weight: 600;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+.app-btn-secondary:hover:not(:disabled) {
+  background-color: var(--bg-elevated);
+  border-color: var(--border-medium);
+}
+.app-btn-secondary:active:not(:disabled) {
+  transform: scale(0.965);
+}
+
+.app-btn-danger {
+  background-color: rgba(244, 63, 94, 0.08);
+  color: #e11d48;
+  border: 1px solid rgba(244, 63, 94, 0.2);
+  font-weight: 600;
+  border-radius: 0.75rem;
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+.app-btn-danger:hover:not(:disabled) {
+  background-color: rgba(244, 63, 94, 0.15);
+  border-color: rgba(244, 63, 94, 0.35);
+}
+
+.app-btn-success {
+  background-color: rgba(16, 185, 129, 0.08);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  font-weight: 600;
+  border-radius: 0.75rem;
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+.app-btn-success:hover:not(:disabled) {
+  background-color: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+/* ── Luxury Card Surfaces ── */
+.app-card-luxury {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04), 0 2px 6px -2px rgba(0, 0, 0, 0.02);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease;
+}
+.app-card-luxury:hover {
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.07), 0 4px 10px -2px rgba(0, 0, 0, 0.03);
+}
+
 /* ── Modern Dropdown Select Styling ── */
 select,
 .app-select {
@@ -438,7 +515,7 @@ select option {
 @keyframes slideDownFromTop {
   0% {
     opacity: 0;
-    transform: translateY(-24px) scale(0.97);
+    transform: translateY(-20px) scale(0.98);
   }
   100% {
     opacity: 1;
@@ -464,10 +541,10 @@ select option {
 
 /* Glassmorphism panel */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(226, 232, 240, 0.8);
 }
 .dark .glass-panel {
   background: rgba(30, 31, 32, 0.8);

@@ -660,10 +660,10 @@ export default function TasksView() {
                 </label>
                 <div className="grid grid-cols-4 gap-2">
                   {[
-                    { id: 'low', label: 'Low', activeClass: 'border-slate-400 bg-slate-500/20 text-slate-200 ring-2 ring-slate-500/40 font-bold' },
-                    { id: 'medium', label: 'Medium', activeClass: 'border-blue-500 bg-blue-500/20 text-blue-400 ring-2 ring-blue-500/40 font-bold' },
-                    { id: 'high', label: 'High', activeClass: 'border-amber-500 bg-amber-500/20 text-amber-400 ring-2 ring-amber-500/40 font-bold' },
-                    { id: 'urgent', label: 'Urgent', activeClass: 'border-rose-500 bg-rose-500/20 text-rose-400 ring-2 ring-rose-500/40 font-bold' },
+                    { id: 'low', label: 'Low', activeClass: 'border-slate-400 bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-200 ring-2 ring-slate-400 font-bold' },
+                    { id: 'medium', label: 'Medium', activeClass: 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 ring-2 ring-blue-400 font-bold' },
+                    { id: 'high', label: 'High', activeClass: 'border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400 ring-2 ring-amber-400 font-bold' },
+                    { id: 'urgent', label: 'Urgent', activeClass: 'border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400 ring-2 ring-rose-400 font-bold' },
                   ].map((p) => {
                     const isSelected = priority === p.id;
                     return (
@@ -818,10 +818,10 @@ export default function TasksView() {
                 </label>
                 <div className="grid grid-cols-4 gap-2">
                   {[
-                    { id: 'low', label: 'Low', activeClass: 'border-slate-400 bg-slate-500/20 text-slate-200 ring-2 ring-slate-500/40 font-bold' },
-                    { id: 'medium', label: 'Medium', activeClass: 'border-blue-500 bg-blue-500/20 text-blue-400 ring-2 ring-blue-500/40 font-bold' },
-                    { id: 'high', label: 'High', activeClass: 'border-amber-500 bg-amber-500/20 text-amber-400 ring-2 ring-amber-500/40 font-bold' },
-                    { id: 'urgent', label: 'Urgent', activeClass: 'border-rose-500 bg-rose-500/20 text-rose-400 ring-2 ring-rose-500/40 font-bold' },
+                    { id: 'low', label: 'Low', activeClass: 'border-slate-400 bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-200 ring-2 ring-slate-400 font-bold' },
+                    { id: 'medium', label: 'Medium', activeClass: 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400 ring-2 ring-blue-400 font-bold' },
+                    { id: 'high', label: 'High', activeClass: 'border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400 ring-2 ring-amber-400 font-bold' },
+                    { id: 'urgent', label: 'Urgent', activeClass: 'border-rose-500 bg-rose-50 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400 ring-2 ring-rose-400 font-bold' },
                   ].map((p) => {
                     const isSelected = editPriority === p.id;
                     return (
