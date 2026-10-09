@@ -32,6 +32,21 @@ import {
   getHolidaysForMonth,
   isGovernmentHoliday,
 } from '@/lib/calendar/holidays';
+import CustomSelect, { SelectOption } from '@/components/common/CustomSelect';
+
+const RECURRENCE_OPTIONS: SelectOption[] = [
+  { value: 'none', label: 'Does not repeat', sublabel: 'Single one-off event' },
+  { value: 'daily', label: 'Daily', sublabel: 'Repeats every single day' },
+  { value: 'weekly', label: 'Weekly', sublabel: 'Repeats on the same day every week' },
+  { value: 'monthly', label: 'Monthly', sublabel: 'Repeats on the same date every month' },
+];
+
+const PRIORITY_OPTIONS: SelectOption[] = [
+  { value: 'low', label: 'Low Priority', badgeColor: '#94a3b8' },
+  { value: 'medium', label: 'Medium Priority', badgeColor: '#3b82f6' },
+  { value: 'high', label: 'High Priority', badgeColor: '#f59e0b' },
+  { value: 'urgent', label: 'Urgent Priority', badgeColor: '#ef4444' },
+];
 
 export type CalendarViewMode = 'day' | 'week' | 'month' | 'year';
 
@@ -1409,32 +1424,22 @@ export default function CalendarView() {
                   <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
                     Recurrence
                   </label>
-                  <select
+                  <CustomSelect
                     value={modalRecurrence}
-                    onChange={(e) => setModalRecurrence(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-primary) focus:outline-hidden"
-                  >
-                    <option value="none">Does not repeat</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
+                    onChange={(val) => setModalRecurrence(val as any)}
+                    options={RECURRENCE_OPTIONS}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
                     Priority
                   </label>
-                  <select
+                  <CustomSelect
                     value={modalPriority}
-                    onChange={(e) => setModalPriority(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-primary) focus:outline-hidden"
-                  >
-                    <option value="low">Low Priority</option>
-                    <option value="medium">Medium Priority</option>
-                    <option value="high">High Priority</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
+                    onChange={(val) => setModalPriority(val as any)}
+                    options={PRIORITY_OPTIONS}
+                  />
                 </div>
               </div>
 
@@ -1537,16 +1542,11 @@ export default function CalendarView() {
                   <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
                     Priority
                   </label>
-                  <select
+                  <CustomSelect
                     value={editPriority}
-                    onChange={(e) => setEditPriority(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-primary) focus:outline-hidden"
-                  >
-                    <option value="low">Low Priority</option>
-                    <option value="medium">Medium Priority</option>
-                    <option value="high">High Priority</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
+                    onChange={(val) => setEditPriority(val as any)}
+                    options={PRIORITY_OPTIONS}
+                  />
                 </div>
 
                 {editingItem.type === 'reminder' && (
@@ -1554,16 +1554,11 @@ export default function CalendarView() {
                     <label className="block text-xs font-semibold text-(--text-secondary) mb-1 uppercase tracking-wider">
                       Recurrence
                     </label>
-                    <select
+                    <CustomSelect
                       value={editRecurrence}
-                      onChange={(e) => setEditRecurrence(e.target.value as any)}
-                      className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-primary) focus:outline-hidden"
-                    >
-                      <option value="none">Does not repeat</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
+                      onChange={(val) => setEditRecurrence(val as any)}
+                      options={RECURRENCE_OPTIONS}
+                    />
                   </div>
                 )}
               </div>

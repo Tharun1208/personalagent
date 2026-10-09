@@ -35,6 +35,7 @@ import {
   exportAllNotesToPdf,
   StandaloneNote,
 } from '@/lib/utils/goalExport';
+import CustomSelect, { SelectOption } from '@/components/common/CustomSelect';
 
 const NOTES_STORAGE_KEY = 'recall_strategic_notes';
 
@@ -497,17 +498,14 @@ export default function NotesView() {
                   <label className="text-xs font-bold text-(--text-secondary) uppercase tracking-wider">
                     Category
                   </label>
-                  <select
+                  <CustomSelect
                     value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-xs font-semibold text-(--text-primary) focus:outline-hidden focus:border-amber-500 transition-all cursor-pointer"
-                  >
-                    {Object.entries(CATEGORY_META).map(([k, meta]) => (
-                      <option key={k} value={k}>
-                        {meta.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setFormCategory(val)}
+                    options={Object.entries(CATEGORY_META).map(([k, meta]) => ({
+                      value: k,
+                      label: meta.label,
+                    }))}
+                  />
                 </div>
               </div>
 

@@ -47,6 +47,16 @@ import {
 import { useApp } from '@/lib/context/AppContext';
 import { LedgerEntry, LedgerType } from '@/types';
 import { DebtGraph } from '@/lib/dsa/DebtGraph';
+import CustomSelect, { SelectOption } from '@/components/common/CustomSelect';
+
+const LEDGER_CATEGORIES: SelectOption[] = [
+  { value: 'personal', label: 'Personal / Friends' },
+  { value: 'food', label: 'Food & Dining' },
+  { value: 'rent', label: 'Rent & Housing' },
+  { value: 'bills', label: 'Bills & Utilities' },
+  { value: 'travel', label: 'Travel & Transport' },
+  { value: 'loan', label: 'Loan / Borrowed' },
+];
 
 // ── Daily Spending Types ──────────────────────────────────────────────────────
 interface SpendingEntry {
@@ -1831,14 +1841,11 @@ ${paymentsList || '  No partial payments logged yet.'}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-(--text-secondary) mb-1">Category</label>
-                  <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full px-3 py-2 rounded-xl bg-(--bg-elevated) border border-(--border-subtle) text-(--text-primary) focus:outline-none">
-                    <option value="personal">Personal / Friends</option>
-                    <option value="food">Food & Dining</option>
-                    <option value="rent">Rent & Housing</option>
-                    <option value="bills">Bills & Utilities</option>
-                    <option value="travel">Travel & Transport</option>
-                    <option value="loan">Loan / Borrowed</option>
-                  </select>
+                  <CustomSelect
+                    value={category}
+                    onChange={(val) => setCategory(val)}
+                    options={LEDGER_CATEGORIES}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-(--text-secondary) mb-1">Due Date</label>
