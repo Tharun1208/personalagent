@@ -689,9 +689,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(t),
               }).catch(() => {});
+            } else {
+              const serverT = map.get(t.id)!;
+              // If local task was completed and server is todo, preserve completed status and sync to server
+              if (t.status === 'completed' && serverT.status !== 'completed') {
+                const merged = { ...serverT, status: 'completed' as const, completedAt: t.completedAt || new Date().toISOString() };
+                map.set(t.id, merged);
+                apiFetch(`/api/tasks/${t.id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ status: 'completed' }),
+                }).catch(() => {});
+              }
             }
           });
-          return Array.from(map.values());
+          const mergedList = Array.from(map.values());
+          try { localStorage.setItem('recall_tasks', JSON.stringify(mergedList)); } catch {}
+          return mergedList;
         });
       }
 
@@ -718,9 +732,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(r),
               }).catch(() => {});
+            } else {
+              const serverR = map.get(r.id)!;
+              if (r.status === 'dismissed' && serverR.status !== 'dismissed') {
+                map.set(r.id, { ...serverR, status: 'dismissed' });
+              }
             }
           });
-          return Array.from(map.values());
+          const mergedList = Array.from(map.values());
+          try { localStorage.setItem('recall_reminders', JSON.stringify(mergedList)); } catch {}
+          return mergedList;
         });
       }
 
@@ -749,7 +770,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               }).catch(() => {});
             }
           });
-          return Array.from(map.values());
+          const mergedList = Array.from(map.values());
+          try { localStorage.setItem('recall_goals', JSON.stringify(mergedList)); } catch {}
+          return mergedList;
         });
       }
 
@@ -791,9 +814,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(l),
               }).catch(() => {});
+            } else {
+              const serverL = map.get(l.id)!;
+              // If local entry was settled and server is pending, preserve settled status and sync to server
+              if (l.status === 'settled' && serverL.status !== 'settled') {
+                const merged = { ...serverL, status: 'settled' as const, settledAt: l.settledAt || new Date().toISOString() };
+                map.set(l.id, merged);
+                apiFetch('/api/ledger', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ id: l.id, action: 'settle' }),
+                }).catch(() => {});
+              }
             }
           });
-          return Array.from(map.values());
+          const mergedList = Array.from(map.values());
+          try { localStorage.setItem('recall_ledger', JSON.stringify(mergedList)); } catch {}
+          return mergedList;
         });
       }
     } catch (err) {
@@ -1246,7 +1283,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const tempId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const tempTask: Task = {
       id: tempId,
-      userId: user?.id || 'u_default_owner',
+      userId: user?.id || 'usr_primary_default',
       title: title.trim(),
       status: 'todo',
       priority: (priority as any) || 'medium',
@@ -1257,18 +1294,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     // Instant optimistic update (0ms latency in UI)
-    setTasks((prev) => [tempTask, ...prev]);
+    setTasks((prev) => {
+      const updated = [tempTask, ...prev];
+      try { localStorage.setItem('recall_tasks', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
 
     try {
       const res = await apiFetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, priority, dueDate, projectId }),
+        body: JSON.stringify({ id: tempId, title, priority, dueDate, projectId }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (data?.task) {
-        // Swap temp task with persisted server task
-        setTasks((prev) => prev.map((t) => (t.id === tempId ? data.task : t)));
+        setTasks((prev) => {
+          const updated = prev.map((t) => (t.id === tempId ? data.task : t));
+          try { localStorage.setItem('recall_tasks', JSON.stringify(updated)); } catch {}
+          return updated;
+        });
       }
     } catch (err) {
       console.error('Task background sync failed', err);
@@ -1276,31 +1320,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleTask = async (id: string, currentStatus: string) => {
-    const nextStatus = currentStatus === 'completed' ? 'todo' : 'completed';
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: nextStatus } : t)));
-    const res = await apiFetch(`/api/tasks/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: nextStatus }),
+    const nextStatus: Task['status'] = currentStatus === 'completed' ? 'todo' : 'completed';
+    const now = new Date().toISOString();
+    setTasks((prev) => {
+      const updated = prev.map((t) => (t.id === id ? { ...t, status: nextStatus, completedAt: nextStatus === 'completed' ? now : undefined } : t));
+      try { localStorage.setItem('recall_tasks', JSON.stringify(updated)); } catch {}
+      return updated;
     });
-    const data = await res.json();
-    if (data?.task) {
-      setTasks((prev) => prev.map((t) => (t.id === id ? data.task : t)));
+    try {
+      const res = await apiFetch(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus, completedAt: nextStatus === 'completed' ? now : null }),
+      });
+      const data = await safeJson(res);
+      if (data?.task) {
+        setTasks((prev) => {
+          const updated = prev.map((t) => (t.id === id ? data.task : t));
+          try { localStorage.setItem('recall_tasks', JSON.stringify(updated)); } catch {}
+          return updated;
+        });
+      }
+    } catch (err) {
+      console.warn('Task toggle sync notice:', err);
     }
   };
 
   const updateTaskStatus = async (id: string, status: Task['status']) => {
+    const now = new Date().toISOString();
     // Instant optimistic update in UI state
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
+    setTasks((prev) => {
+      const updated = prev.map((t) => (t.id === id ? { ...t, status, completedAt: status === 'completed' ? now : undefined } : t));
+      try { localStorage.setItem('recall_tasks', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     try {
-    const res = await apiFetch(`/api/tasks/${id}`, {
+      const res = await apiFetch(`/api/tasks/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, completedAt: status === 'completed' ? now : null }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (data?.task) {
-        setTasks((prev) => prev.map((t) => (t.id === id ? data.task : t)));
+        setTasks((prev) => {
+          const updated = prev.map((t) => (t.id === id ? data.task : t));
+          try { localStorage.setItem('recall_tasks', JSON.stringify(updated)); } catch {}
+          return updated;
+        });
       }
     } catch (err) {
       console.error('Failed to update task status', err);
@@ -1308,9 +1374,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteTask = async (id: string) => {
-    await apiFetch(`/api/tasks/${id}`, { method: 'DELETE' });
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    setTasks((prev) => {
+      const updated = prev.filter((t) => t.id !== id);
+      try { localStorage.setItem('recall_tasks', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     cancelNotification(notificationIdFromString(id));
+    try {
+      await apiFetch(`/api/tasks/${id}`, { method: 'DELETE' });
+    } catch {}
   };
 
   // Reminder Actions
@@ -1318,7 +1390,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const tempId = `rem_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const tempReminder: Reminder = {
       id: tempId,
-      userId: user?.id || 'usr_default',
+      userId: user?.id || 'usr_primary_default',
       title: title.trim(),
       dueDateTime: dueDateTime || new Date(Date.now() + 3600000).toISOString(),
       recurrence: (recurrence as any) || 'none',
@@ -1329,17 +1401,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     // Instant optimistic update
-    setReminders((prev) => [tempReminder, ...prev]);
+    setReminders((prev) => {
+      const updated = [tempReminder, ...prev];
+      try { localStorage.setItem('recall_reminders', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
 
     try {
       const res = await apiFetch('/api/reminders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, dueDateTime, recurrence, notes }),
+        body: JSON.stringify({ id: tempId, title, dueDateTime, recurrence, notes }),
       });
       const data = await safeJson(res);
       if (data?.reminder) {
-        setReminders((prev) => prev.map((r) => (r.id === tempId ? data.reminder : r)));
+        setReminders((prev) => {
+          const updated = prev.map((r) => (r.id === tempId ? data.reminder : r));
+          try { localStorage.setItem('recall_reminders', JSON.stringify(updated)); } catch {}
+          return updated;
+        });
       }
     } catch (err) {
       console.warn('Reminder sync notice:', err);
@@ -1347,16 +1427,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateReminder = async (id: string, patch: Partial<Reminder>) => {
-    setReminders((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    setReminders((prev) => {
+      const updated = prev.map((r) => (r.id === id ? { ...r, ...patch } : r));
+      try { localStorage.setItem('recall_reminders', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     try {
       const res = await apiFetch(`/api/reminders/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (data?.reminder) {
-        setReminders((prev) => prev.map((r) => (r.id === id ? data.reminder : r)));
+        setReminders((prev) => {
+          const updated = prev.map((r) => (r.id === id ? data.reminder : r));
+          try { localStorage.setItem('recall_reminders', JSON.stringify(updated)); } catch {}
+          return updated;
+        });
       }
     } catch (err) {
       console.error('Failed to update reminder', err);
@@ -1364,9 +1452,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteReminder = async (id: string) => {
-    await apiFetch(`/api/reminders/${id}`, { method: 'DELETE' });
-    setReminders((prev) => prev.filter((r) => r.id !== id));
+    setReminders((prev) => {
+      const updated = prev.filter((r) => r.id !== id);
+      try { localStorage.setItem('recall_reminders', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     cancelNotification(notificationIdFromString(id));
+    try {
+      await apiFetch(`/api/reminders/${id}`, { method: 'DELETE' });
+    } catch {}
   };
 
   // Goal Actions (Local-first & instant)
@@ -1591,8 +1685,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const settleLedgerEntry = async (id: string) => {
+    const now = new Date().toISOString();
     setLedgerEntries((prev) => {
-      const updated = prev.map((l) => (l.id === id ? { ...l, status: 'settled' as const } : l));
+      const updated = prev.map((l) => (l.id === id ? { ...l, status: 'settled' as const, settledAt: now, updatedAt: now } : l));
       try { localStorage.setItem('recall_ledger', JSON.stringify(updated)); } catch {}
       return updated;
     });
@@ -1605,7 +1700,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       const data = await safeJson(res);
       if (data?.entry) {
-        setLedgerEntries((prev) => prev.map((l) => (l.id === id ? data.entry : l)));
+        setLedgerEntries((prev) => {
+          const updated = prev.map((l) => (l.id === id ? data.entry : l));
+          try { localStorage.setItem('recall_ledger', JSON.stringify(updated)); } catch {}
+          return updated;
+        });
       }
     } catch (err) {
       console.warn('Ledger settle background sync notice:', err);
