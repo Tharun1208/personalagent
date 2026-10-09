@@ -14,33 +14,33 @@
   }
 
   :root {
-    --bg-primary: #ffffff;
-    --bg-secondary: #f0f4f9;
-    --bg-sidebar: #f0f4f9;
+    --bg-primary: #f8fafc;
+    --bg-secondary: #f1f5f9;
+    --bg-sidebar: #ffffff;
     --bg-card: #ffffff;
-    --bg-elevated: #e9eef6;
-    --bg-bubble-user: #f0f4f9;
-    --bg-composer: #f0f4f9;
-    --text-primary: #111827;
-    --text-secondary: #374151;
-    --text-muted: #6b7280;
-    --border-subtle: #e5e7eb;
-    --border-medium: #d1d5db;
-    --border-composer: #d3d7dc;
-    --accent: #1a73e8;
-    --accent-hover: #1557b0;
+    --bg-elevated: #f1f5f9;
+    --bg-bubble-user: #eef2ff;
+    --bg-composer: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #64748b;
+    --border-subtle: #e2e8f0;
+    --border-medium: #cbd5e1;
+    --border-composer: #e2e8f0;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
     --accent-contrast: #ffffff;
-    --send-btn-bg: #1a73e8;
+    --send-btn-bg: #2563eb;
     --send-btn-text: #ffffff;
-    --brand-indigo: #4e82ee;
-    --brand-emerald: #10a37f;
+    --brand-indigo: #4f46e5;
+    --brand-emerald: #059669;
     --brand-amber: #d97706;
-    --brand-rose: #ef4444;
-    --memory-badge-bg: #e8f0fe;
-    --memory-badge-text: #174ea6;
-    --memory-badge-border: #d2e3fc;
-    --code-bg: #1e1f20;
-    --code-header-bg: #282a2c;
+    --brand-rose: #e11d48;
+    --memory-badge-bg: #eff6ff;
+    --memory-badge-text: #1d4ed8;
+    --memory-badge-border: #bfdbfe;
+    --code-bg: #0f172a;
+    --code-header-bg: #1e293b;
   }
 
   .dark {

@@ -536,12 +536,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Initial Theme load
+  // Initial Theme load - Defaults explicitly to pristine Light Theme
   useEffect(() => {
-    const savedTheme = localStorage.getItem('recall_theme') as 'light' | 'dark';
-    if (savedTheme) {
-      setTheme(savedTheme);
-    }
+    const savedTheme = (localStorage.getItem('recall_theme') as 'light' | 'dark') || 'light';
+    setTheme(savedTheme);
   }, [setTheme]);
 
   const startNewChat = useCallback((initialMessage?: string) => {
@@ -1105,12 +1103,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               try { (navigator as any).wakeLock.request('screen').catch(() => {}); } catch {}
             }
 
-            // Create instant alarm notification
+            // Create instant reminder banner notification
             const newNotif: AppNotification = {
               id: `notif_alarm_${r.id}_${Date.now()}`,
               userId: user.id,
-              title: r.title || 'Alarm',
-              message: r.notes || `Your alarm "${r.title || 'Alarm'}" is ringing now!`,
+              title: r.title || 'Scheduled Reminder',
+              message: r.notes || `Reminder due: ${r.title}`,
               type: 'reminder',
               read: false,
               actionUrl: '/reminders',

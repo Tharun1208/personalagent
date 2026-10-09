@@ -7,29 +7,12 @@ import {
   CheckCircle2,
   X,
   Volume2,
-  VolumeX,
   RotateCcw,
   AlarmClock,
-  Sparkles,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { AppNotification } from '@/types';
 import { soundEngine } from '@/lib/audio/soundEngine';
-
-function safeVibrate(pattern: number | number[]) {
-  if (typeof window === 'undefined' || !navigator.vibrate) return;
-  try {
-    // Avoid Chrome intervention error if user hasn't interacted with page yet
-    if (
-      'userActivation' in navigator &&
-      (navigator as any).userActivation &&
-      !(navigator as any).userActivation.hasBeenActive
-    ) {
-      return;
-    }
-    navigator.vibrate(pattern);
-  } catch {}
-}
 
 export default function NotificationAlertToast() {
   const {
@@ -43,44 +26,11 @@ export default function NotificationAlertToast() {
 
   const [activeAlerts, setActiveAlerts] = useState<AppNotification[]>([]);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
-  const [currentTime, setCurrentTime] = useState<string>('');
-  const [isAudioUnlocked, setIsAudioUnlocked] = useState<boolean>(true);
   const mountTimeRef = React.useRef<number>(Date.now());
 
-  // Monitor sound engine unlock state
-  useEffect(() => {
-    const unsub = soundEngine.subscribeState((unlocked) => {
-      setIsAudioUnlocked(unlocked);
-    });
-    return unsub;
-  }, []);
-
-  // Live clock for mobile alarm screen
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setCurrentTime(
-        now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-      );
-    };
-    updateTime();
-    const timer = setInterval(updateTime, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Request browser notification permission once on mount
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'default') {
-        Notification.requestPermission().catch(() => {});
-      }
-    }
-  }, []);
-
-  // Check unread notifications and pop them up as real native alerts only for fresh live alarms
+  // Check unread notifications and pop them up as subtle top banner alerts
   useEffect(() => {
     const now = Date.now();
-    // Only trigger full-screen loud alarm for fresh reminder alarms created during active session (within 60s)
     const freshAlarms = notifications.filter((n) => {
       if (n.read || dismissedIds.has(n.id)) return false;
       if (n.type !== 'reminder' && !n.id.startsWith('notif_alarm_')) return false;
@@ -100,65 +50,31 @@ export default function NotificationAlertToast() {
       if (newItems.length > 0) {
         setActiveAlerts((prev) => [...newItems, ...prev]);
 
-        // Start loud looping mobile alarm tone
-        soundEngine.startLoudAlarmLoop(
-          user?.preferences?.alarmTone || 'digital',
-          user?.preferences?.alarmVolume ?? 1.0,
-          user?.preferences?.customAlarmUrl
-        );
-
-        // Native Mobile Haptic Vibration loop
-        safeVibrate([400, 150, 400, 150, 600]);
+        // Play gentle chime sound once instead of loud continuous siren
+        try {
+          soundEngine.playAlarm('gentle', 0.5);
+        } catch {}
 
         // Native OS Desktop & Mobile Push Notification
         if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
           newItems.forEach((item) => {
             try {
-              new Notification(item.title || 'Assistance Alarm', {
+              new Notification(item.title || 'Reminder', {
                 body: item.message,
-                icon: '/logo.png',
-                badge: '/logo.png',
+                icon: '/icon.png',
                 tag: item.id,
-                requireInteraction: true,
               });
             } catch {}
           });
         }
       }
-    } else if (activeAlerts.length === 0) {
-      soundEngine.stopLoudAlarmLoop();
     }
   }, [notifications, dismissedIds, activeAlerts, user]);
 
-  // Periodic mobile vibration while ringing
-  useEffect(() => {
-    if (activeAlerts.length === 0) return;
-    const vibInterval = setInterval(() => {
-      safeVibrate([400, 150, 400, 150, 600]);
-    }, 1800);
-    return () => clearInterval(vibInterval);
-  }, [activeAlerts.length]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      soundEngine.stopLoudAlarmLoop();
-    };
-  }, []);
-
-  const handleTapScreen = () => {
-    soundEngine.unlockAudio();
-    setIsAudioUnlocked(true);
-  };
-
   const handleDismiss = (id: string) => {
     setDismissedIds((prev) => new Set(prev).add(id));
-    const next = activeAlerts.filter((a) => a.id !== id);
-    setActiveAlerts(next);
+    setActiveAlerts((prev) => prev.filter((a) => a.id !== id));
     markNotificationRead(id);
-    if (next.length === 0) {
-      soundEngine.stopLoudAlarmLoop();
-    }
   };
 
   const handleComplete = (alert: AppNotification) => {
@@ -182,115 +98,74 @@ export default function NotificationAlertToast() {
 
   if (activeAlerts.length === 0) return null;
 
-  // The primary active alarm
-  const primaryAlert = activeAlerts[0];
-
   return (
-    <div
-      onClick={handleTapScreen}
-      onTouchStart={handleTapScreen}
-      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-2xl flex flex-col items-center justify-between p-6 sm:p-10 select-none animate-in fade-in duration-300"
-    >
-      {/* Top Header: Brand & Dismiss */}
-      <div className="w-full max-w-md flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-rose-500 animate-ping" />
-          <span className="text-xs font-bold uppercase tracking-widest text-rose-400">
-            {isAudioUnlocked ? 'Alarm Ringing' : 'Alarm Ready'}
-          </span>
-        </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDismiss(primaryAlert.id);
-          }}
-          className="p-2 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-          title="Dismiss"
+    <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4 pointer-events-none space-y-2.5">
+      {activeAlerts.slice(0, 3).map((alert) => (
+        <div
+          key={alert.id}
+          className="pointer-events-auto w-full bg-(--bg-card) border border-(--border-subtle) rounded-2xl shadow-2xl p-4 flex items-start gap-3.5 animate-in slide-in-from-top-6 duration-200 text-(--text-primary)"
         >
-          <X size={20} />
-        </button>
-      </div>
+          {/* Squircle Alarm Icon */}
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+            <AlarmClock size={20} />
+          </div>
 
-      {/* Center: Mobile Alarm Clock UI */}
-      <div className="w-full max-w-md flex flex-col items-center text-center space-y-6 my-auto">
-        {/* Pulsing Animated Bell Ring */}
-        <div className="relative flex items-center justify-center">
-          <div className="absolute w-36 h-36 rounded-full bg-rose-500/20 animate-ping" />
-          <div className="absolute w-28 h-28 rounded-full bg-rose-500/30 animate-pulse" />
-          <div className="relative w-24 h-24 rounded-full bg-gradient-to-tr from-rose-600 via-orange-500 to-amber-500 text-white flex items-center justify-center shadow-2xl shadow-rose-500/50">
-            <AlarmClock size={48} className="animate-bounce" />
+          {/* Alert Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0 animate-ping" />
+                <h4 className="text-xs font-bold uppercase tracking-wider text-rose-500">
+                  Reminder Alarm
+                </h4>
+              </div>
+              <span className="text-[10px] font-mono text-(--text-muted)">
+                {new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+
+            <div className="text-sm font-bold text-(--text-primary) mt-1 truncate">
+              {alert.title.replace(/^Reminder:\s*/i, '')}
+            </div>
+
+            {alert.message && (
+              <p className="text-xs text-(--text-secondary) mt-0.5 line-clamp-2 leading-relaxed">
+                {alert.message}
+              </p>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 mt-3 pt-2 border-t border-(--border-subtle)">
+              <button
+                type="button"
+                onClick={() => handleSnooze(alert)}
+                className="px-3 py-1.5 rounded-lg bg-(--bg-elevated) hover:bg-(--bg-card) border border-(--border-subtle) text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+              >
+                <RotateCcw size={12} className="text-amber-500" />
+                <span>Snooze (5m)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleComplete(alert)}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              >
+                <CheckCircle2 size={12} />
+                <span>Mark Done</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDismiss(alert.id)}
+                className="ml-auto p-1.5 rounded-lg text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) transition-colors cursor-pointer"
+                title="Dismiss"
+              >
+                <X size={15} />
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* Live Digital Clock Digits (Mobile Alarm Clock style) */}
-        <div className="space-y-1">
-          <div className="text-5xl sm:text-6xl font-mono font-black tracking-tight text-white drop-shadow-lg">
-            {currentTime || '09:00:00 AM'}
-          </div>
-          <div className="text-xs text-rose-300/80 font-medium tracking-wide">
-            Assistance Mobile Alarm Clock
-          </div>
-        </div>
-
-        {/* Alarm Title & Message */}
-        <div className="space-y-2 px-4 max-w-sm">
-          <h2 className="text-xl sm:text-2xl font-black text-white leading-snug tracking-tight">
-            {primaryAlert.title.replace(/^Reminder:\s*/i, '')}
-          </h2>
-          {primaryAlert.message && (
-            <p className="text-sm text-white/75 font-medium leading-relaxed">
-              {primaryAlert.message}
-            </p>
-          )}
-        </div>
-
-        {/* Sound & Audio Visualizer Status / Tap Prompt */}
-        {!isAudioUnlocked ? (
-          <button
-            onClick={handleTapScreen}
-            className="w-full max-w-xs py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-red-500 hover:from-amber-400 hover:to-red-400 text-white font-extrabold text-sm tracking-wide shadow-2xl shadow-rose-500/50 flex items-center justify-center gap-2.5 animate-bounce cursor-pointer active:scale-95 border border-white/20"
-          >
-            <Volume2 size={20} />
-            <span>TAP TO UNMUTE LOUD SOUND</span>
-          </button>
-        ) : (
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 text-white/90 text-xs font-semibold backdrop-blur-md">
-            <Volume2 size={15} className="text-rose-400 animate-pulse" />
-            <span>Loud Alarm Tone Ringing</span>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom: Mobile Touch Action Buttons */}
-      <div className="w-full max-w-md space-y-3" onClick={(e) => e.stopPropagation()}>
-        {/* Big Stop Alarm Button (Full Width Mobile Style) */}
-        <button
-          onClick={() => handleDismiss(primaryAlert.id)}
-          className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-extrabold text-base tracking-wide transition-all shadow-xl shadow-rose-600/40 flex items-center justify-center gap-2.5 active:scale-[0.98] cursor-pointer"
-        >
-          <VolumeX size={20} />
-          <span>STOP ALARM</span>
-        </button>
-
-        {/* Snooze & Complete Row */}
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => handleSnooze(primaryAlert)}
-            className="py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-          >
-            <RotateCcw size={15} className="text-amber-400" />
-            <span>Snooze (5m)</span>
-          </button>
-
-          <button
-            onClick={() => handleComplete(primaryAlert)}
-            className="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-md shadow-emerald-600/30"
-          >
-            <CheckCircle2 size={15} />
-            <span>Done / Complete</span>
-          </button>
-        </div>
-      </div>
+      ))}
     </div>
   );
 }
