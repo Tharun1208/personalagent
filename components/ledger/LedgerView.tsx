@@ -299,7 +299,7 @@ export default function LedgerView() {
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-y-auto no-scrollbar bg-[#F8FAFC] text-slate-900 font-sans select-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-      <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 pb-32 md:pb-16 space-y-6">
+      <div className="max-w-4xl w-full mx-auto px-4 sm:px-6 py-6 pb-28 md:pb-16 space-y-6">
 
         {/* ── 1. Main 2-Way Segmented Tab Switcher (Dues vs Daily Expenses) ── */}
         <div className="p-1.5 rounded-2xl bg-slate-200/70 border border-slate-300/60 flex items-center gap-1.5 shadow-2xs">

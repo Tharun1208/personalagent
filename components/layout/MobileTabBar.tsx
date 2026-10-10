@@ -130,7 +130,7 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="md:hidden fixed bottom-0 left-0 right-0 h-24 pointer-events-none z-30 bg-gradient-to-t from-white/90 via-white/40 to-transparent backdrop-blur-sm"
+            className="md:hidden fixed bottom-0 left-0 right-0 h-20 pointer-events-none z-30 bg-gradient-to-t from-slate-100/60 via-transparent to-transparent"
           />
 
           <motion.div

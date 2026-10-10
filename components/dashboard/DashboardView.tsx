@@ -283,7 +283,7 @@ export default function DashboardView() {
 
   return (
     <div className="flex-1 flex overflow-hidden bg-[#F4F5F8] text-slate-900 select-none font-sans">
-      <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 no-scrollbar pb-32 md:pb-12 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 no-scrollbar pb-28 md:pb-12 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         <div className="max-w-6xl mx-auto space-y-6">
 
           {/* ───────────────────────────────────────────────────────────── */}

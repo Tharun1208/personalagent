@@ -184,7 +184,7 @@ export default function TasksView() {
   ], [allTasksList]);
 
   return (
-    <div className="flex-1 min-h-screen w-full bg-[#F4F5F8] text-slate-900 flex justify-center items-start pt-4 sm:pt-6 px-3 sm:px-4 overflow-y-auto font-sans select-none pb-28 md:pb-16">
+    <div className="flex-1 h-full w-full bg-[#F4F5F8] text-slate-900 flex justify-center items-start pt-4 sm:pt-6 px-3 sm:px-4 overflow-y-auto font-sans select-none pb-28 md:pb-14">
       {/* Responsive Container */}
       <div className="w-full max-w-4xl space-y-4 sm:space-y-6">
         
@@ -461,7 +461,6 @@ export default function TasksView() {
             )}
           </div>
         </div>
-
       </div>
 
       {/* ───────────────────────────────────────────────────────────── */}

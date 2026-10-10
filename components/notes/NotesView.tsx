@@ -564,7 +564,7 @@ export default function NotesView() {
           </div>
 
           {/* Main Scrollable Content */}
-          <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-28 max-w-4xl w-full mx-auto custom-scrollbar">
+          <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-32 md:pb-20 max-w-4xl w-full mx-auto custom-scrollbar">
             
             {/* ── Recent Section ── */}
             <div className="mt-6">
@@ -983,7 +983,7 @@ export default function NotesView() {
           </div>
 
           {/* Folder Notes Stack */}
-          <div className="flex-1 overflow-y-auto px-6 md:px-10 py-6 pb-28 max-w-4xl w-full mx-auto custom-scrollbar">
+          <div className="flex-1 overflow-y-auto px-6 md:px-10 py-6 pb-32 md:pb-20 max-w-4xl w-full mx-auto custom-scrollbar">
             {folderNotes.length === 0 ? (
               <div className="p-10 rounded-[28px] bg-slate-50 border border-slate-200 text-center max-w-md mx-auto mt-6">
                 <div className="text-3xl mb-2">{activeFolder.icon || '📝'}</div>
@@ -1101,7 +1101,7 @@ export default function NotesView() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6 md:px-10 py-4 pb-28 max-w-4xl w-full mx-auto custom-scrollbar">
+          <div className="flex-1 overflow-y-auto px-6 md:px-10 py-4 pb-32 md:pb-20 max-w-4xl w-full mx-auto custom-scrollbar">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {notes
                 .filter(
