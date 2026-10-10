@@ -7,6 +7,7 @@ import {
   FileText,
   Wallet,
   Calendar,
+  Bell,
   Settings,
   X,
   ChevronLeft,
@@ -32,7 +33,7 @@ interface NavItem {
   title: string;
   subtitle: string;
   icon: LucideIcon;
-  badgeType?: 'tasks' | 'ledger';
+  badgeType?: 'tasks' | 'ledger' | 'notifications';
 }
 
 // ── Asklepios v3 Modern Navigation Modules ──
@@ -69,6 +70,13 @@ const MAIN_NAV_ITEMS: NavItem[] = [
     subtitle: 'Events & reminders',
     icon: Calendar,
   },
+  {
+    key: 'notifications',
+    title: 'Notifications',
+    subtitle: 'Alerts & updates',
+    icon: Bell,
+    badgeType: 'notifications',
+  },
 ];
 
 export default function Sidebar({ onClose, isCollapsed = false, onToggleCollapse }: SidebarProps) {
@@ -77,15 +85,17 @@ export default function Sidebar({ onClose, isCollapsed = false, onToggleCollapse
     setActiveTab,
     tasks,
     ledgerEntries,
+    unreadNotificationCount,
     user,
   } = useApp();
 
   const pendingTaskCount = tasks.filter((t) => t.status !== 'completed').length;
   const pendingLedgerCount = (ledgerEntries || []).filter((l) => l.status === 'pending').length;
 
-  const getBadge = (badgeType?: 'tasks' | 'ledger') => {
+  const getBadge = (badgeType?: 'tasks' | 'ledger' | 'notifications') => {
     if (badgeType === 'tasks') return pendingTaskCount;
     if (badgeType === 'ledger') return pendingLedgerCount;
+    if (badgeType === 'notifications') return unreadNotificationCount;
     return 0;
   };
 
@@ -105,7 +115,15 @@ export default function Sidebar({ onClose, isCollapsed = false, onToggleCollapse
             }}
             className="flex items-center gap-2.5 cursor-pointer group"
           >
-            <span className="font-bold text-lg tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
+            <div className="w-8 h-8 rounded-xl overflow-hidden bg-white border border-slate-200/80 p-1 shadow-2xs shrink-0 flex items-center justify-center group-hover:scale-105 transition-transform">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo.png"
+                alt="Assistance"
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <span className="font-extrabold text-lg tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
               Assistance
             </span>
           </div>
@@ -118,9 +136,14 @@ export default function Sidebar({ onClose, isCollapsed = false, onToggleCollapse
             className="w-full flex justify-center cursor-pointer group"
             title="Assistance"
           >
-            <span className="font-bold text-lg tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
-              A
-            </span>
+            <div className="w-9 h-9 rounded-xl overflow-hidden bg-white border border-slate-200/80 p-1 shadow-2xs flex items-center justify-center group-hover:scale-105 transition-transform">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo.png"
+                alt="Assistance"
+                className="w-full h-full object-contain"
+              />
+            </div>
           </div>
         )}
 

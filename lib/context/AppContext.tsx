@@ -38,7 +38,8 @@ export type AppTab =
   | 'reminders'
   | 'actions'
   | 'apps'
-  | 'settings';
+  | 'settings'
+  | 'notifications';
 
 export const VALID_TABS: AppTab[] = [
   'dashboard',
@@ -50,6 +51,7 @@ export const VALID_TABS: AppTab[] = [
   'actions',
   'apps',
   'settings',
+  'notifications',
 ];
 
 export function isValidTab(tab: any): tab is AppTab {

@@ -124,6 +124,7 @@ logSection('3. API Routes & Endpoint Integrity');
 const expectedRoutes = [
   'app/api/tasks/route.ts',
   'app/api/tasks/[id]/route.ts',
+  'app/api/goals/route.ts',
   'app/api/ledger/route.ts',
   'app/api/memories/route.ts',
   'app/api/reminders/route.ts',

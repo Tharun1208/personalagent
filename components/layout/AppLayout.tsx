@@ -13,6 +13,7 @@ import DashboardView from '@/components/dashboard/DashboardView';
 import DynamicAppsView from '@/components/apps/DynamicAppsView';
 import SettingsView from '@/components/settings/SettingsView';
 import LedgerView from '@/components/ledger/LedgerView';
+import NotificationsView from '@/components/notifications/NotificationsView';
 import AuthModal from '@/components/auth/AuthModal';
 import CommandPalette from '@/components/common/CommandPalette';
 import NotificationDrawer from '@/components/common/NotificationDrawer';
@@ -58,15 +59,16 @@ export default function AppLayout() {
 
   const renderActiveView = () => {
     switch (activeTab) {
-      case 'calendar':  return <CalendarLightView />;
-      case 'tasks':     return <TasksView />;
-      case 'notes':     return <NotesView />;
-      case 'ledger':    return <LedgerView />;
-      case 'actions':   return <ActivityLogView />;
-      case 'dashboard': return <DashboardView />;
-      case 'apps':      return <DynamicAppsView />;
-      case 'settings':  return <SettingsView />;
-      default:          return <DashboardView />;
+      case 'calendar':      return <CalendarLightView />;
+      case 'tasks':         return <TasksView />;
+      case 'notes':         return <NotesView />;
+      case 'ledger':        return <LedgerView />;
+      case 'actions':       return <ActivityLogView />;
+      case 'dashboard':     return <DashboardView />;
+      case 'apps':          return <DynamicAppsView />;
+      case 'settings':      return <SettingsView />;
+      case 'notifications': return <NotificationsView />;
+      default:              return <DashboardView />;
     }
   };
 

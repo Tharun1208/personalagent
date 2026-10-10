@@ -58,9 +58,17 @@ export default function TopNavbar({
           onClick={() => {
             setActiveTab('dashboard');
           }}
-          className="flex items-center cursor-pointer group"
+          className="flex items-center gap-2.5 cursor-pointer group"
         >
-          <span className="font-bold text-base sm:text-lg tracking-tight text-(--text-primary) group-hover:text-[#4E82EE] transition-colors">
+          <div className="w-8 h-8 rounded-xl overflow-hidden bg-white border border-slate-200/80 p-1 shadow-2xs shrink-0 flex items-center justify-center group-hover:scale-105 transition-transform">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="Assistance"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <span className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
             Assistance
           </span>
         </div>
@@ -79,8 +87,12 @@ export default function TopNavbar({
 
         {/* Notifications Bell Button */}
         <button
-          onClick={() => setNotificationDrawerOpen(true)}
-          className="relative p-2 rounded-xl text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated) transition-colors cursor-pointer active:scale-95"
+          onClick={() => setActiveTab('notifications')}
+          className={`relative p-2 rounded-xl transition-colors cursor-pointer active:scale-95 ${
+            activeTab === 'notifications'
+              ? 'text-blue-600 bg-blue-50'
+              : 'text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-elevated)'
+          }`}
           title="Notifications & Updates"
         >
           <Bell size={17} />
