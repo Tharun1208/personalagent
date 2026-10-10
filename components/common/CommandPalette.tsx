@@ -136,6 +136,7 @@ export default function CommandPalette() {
 
   return (
     <div
+      data-modal-backdrop="true"
       onClick={() => setCommandPaletteOpen(false)}
       className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-start justify-center pt-20 p-4 z-50 animate-in fade-in"
     >

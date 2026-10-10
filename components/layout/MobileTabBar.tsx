@@ -80,13 +80,14 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {
     };
   }, []);
 
-  // Is any modal currently open?
+  // Is any modal currently open or is active view one that hides bottom bar?
   const isAnyModalOpen =
     hasDomModal ||
     authModalOpen ||
     commandPaletteOpen ||
     notificationDrawerOpen ||
-    !!confirmDialog?.isOpen;
+    !!confirmDialog?.isOpen ||
+    activeTab === 'notifications';
 
   const navItems: NavItem[] = [
     {
