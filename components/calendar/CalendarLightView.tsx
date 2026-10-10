@@ -154,16 +154,15 @@ export default function CalendarLightView() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  // Helper: Format events list from reminders + tasks
+  // Helper: Format events list from reminders + tasks with recurring projections
   const allEvents = useMemo(() => {
     const list: FormattedEvent[] = [];
 
     // Reminders
     (reminders || []).forEach((r) => {
       const rawDateStr = r.dueDateTime || (r as any).dateTime || (r as any).time;
-      const d = parseDateSafe(rawDateStr);
-      const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const dateStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      const baseDate = parseDateSafe(rawDateStr);
+      const timeStr = baseDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       let colorBg = 'bg-blue-50';
       let colorBorder = 'border-blue-200';
@@ -188,11 +187,11 @@ export default function CalendarLightView() {
         colorText = 'text-indigo-800';
       }
 
-      list.push({
-        id: `reminder_${r.id}`,
+      const createEventObj = (d: Date, occId: string): FormattedEvent => ({
+        id: occId,
         itemType: 'reminder',
         title: r.title,
-        dateStr,
+        dateStr: d.toLocaleDateString([], { month: 'short', day: 'numeric' }),
         timeStr,
         rawDate: d,
         recurrence: r.recurrence,
@@ -202,9 +201,45 @@ export default function CalendarLightView() {
         colorBg,
         colorBorder,
         colorText,
-        isDone: false,
+        isDone: (r.status as string) === 'dismissed' || (r.status as string) === 'completed',
         originalReminder: r,
       });
+
+      // Base event
+      list.push(createEventObj(baseDate, `reminder_${r.id}`));
+
+      // Recurrence projections
+      if (r.recurrence === 'weekly') {
+        // Project 52 weeks in the future & up to 8 weeks prior
+        for (let w = 1; w <= 52; w++) {
+          const occDate = new Date(baseDate);
+          occDate.setDate(baseDate.getDate() + w * 7);
+          list.push(createEventObj(occDate, `reminder_${r.id}_w_${w}`));
+        }
+        for (let w = 1; w <= 8; w++) {
+          const occDate = new Date(baseDate);
+          occDate.setDate(baseDate.getDate() - w * 7);
+          list.push(createEventObj(occDate, `reminder_${r.id}_pw_${w}`));
+        }
+      } else if (r.recurrence === 'daily') {
+        // Project 90 days in future & up to 14 days prior
+        for (let d = 1; d <= 90; d++) {
+          const occDate = new Date(baseDate);
+          occDate.setDate(baseDate.getDate() + d);
+          list.push(createEventObj(occDate, `reminder_${r.id}_d_${d}`));
+        }
+        for (let d = 1; d <= 14; d++) {
+          const occDate = new Date(baseDate);
+          occDate.setDate(baseDate.getDate() - d);
+          list.push(createEventObj(occDate, `reminder_${r.id}_pd_${d}`));
+        }
+      } else if (r.recurrence === 'monthly') {
+        for (let m = 1; m <= 12; m++) {
+          const occDate = new Date(baseDate);
+          occDate.setMonth(baseDate.getMonth() + m);
+          list.push(createEventObj(occDate, `reminder_${r.id}_m_${m}`));
+        }
+      }
     });
 
     // Tasks
@@ -313,13 +348,66 @@ export default function CalendarLightView() {
     return days;
   }, [year, month, selectedDate]);
 
-  // Handlers for month navigation
+  // Computed header title based on current view mode
+  const headerTitle = useMemo(() => {
+    if (viewMode === 'month') {
+      return `${MONTH_NAMES[month]} ${year}`;
+    }
+    if (viewMode === 'week') {
+      const firstDay = currentWeekDays[0].date;
+      const lastDay = currentWeekDays[6].date;
+      const firstMonth = SHORT_MONTH_NAMES[firstDay.getMonth()];
+      const lastMonth = SHORT_MONTH_NAMES[lastDay.getMonth()];
+      const firstYear = firstDay.getFullYear();
+      const lastYear = lastDay.getFullYear();
+
+      if (firstYear !== lastYear) {
+        return `${firstMonth} ${firstDay.getDate()}, ${firstYear} – ${lastMonth} ${lastDay.getDate()}, ${lastYear}`;
+      }
+      if (firstMonth !== lastMonth) {
+        return `${firstMonth} ${firstDay.getDate()} – ${lastMonth} ${lastDay.getDate()}, ${firstYear}`;
+      }
+      return `${firstMonth} ${firstDay.getDate()} – ${lastDay.getDate()}, ${firstYear}`;
+    }
+    // Day view
+    return selectedDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  }, [viewMode, month, year, currentWeekDays, selectedDate]);
+
+  // Handlers for navigation (adapts to Day, Week, or Month view)
   const handlePrev = () => {
-    setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    if (viewMode === 'week') {
+      const newD = new Date(selectedDate);
+      newD.setDate(newD.getDate() - 7);
+      setSelectedDate(newD);
+      setCurrentDate(newD);
+    } else if (viewMode === 'day') {
+      const newD = new Date(selectedDate);
+      newD.setDate(newD.getDate() - 1);
+      setSelectedDate(newD);
+      setCurrentDate(newD);
+    } else {
+      const newD = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+      setCurrentDate(newD);
+      setSelectedDate(newD);
+    }
   };
 
   const handleNext = () => {
-    setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    if (viewMode === 'week') {
+      const newD = new Date(selectedDate);
+      newD.setDate(newD.getDate() + 7);
+      setSelectedDate(newD);
+      setCurrentDate(newD);
+    } else if (viewMode === 'day') {
+      const newD = new Date(selectedDate);
+      newD.setDate(newD.getDate() + 1);
+      setSelectedDate(newD);
+      setCurrentDate(newD);
+    } else {
+      const newD = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+      setCurrentDate(newD);
+      setSelectedDate(newD);
+    }
   };
 
   const handleToday = () => {
@@ -329,12 +417,16 @@ export default function CalendarLightView() {
   };
 
   const handleSelectMonth = (mIndex: number) => {
-    setCurrentDate(new Date(currentDate.getFullYear(), mIndex, 1));
+    const newD = new Date(currentDate.getFullYear(), mIndex, 1);
+    setCurrentDate(newD);
+    setSelectedDate(newD);
     setIsMonthPickerOpen(false);
   };
 
   const handleStepYear = (delta: number) => {
-    setCurrentDate(new Date(currentDate.getFullYear() + delta, currentDate.getMonth(), 1));
+    const newD = new Date(currentDate.getFullYear() + delta, currentDate.getMonth(), 1);
+    setCurrentDate(newD);
+    setSelectedDate(newD);
   };
 
   // Open modals
@@ -461,7 +553,7 @@ export default function CalendarLightView() {
               className="flex items-center gap-2 px-3 py-1.5 rounded-2xl hover:bg-slate-100 transition-all cursor-pointer group"
             >
               <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 flex items-center gap-1.5">
-                <span>{year} {MONTH_NAMES[month]}</span>
+                <span>{headerTitle}</span>
                 <ChevronDown
                   size={18}
                   className={`text-slate-400 group-hover:text-slate-900 transition-transform duration-200 ${
@@ -539,7 +631,7 @@ export default function CalendarLightView() {
               type="button"
               onClick={handlePrev}
               className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center shadow-2xs transition-all active:scale-95 cursor-pointer"
-              title="Previous month"
+              title={viewMode === 'week' ? 'Previous week' : viewMode === 'day' ? 'Previous day' : 'Previous month'}
             >
               <ChevronLeft size={16} />
             </button>
@@ -547,7 +639,7 @@ export default function CalendarLightView() {
               type="button"
               onClick={handleNext}
               className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center shadow-2xs transition-all active:scale-95 cursor-pointer"
-              title="Next month"
+              title={viewMode === 'week' ? 'Next week' : viewMode === 'day' ? 'Next day' : 'Next month'}
             >
               <ChevronRight size={16} />
             </button>

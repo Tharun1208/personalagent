@@ -419,7 +419,7 @@ export default function DashboardView() {
               </div>
             </div>
 
-            {/* ── 4. LAST CARD: Notes & Knowledge Vault (Amber Accent) ── */}
+            {/* ── 4. LAST CARD: Notes (Amber Accent) ── */}
             <div
               onClick={() => setActiveTab('notes')}
               className="col-span-2 lg:col-span-12 rounded-[26px] sm:rounded-[28px] bg-white border border-slate-100 hover:border-amber-200 shadow-2xs hover:shadow-md transition-all cursor-pointer p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 group overflow-hidden min-h-[100px]"
@@ -431,14 +431,14 @@ export default function DashboardView() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-amber-600 transition-colors">
-                      Notes & Knowledge Vault
+                      Notes
                     </h3>
                     <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100/70">
-                      Vault
+                      Notes
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
-                    {totalNotes > 0 ? `${totalNotes} notes, documents & memories stored` : 'Vault is empty'}
+                    {totalNotes > 0 ? `${totalNotes} notes, documents & memories stored` : 'No notes saved yet'}
                   </p>
                 </div>
               </div>
@@ -452,7 +452,7 @@ export default function DashboardView() {
                 </div>
 
                 <div className="px-3.5 py-1.5 rounded-xl bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white font-bold text-xs flex items-center gap-1 transition-all shadow-2xs">
-                  <span>Open Vault</span>
+                  <span>Open Notes</span>
                   <ArrowUpRight size={13} />
                 </div>
               </div>

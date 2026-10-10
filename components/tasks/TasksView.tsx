@@ -236,65 +236,59 @@ export default function TasksView() {
         </div>
 
         {/* ───────────────────────────────────────────────────────────── */}
-        {/* 2. THREE REAL TASK METRIC CARDS (BIGGER & MORE SPACIOUS)      */}
+        {/* 2. THREE REAL TASK METRIC CARDS (MATCHING REFERENCE DESIGN)   */}
         {/* ───────────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-3 gap-3 sm:gap-4">
           
-          {/* Card 1: Active To-Dos */}
-          <div className="p-5 sm:p-6 min-h-[145px] sm:min-h-[160px] rounded-[28px] bg-white border border-slate-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between">
+          {/* Card 1: Pending */}
+          <div className="p-4 sm:p-5 min-h-[140px] sm:min-h-[155px] rounded-[26px] sm:rounded-[28px] bg-white border border-slate-100/90 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Pending
-                </span>
-                <Clock size={16} className="text-indigo-600" strokeWidth={2.5} />
-              </div>
+              <span className="text-xs font-extrabold text-[#5B67F6] uppercase tracking-wider">
+                PENDING
+              </span>
+              <Clock size={17} className="text-[#5B67F6]" strokeWidth={2.5} />
             </div>
-            <div className="mt-4">
-              <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 font-mono">
+            <div className="mt-3">
+              <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
                 {totalCount - completedCount}
               </span>
-              <p className="text-xs sm:text-[13px] text-slate-400 font-medium truncate mt-1.5">
+              <p className="text-xs sm:text-[13px] text-slate-400 font-medium truncate mt-1">
                 Active to-dos
               </p>
             </div>
           </div>
 
           {/* Card 2: Completed */}
-          <div className="p-5 sm:p-6 min-h-[145px] sm:min-h-[160px] rounded-[28px] bg-white border border-slate-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between">
+          <div className="p-4 sm:p-5 min-h-[140px] sm:min-h-[155px] rounded-[26px] sm:rounded-[28px] bg-white border border-slate-100/90 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Completed
-                </span>
-                <CheckCircle2 size={16} className="text-emerald-600" strokeWidth={2.5} />
-              </div>
+              <span className="text-xs font-extrabold text-emerald-600 uppercase tracking-wider">
+                COMPLETED
+              </span>
+              <CheckCircle2 size={17} className="text-emerald-600" strokeWidth={2.5} />
             </div>
-            <div className="mt-4">
-              <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 font-mono">
+            <div className="mt-3">
+              <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
                 {completedCount}
               </span>
-              <p className="text-xs sm:text-[13px] text-slate-400 font-medium truncate mt-1.5">
+              <p className="text-xs sm:text-[13px] text-slate-400 font-medium truncate mt-1">
                 Finished tasks
               </p>
             </div>
           </div>
 
-          {/* Card 3: Completion Rate */}
-          <div className="p-5 sm:p-6 min-h-[145px] sm:min-h-[160px] rounded-[28px] bg-white border border-slate-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between">
+          {/* Card 3: Progress */}
+          <div className="p-4 sm:p-5 min-h-[140px] sm:min-h-[155px] rounded-[26px] sm:rounded-[28px] bg-white border border-slate-100/90 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Progress
-                </span>
-                <TrendingUp size={16} className="text-[#1C73E8]" strokeWidth={2.5} />
-              </div>
+              <span className="text-xs font-extrabold text-[#1C73E8] uppercase tracking-wider">
+                PROGRESS
+              </span>
+              <TrendingUp size={17} className="text-[#1C73E8]" strokeWidth={2.5} />
             </div>
-            <div className="mt-4">
-              <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 font-mono">
+            <div className="mt-3">
+              <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
                 {progressPercent}%
               </span>
-              <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden mt-2.5">
+              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden mt-2">
                 <div
                   className="bg-[#1C73E8] h-full rounded-full transition-all duration-500"
                   style={{ width: `${progressPercent}%` }}
