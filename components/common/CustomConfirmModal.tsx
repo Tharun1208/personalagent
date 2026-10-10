@@ -85,7 +85,10 @@ export default function CustomConfirmModal({ dialog, onClose }: CustomConfirmMod
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-12 sm:pt-16 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+    <div
+      data-modal-backdrop="true"
+      className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-12 sm:pt-16 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto"
+    >
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md bg-(--bg-card) border border-(--border-subtle) rounded-3xl shadow-2xl p-6 overflow-hidden animate-top-modal text-(--text-primary)"

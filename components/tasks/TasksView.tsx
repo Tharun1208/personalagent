@@ -474,7 +474,7 @@ export default function TasksView() {
       {/* CREATE NEW TASK MODAL                                         */}
       {/* ───────────────────────────────────────────────────────────── */}
       {isAddOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+        <div data-modal-backdrop="true" className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
           <div className="bg-white rounded-[28px] w-full max-w-sm p-6 shadow-2xl space-y-4 border border-slate-100">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">Create New Task</h3>
@@ -552,7 +552,7 @@ export default function TasksView() {
       {/* EDIT / DETAIL TASK MODAL                                      */}
       {/* ───────────────────────────────────────────────────────────── */}
       {isEditModalOpen && selectedTask && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+        <div data-modal-backdrop="true" className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
           <div className="bg-white rounded-[28px] w-full max-w-sm p-6 shadow-2xl space-y-4 border border-slate-100">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">Task Details</h3>

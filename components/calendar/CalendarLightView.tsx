@@ -26,15 +26,43 @@ import {
   ListTodo,
   Tag,
   AlertCircle,
+  ArrowRight,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '@/lib/context/AppContext';
 import { Reminder, Task } from '@/types';
+import CustomSelect, { SelectOption } from '@/components/common/CustomSelect';
 
 export type CalendarViewMode = 'day' | 'week' | 'month';
+
+const PRIORITY_OPTIONS: SelectOption[] = [
+  { value: 'normal', label: 'Normal Priority', badgeColor: '#3b82f6' },
+  { value: 'high', label: 'High Priority', badgeColor: '#f59e0b' },
+  { value: 'urgent', label: 'Urgent', badgeColor: '#ef4444' },
+];
+
+const TASK_PRIORITY_OPTIONS: SelectOption[] = [
+  { value: 'low', label: 'Low Priority', badgeColor: '#64748b' },
+  { value: 'medium', label: 'Medium Priority', badgeColor: '#3b82f6' },
+  { value: 'high', label: 'High Priority', badgeColor: '#f59e0b' },
+  { value: 'urgent', label: 'Urgent', badgeColor: '#ef4444' },
+];
+
+const RECURRENCE_OPTIONS: SelectOption[] = [
+  { value: 'none', label: 'One-time event' },
+  { value: 'daily', label: 'Repeats Daily' },
+  { value: 'weekly', label: 'Repeats Weekly' },
+  { value: 'monthly', label: 'Repeats Monthly' },
+];
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const SHORT_MONTH_NAMES = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
 const WEEKDAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -76,13 +104,14 @@ export default function CalendarLightView() {
   const [viewMode, setViewMode] = useState<CalendarViewMode>('month');
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Dropdown states
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
+  
   // Modals state
   const [selectedEvent, setSelectedEvent] = useState<FormattedEvent | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isDayAgendaModalOpen, setIsDayAgendaModalOpen] = useState(false);
-  
-  // Enhanced Dropdown Menu State (Task vs Schedule)
-  const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   
   // Schedule / Reminder Modal State
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
@@ -103,7 +132,7 @@ export default function CalendarLightView() {
   const [taskDueDate, setTaskDueDate] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
 
-  // Safe date parser to avoid timezone mismatch
+  // Safe date parser
   const parseDateSafe = (dateStr?: string): Date => {
     if (!dateStr) return new Date();
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -122,7 +151,6 @@ export default function CalendarLightView() {
     );
   };
 
-  // Month & year computation
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
@@ -130,14 +158,13 @@ export default function CalendarLightView() {
   const allEvents = useMemo(() => {
     const list: FormattedEvent[] = [];
 
-    // 1. Existing Reminders from AppContext
+    // Reminders
     (reminders || []).forEach((r) => {
       const rawDateStr = r.dueDateTime || (r as any).dateTime || (r as any).time;
       const d = parseDateSafe(rawDateStr);
       const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const dateStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-      // Determine category and clean light styling
       let colorBg = 'bg-blue-50';
       let colorBorder = 'border-blue-200';
       let colorText = 'text-[#1C73E8]';
@@ -162,7 +189,7 @@ export default function CalendarLightView() {
       }
 
       list.push({
-        id: `rem_${r.id}`,
+        id: `reminder_${r.id}`,
         itemType: 'reminder',
         title: r.title,
         dateStr,
@@ -170,21 +197,20 @@ export default function CalendarLightView() {
         rawDate: d,
         recurrence: r.recurrence,
         notes: r.notes,
-        priority: r.priority,
+        priority: (r as any).priority || 'normal',
         category,
         colorBg,
         colorBorder,
         colorText,
-        isDone: (r as any).status === 'completed' || r.status === 'dismissed',
+        isDone: false,
         originalReminder: r,
       });
     });
 
-    // 2. Scheduled Tasks with due dates or created dates
+    // Tasks
     (tasks || []).forEach((t) => {
-      const rawDateStr = t.dueDate || t.createdAt;
-      const d = parseDateSafe(rawDateStr);
-      const timeStr = t.dueDate ? 'Task Due' : 'Created';
+      const d = parseDateSafe(t.dueDate || t.createdAt);
+      const timeStr = 'All day';
       const dateStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
       list.push({
@@ -205,7 +231,6 @@ export default function CalendarLightView() {
       });
     });
 
-    // Sort by chronological order
     list.sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime());
     return list;
   }, [reminders, tasks]);
@@ -217,10 +242,10 @@ export default function CalendarLightView() {
     return allEvents.filter((e) => e.title.toLowerCase().includes(q) || (e.notes && e.notes.toLowerCase().includes(q)));
   }, [allEvents, searchQuery]);
 
-  // Selected Day Weekdays Strip (7 days containing selectedDate)
+  // Selected Day Weekdays Strip (7 days)
   const currentWeekDays = useMemo(() => {
     const start = new Date(selectedDate);
-    const dayIndex = start.getDay(); // 0 = Sun
+    const dayIndex = start.getDay();
     start.setDate(start.getDate() - dayIndex);
 
     return Array.from({ length: 7 }, (_, i) => {
@@ -248,49 +273,53 @@ export default function CalendarLightView() {
 
     const days = [];
 
-    // Previous month trailing days
+    // Prev month padding
     for (let i = firstDayOfMonth - 1; i >= 0; i--) {
       const d = new Date(year, month - 1, daysInPrevMonth - i);
-      days.push({ date: d, isCurrentMonth: false, dayNum: d.getDate() });
+      days.push({
+        date: d,
+        dayNum: d.getDate(),
+        isCurrentMonth: false,
+        isToday: isSameDay(d, new Date()),
+        isSelected: isSameDay(d, selectedDate),
+      });
     }
 
     // Current month days
     for (let i = 1; i <= daysInCurrentMonth; i++) {
       const d = new Date(year, month, i);
-      days.push({ date: d, isCurrentMonth: true, dayNum: i });
+      days.push({
+        date: d,
+        dayNum: i,
+        isCurrentMonth: true,
+        isToday: isSameDay(d, new Date()),
+        isSelected: isSameDay(d, selectedDate),
+      });
     }
 
-    // Next month leading days to complete full weeks
-    const remaining = 42 - days.length;
+    // Next month padding
+    const remaining = (7 - (days.length % 7)) % 7;
     for (let i = 1; i <= remaining; i++) {
       const d = new Date(year, month + 1, i);
-      days.push({ date: d, isCurrentMonth: false, dayNum: i });
+      days.push({
+        date: d,
+        dayNum: i,
+        isCurrentMonth: false,
+        isToday: isSameDay(d, new Date()),
+        isSelected: isSameDay(d, selectedDate),
+      });
     }
 
     return days;
-  }, [year, month]);
+  }, [year, month, selectedDate]);
 
-  // Navigation handlers
+  // Handlers for month navigation
   const handlePrev = () => {
-    if (viewMode === 'month') {
-      setCurrentDate(new Date(year, month - 1, 1));
-    } else {
-      const d = new Date(selectedDate);
-      d.setDate(d.getDate() - (viewMode === 'week' ? 7 : 1));
-      setSelectedDate(d);
-      setCurrentDate(d);
-    }
+    setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
 
   const handleNext = () => {
-    if (viewMode === 'month') {
-      setCurrentDate(new Date(year, month + 1, 1));
-    } else {
-      const d = new Date(selectedDate);
-      d.setDate(d.getDate() + (viewMode === 'week' ? 7 : 1));
-      setSelectedDate(d);
-      setCurrentDate(d);
-    }
+    setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
   const handleToday = () => {
@@ -299,20 +328,27 @@ export default function CalendarLightView() {
     setSelectedDate(now);
   };
 
-  // Open creation dropdown toggle
-  const handleTogglePlusMenu = () => {
-    setIsPlusMenuOpen((prev) => !prev);
-  };
-  const handleOpenPlusOptions = () => {
-    openScheduleCreateModal();
+  const handleSelectMonth = (mIndex: number) => {
+    setCurrentDate(new Date(currentDate.getFullYear(), mIndex, 1));
+    setIsMonthPickerOpen(false);
   };
 
-  // Open Schedule Modal
+  const handleStepYear = (delta: number) => {
+    setCurrentDate(new Date(currentDate.getFullYear() + delta, currentDate.getMonth(), 1));
+  };
+
+  // Open modals
+  const handleTogglePlusMenu = () => {
+    setIsPlusMenuOpen((prev) => !prev);
+    setIsMonthPickerOpen(false);
+  };
+
   const openScheduleCreateModal = () => {
     setIsPlusMenuOpen(false);
     setIsEditingSchedule(false);
     setEditingScheduleId(null);
     setFormTitle('');
+    
     const yyyy = selectedDate.getFullYear();
     const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
     const dd = String(selectedDate.getDate()).padStart(2, '0');
@@ -324,16 +360,16 @@ export default function CalendarLightView() {
     setIsScheduleModalOpen(true);
   };
 
-  // Open Task Modal
   const openTaskCreateModal = () => {
     setIsPlusMenuOpen(false);
     setTaskTitle('');
+    setTaskDescription('');
     setTaskPriority('medium');
+    
     const yyyy = selectedDate.getFullYear();
     const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
     const dd = String(selectedDate.getDate()).padStart(2, '0');
     setTaskDueDate(`${yyyy}-${mm}-${dd}`);
-    setTaskDescription('');
     setIsTaskModalOpen(true);
   };
 
@@ -370,7 +406,7 @@ export default function CalendarLightView() {
         notes: formNotes.trim() || undefined,
         priority: formPriority as any,
       });
-      showToast('Schedule event updated', 'success');
+      showToast?.('Schedule event updated', 'success');
     } else {
       await createReminder(
         formTitle.trim(),
@@ -378,7 +414,7 @@ export default function CalendarLightView() {
         formRecurrence,
         formNotes.trim() || undefined
       );
-      showToast('Schedule event created', 'success');
+      showToast?.('Schedule event created', 'success');
     }
 
     setIsScheduleModalOpen(false);
@@ -393,17 +429,17 @@ export default function CalendarLightView() {
       taskPriority,
       taskDueDate || undefined
     );
-    showToast('Task created successfully', 'success');
+    showToast?.('Task created successfully', 'success');
     setIsTaskModalOpen(false);
   };
 
   const handleDeleteEvent = async (ev: FormattedEvent) => {
     if (ev.itemType === 'reminder' && ev.originalReminder) {
       await deleteReminder(ev.originalReminder.id);
-      showToast('Schedule event removed', 'info');
+      showToast?.('Schedule event removed', 'info');
     } else if (ev.itemType === 'task' && ev.originalTask) {
       await deleteTask(ev.originalTask.id);
-      showToast('Task removed', 'info');
+      showToast?.('Task removed', 'info');
     }
     setIsDetailsOpen(false);
   };
@@ -411,22 +447,98 @@ export default function CalendarLightView() {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-white text-slate-900 select-none font-sans relative">
       
-      {/* ── 1. Top Header (Pure Light Theme) ── */}
-      <header className="px-4 sm:px-6 pt-4 pb-3 flex items-center justify-between border-b border-slate-100 bg-white/95 backdrop-blur-md shrink-0">
-        {/* Left: Year & Month Title */}
+      {/* ── 1. Top Header ── */}
+      <header className="relative z-30 px-4 sm:px-6 pt-4 pb-3 flex items-center justify-between border-b border-slate-100 bg-white shrink-0">
+        {/* Left: Year & Month Title with interactive dropdown */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 cursor-pointer group">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-1.5">
-              <span>{year} {MONTH_NAMES[month]}</span>
-              <ChevronDown size={18} className="text-slate-400 group-hover:text-slate-900 transition-colors" />
-            </h1>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setIsMonthPickerOpen((p) => !p);
+                setIsPlusMenuOpen(false);
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-2xl hover:bg-slate-100 transition-all cursor-pointer group"
+            >
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 flex items-center gap-1.5">
+                <span>{year} {MONTH_NAMES[month]}</span>
+                <ChevronDown
+                  size={18}
+                  className={`text-slate-400 group-hover:text-slate-900 transition-transform duration-200 ${
+                    isMonthPickerOpen ? 'rotate-180 text-blue-600' : ''
+                  }`}
+                />
+              </h1>
+            </button>
+
+            {/* Interactive Month & Year Picker Dropdown */}
+            <AnimatePresence>
+              {isMonthPickerOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40 bg-black/20"
+                    onClick={() => setIsMonthPickerOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute left-0 top-full mt-2 z-50 w-72 p-3.5 rounded-3xl bg-white border border-slate-200 shadow-[0_20px_45px_rgba(0,0,0,0.16)] ring-1 ring-black/5"
+                  >
+                    {/* Year Switcher */}
+                    <div className="flex items-center justify-between px-2 pb-3 mb-2 border-b border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => handleStepYear(-1)}
+                        className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors"
+                      >
+                        <ChevronLeft size={15} />
+                      </button>
+                      <span className="text-sm font-extrabold text-slate-900">
+                        {year}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleStepYear(1)}
+                        className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors"
+                      >
+                        <ChevronRight size={15} />
+                      </button>
+                    </div>
+
+                    {/* 12 Months Grid */}
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {SHORT_MONTH_NAMES.map((mName, idx) => {
+                        const isCurrent = idx === month;
+                        return (
+                          <button
+                            key={mName}
+                            type="button"
+                            onClick={() => handleSelectMonth(idx)}
+                            className={`py-2 px-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              isCurrent
+                                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25'
+                                : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                            }`}
+                          >
+                            {mName}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
 
-          <div className="flex items-center gap-1 ml-2">
+          {/* Nav buttons */}
+          <div className="flex items-center gap-1 ml-1">
             <button
               type="button"
               onClick={handlePrev}
-              className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-950 border border-slate-200/80 flex items-center justify-center shadow-2xs transition-all active:scale-95 cursor-pointer"
+              className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center shadow-2xs transition-all active:scale-95 cursor-pointer"
               title="Previous month"
             >
               <ChevronLeft size={16} />
@@ -434,7 +546,7 @@ export default function CalendarLightView() {
             <button
               type="button"
               onClick={handleNext}
-              className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-950 border border-slate-200/80 flex items-center justify-center shadow-2xs transition-all active:scale-95 cursor-pointer"
+              className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center shadow-2xs transition-all active:scale-95 cursor-pointer"
               title="Next month"
             >
               <ChevronRight size={16} />
@@ -442,23 +554,23 @@ export default function CalendarLightView() {
             <button
               type="button"
               onClick={handleToday}
-              className="px-2.5 py-1 rounded-full bg-blue-50 hover:bg-blue-100 text-xs font-bold text-blue-700 border border-blue-200 shadow-2xs transition-all cursor-pointer ml-1"
+              className="px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100 text-xs font-bold text-blue-700 border border-blue-200 shadow-2xs transition-all cursor-pointer ml-1 active:scale-95"
             >
               Today
             </button>
           </div>
         </div>
 
-        {/* Right: Search & Actions */}
-        <div className="flex items-center gap-2">
+        {/* Right: Search & Plus Button with Elevated Dropdown */}
+        <div className="flex items-center gap-2.5">
           <div className="relative hidden sm:block">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Search schedule..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-3 py-1.5 rounded-full text-xs bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 w-44 transition-all"
+              className="pl-9 pr-3 py-1.5 rounded-full text-xs bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 w-44 transition-all"
             />
           </div>
 
@@ -466,72 +578,87 @@ export default function CalendarLightView() {
             <button
               type="button"
               onClick={handleTogglePlusMenu}
-              className={`w-9 h-9 rounded-xl bg-[#1C73E8] hover:bg-[#1557B0] text-white shadow-xs flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
-                isPlusMenuOpen ? 'ring-2 ring-[#1C73E8]/30 bg-[#1557B0]' : ''
+              className={`w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 flex items-center justify-center transition-all cursor-pointer active:scale-95 hover:opacity-95 ${
+                isPlusMenuOpen ? 'ring-3 ring-blue-500/30 scale-105' : ''
               }`}
               title="Create Event or Task"
             >
-              <Plus size={18} className={`transition-transform duration-200 ${isPlusMenuOpen ? 'rotate-45' : ''}`} />
+              <Plus
+                size={20}
+                className={`transition-transform duration-250 ${isPlusMenuOpen ? 'rotate-45' : ''}`}
+              />
             </button>
 
-            {/* Enhanced UI Dropdown Menu */}
-            {isPlusMenuOpen && (
-              <>
-                {/* Backdrop dismiss */}
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setIsPlusMenuOpen(false)}
-                />
+            {/* ── Elevated "Add to Calendar" Dropdown Menu ── */}
+            <AnimatePresence>
+              {isPlusMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40 bg-black/25"
+                    onClick={() => setIsPlusMenuOpen(false)}
+                  />
 
-                {/* Dropdown Card */}
-                <div className="absolute right-0 top-full mt-2 z-50 w-64 rounded-2xl bg-white/95 backdrop-blur-md border border-slate-200 shadow-2xl p-2 animate-in fade-in zoom-in-95 origin-top-right space-y-1 ring-1 ring-black/5">
-                  <div className="px-3 py-1.5 border-b border-slate-100/80 flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
-                      Add to Calendar
-                    </span>
-                    <Sparkles size={12} className="text-[#1C73E8]" />
-                  </div>
-
-                  {/* Option 1: Schedule Event */}
-                  <button
-                    type="button"
-                    onClick={openScheduleCreateModal}
-                    className="w-full p-2.5 rounded-xl hover:bg-blue-50/80 transition-all flex items-center gap-3 text-left group cursor-pointer"
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute right-0 top-full mt-2.5 z-50 w-72 rounded-3xl bg-white border border-slate-200/90 shadow-[0_24px_60px_rgba(0,0,0,0.18),0_4px_16px_rgba(0,0,0,0.06)] p-2.5 space-y-1.5 ring-1 ring-black/5 origin-top-right"
                   >
-                    <div className="w-9 h-9 rounded-xl bg-[#1C73E8] text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                      <CalendarIcon size={17} />
+                    <div className="px-3 py-1.5 border-b border-slate-100 flex items-center justify-between">
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">
+                        Add to Calendar
+                      </span>
+                      <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-900 group-hover:text-[#1C73E8] transition-colors">
-                        New Event
-                      </p>
-                      <p className="text-[10px] text-slate-400">
-                        Meetings, alarms & reminders
-                      </p>
-                    </div>
-                  </button>
 
-                  {/* Option 2: Task */}
-                  <button
-                    type="button"
-                    onClick={openTaskCreateModal}
-                    className="w-full p-2.5 rounded-xl hover:bg-indigo-50/80 transition-all flex items-center gap-3 text-left group cursor-pointer"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                      <CheckSquare size={17} />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                        New Task
-                      </p>
-                      <p className="text-[10px] text-slate-400">
-                        To-dos, priorities & goals
-                      </p>
-                    </div>
-                  </button>
-                </div>
-              </>
-            )}
+                    {/* Option 1: Schedule Event */}
+                    <button
+                      type="button"
+                      onClick={openScheduleCreateModal}
+                      className="w-full p-3 rounded-2xl hover:bg-blue-50 transition-all flex items-center justify-between group cursor-pointer text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-500 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+                          <CalendarIcon size={18} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                            New Event
+                          </p>
+                          <p className="text-[10.5px] text-slate-400 leading-tight">
+                            Meetings, alarms & reminders
+                          </p>
+                        </div>
+                      </div>
+                      <ArrowRight size={14} className="text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
+                    </button>
+
+                    {/* Option 2: Task */}
+                    <button
+                      type="button"
+                      onClick={openTaskCreateModal}
+                      className="w-full p-3 rounded-2xl hover:bg-indigo-50 transition-all flex items-center justify-between group cursor-pointer text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+                          <CheckSquare size={18} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                            New Task
+                          </p>
+                          <p className="text-[10.5px] text-slate-400 leading-tight">
+                            To-dos, priorities & goals
+                          </p>
+                        </div>
+                      </div>
+                      <ArrowRight size={14} className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </header>
@@ -553,7 +680,7 @@ export default function CalendarLightView() {
                 onClick={() => setViewMode(mode.key as CalendarViewMode)}
                 className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-[#1C73E8] text-white shadow-xs'
+                    ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/70'
                 }`}
               >
@@ -569,7 +696,7 @@ export default function CalendarLightView() {
         </span>
       </div>
 
-      {/* ── 3. Horizontal Weekday Selector Strip (Only visible in Day & Week views) ── */}
+      {/* ── 3. Horizontal Weekday Selector Strip (Day & Week views) ── */}
       {viewMode !== 'month' && (
         <div className="px-4 sm:px-6 py-3 bg-[#F8FAFC] border-b border-slate-100 shrink-0">
           <div className="grid grid-cols-7 gap-1 sm:gap-2 max-w-2xl mx-auto">
@@ -592,7 +719,7 @@ export default function CalendarLightView() {
                   <span
                     className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-sm font-extrabold transition-all duration-200 ${
                       item.isSelected
-                        ? 'bg-[#1C73E8] text-white shadow-md shadow-blue-500/25 scale-105'
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-105'
                         : item.isToday
                         ? 'bg-blue-100 text-blue-800 border border-blue-300'
                         : 'text-slate-800 hover:bg-slate-200/60'
@@ -608,15 +735,13 @@ export default function CalendarLightView() {
       )}
 
       {/* ── 4. Main Scrollable Content Area ── */}
-      <div className="flex-1 overflow-y-auto no-scrollbar px-4 sm:px-6 py-4 pb-20 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex-1 overflow-y-auto no-scrollbar px-4 sm:px-6 py-4 pb-20">
         <div className="max-w-3xl mx-auto">
 
-          {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 1: DAY VIEW                                              */}
-          {/* ───────────────────────────────────────────────────────────── */}
+          {/* VIEW 1: DAY VIEW */}
           {viewMode === 'day' && (
             <div className="space-y-4">
-              <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs space-y-4">
+              <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">
@@ -628,10 +753,10 @@ export default function CalendarLightView() {
                   </div>
                   <button
                     type="button"
-                    onClick={handleOpenPlusOptions}
-                    className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1C73E8] text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                    onClick={openScheduleCreateModal}
+                    className="px-3.5 py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
                   >
-                    <Plus size={13} strokeWidth={2.5} />
+                    <Plus size={14} />
                     <span>Add Item</span>
                   </button>
                 </div>
@@ -647,10 +772,10 @@ export default function CalendarLightView() {
                             setSelectedEvent(ev);
                             setIsDetailsOpen(true);
                           }}
-                          className={`p-3.5 rounded-xl border ${ev.colorBg} ${ev.colorBorder} ${ev.colorText} flex items-center justify-between cursor-pointer hover:shadow-xs transition-all`}
+                          className={`p-3.5 rounded-2xl border ${ev.colorBg} ${ev.colorBorder} ${ev.colorText} flex items-center justify-between cursor-pointer hover:shadow-xs transition-all`}
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-9 h-9 rounded-xl bg-white/80 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                            <div className="w-9 h-9 rounded-xl bg-white/90 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
                               {ev.itemType === 'task' ? <CheckSquare size={17} /> : <CalendarIcon size={17} />}
                             </div>
                             <div className="min-w-0">
@@ -658,239 +783,144 @@ export default function CalendarLightView() {
                               <p className="text-xs opacity-80 mt-0.5">{ev.timeStr} {ev.notes ? `· ${ev.notes}` : ''}</p>
                             </div>
                           </div>
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-white/70 uppercase shrink-0 ml-2">
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-white/80 uppercase shrink-0 ml-2">
                             {ev.itemType}
                           </span>
                         </div>
                       ))}
                   </div>
                 ) : (
-                  <div className="py-10 text-center space-y-2">
-                    <p className="text-xs text-slate-400 italic">
-                      No events or tasks scheduled for this day
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleOpenPlusOptions}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#1C73E8] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
-                    >
-                      <Plus size={13} strokeWidth={2.5} />
-                      <span>Create Task or Event</span>
-                    </button>
+                  <div className="py-12 text-center text-xs text-slate-400 italic">
+                    No events or tasks scheduled for this day. Click "+ Add Item" above.
                   </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 2: WEEK VIEW                                             */}
-          {/* ───────────────────────────────────────────────────────────── */}
+          {/* VIEW 2: WEEK VIEW */}
           {viewMode === 'week' && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-3">
-                {currentWeekDays.map((dayItem, idx) => {
-                  const dayEvents = filteredEvents.filter((e) => isSameDay(e.rawDate, dayItem.date));
-                  const isSelected = isSameDay(selectedDate, dayItem.date);
-
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => setSelectedDate(dayItem.date)}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-blue-50/40 border-blue-300 shadow-xs ring-2 ring-blue-500/20'
-                          : 'bg-white border-slate-200/80 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-extrabold ${dayItem.isWeekend ? 'text-rose-500' : 'text-slate-600'}`}>
-                            {dayItem.dayName}
-                          </span>
-                          <span className="text-xs font-bold text-slate-900">
-                            {dayItem.date.toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                          </span>
-                        </div>
-                        <span className="text-[11px] font-bold text-slate-400">
-                          {dayEvents.length} items
+            <div className="space-y-3">
+              {currentWeekDays.map((dayItem, idx) => {
+                const dayEvents = filteredEvents.filter((e) => isSameDay(e.rawDate, dayItem.date));
+                return (
+                  <div
+                    key={idx}
+                    className={`p-4 rounded-3xl border transition-all ${
+                      dayItem.isSelected
+                        ? 'bg-blue-50/40 border-blue-200'
+                        : 'bg-white border-slate-200/80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-extrabold ${dayItem.isWeekend ? 'text-rose-500' : 'text-slate-500'}`}>
+                          {dayItem.dayName}
+                        </span>
+                        <span className="text-xs font-bold text-slate-800">
+                          {dayItem.date.toLocaleDateString([], { month: 'short', day: 'numeric' })}
                         </span>
                       </div>
-
-                      {dayEvents.length > 0 ? (
-                        <div className="space-y-2 mt-2.5">
-                          {dayEvents.map((ev) => (
-                            <div
-                              key={ev.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedDate(dayItem.date);
-                                setSelectedEvent(ev);
-                                setIsDetailsOpen(true);
-                              }}
-                              className={`p-2.5 rounded-xl border ${ev.colorBg} ${ev.colorBorder} ${ev.colorText} flex items-center justify-between text-xs font-bold cursor-pointer hover:opacity-90`}
-                            >
-                              <div className="flex items-center gap-2 truncate">
-                                <span>{ev.title}</span>
-                              </div>
-                              <span className="text-[10px] opacity-75 shrink-0 ml-2">{ev.timeStr}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-[11px] text-slate-400 italic pt-2">No items</p>
-                      )}
+                      <span className="text-[11px] text-slate-400 font-semibold">
+                        {dayEvents.length} items
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
+
+                    {dayEvents.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {dayEvents.map((ev) => (
+                          <div
+                            key={ev.id}
+                            onClick={() => {
+                              setSelectedEvent(ev);
+                              setIsDetailsOpen(true);
+                            }}
+                            className={`p-2.5 rounded-xl border text-xs font-semibold ${ev.colorBg} ${ev.colorBorder} ${ev.colorText} flex items-center justify-between cursor-pointer`}
+                          >
+                            <span className="truncate">{ev.title}</span>
+                            <span className="text-[10px] opacity-75 shrink-0 ml-2">{ev.timeStr}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 italic py-1">No items</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 
-          {/* ───────────────────────────────────────────────────────────── */}
-          {/* VIEW 3: FULL MONTH GRID                                       */}
-          {/* ───────────────────────────────────────────────────────────── */}
+          {/* VIEW 3: MONTH VIEW */}
           {viewMode === 'month' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs text-slate-400 pb-2 border-b border-slate-100">
-                {WEEKDAY_NAMES.map((w) => (
-                  <span key={w} className={w === 'SUN' || w === 'SAT' ? 'text-rose-400' : ''}>{w}</span>
+              {/* Weekday headers */}
+              <div className="grid grid-cols-7 gap-1 text-center font-bold text-[11px] text-slate-400 pb-1">
+                {WEEKDAY_NAMES.map((wd, i) => (
+                  <div key={wd} className={i === 0 || i === 6 ? 'text-rose-500' : ''}>
+                    {wd}
+                  </div>
                 ))}
               </div>
 
-              <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-                {monthCalendarDays.map((dItem, idx) => {
-                  const dayEvents = filteredEvents.filter((e) => isSameDay(e.rawDate, dItem.date));
-                  const isSelected = isSameDay(selectedDate, dItem.date);
-                  const isToday = isSameDay(new Date(), dItem.date);
+              {/* Month Calendar Grid */}
+              <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+                {monthCalendarDays.map((cell, idx) => {
+                  const dayEvents = filteredEvents.filter((e) => isSameDay(e.rawDate, cell.date));
+                  const isSelected = isSameDay(cell.date, selectedDate);
 
                   return (
                     <div
                       key={idx}
                       onClick={() => {
-                        setSelectedDate(dItem.date);
-                        if (dayEvents.length === 1) {
-                          setSelectedEvent(dayEvents[0]);
-                          setIsDetailsOpen(true);
-                        } else if (dayEvents.length > 1) {
+                        setSelectedDate(cell.date);
+                        if (dayEvents.length > 0) {
                           setIsDayAgendaModalOpen(true);
                         }
                       }}
-                      className={`min-h-[85px] sm:min-h-[105px] p-2 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between group/cell ${
+                      className={`min-h-[80px] sm:min-h-[92px] p-1.5 sm:p-2 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
                         isSelected
-                          ? 'border-[#1C73E8] bg-blue-50/50 shadow-xs ring-2 ring-blue-500/20'
-                          : dItem.isCurrentMonth
-                          ? 'border-slate-100 bg-white hover:border-blue-300 hover:shadow-xs'
-                          : 'border-transparent bg-slate-50/50 opacity-40'
+                          ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/30'
+                          : cell.isCurrentMonth
+                          ? 'bg-white border-slate-200/70 hover:border-slate-300'
+                          : 'bg-slate-50/50 border-transparent opacity-40'
                       }`}
                     >
+                      {/* Top Date Number */}
                       <div className="flex items-center justify-between">
                         <span
-                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-transform group-hover/cell:scale-110 ${
-                            isToday
-                              ? 'bg-[#1C73E8] text-white'
-                              : isSelected
-                              ? 'bg-blue-200 text-blue-900 font-extrabold'
-                              : 'text-slate-700'
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                            cell.isToday
+                              ? 'bg-blue-600 text-white'
+                              : 'text-slate-800'
                           }`}
                         >
-                          {dItem.dayNum}
+                          {cell.dayNum}
                         </span>
                         {dayEvents.length > 0 && (
-                          <span className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-[#1C73E8]" />
-                            <span className="text-[10px] font-bold text-[#1C73E8] hidden sm:inline">
-                              {dayEvents.length}
-                            </span>
-                          </span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                         )}
                       </div>
 
-                      <div className="space-y-1 mt-1 overflow-hidden">
+                      {/* Event Chips Preview */}
+                      <div className="space-y-1 overflow-hidden">
                         {dayEvents.slice(0, 2).map((ev) => (
                           <div
                             key={ev.id}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedDate(dItem.date);
-                              setSelectedEvent(ev);
-                              setIsDetailsOpen(true);
-                            }}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold truncate ${ev.colorBg} ${ev.colorText} hover:opacity-80 transition-opacity cursor-pointer shadow-2xs`}
+                            className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-md truncate ${ev.colorBg} ${ev.colorText}`}
                           >
                             {ev.title}
                           </div>
                         ))}
                         {dayEvents.length > 2 && (
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedDate(dItem.date);
-                              setIsDayAgendaModalOpen(true);
-                            }}
-                            className="text-[9px] font-bold text-[#1C73E8] hover:underline block text-right cursor-pointer"
-                          >
+                          <div className="text-[9px] font-extrabold text-blue-600 pl-1">
                             +{dayEvents.length - 2} more
-                          </span>
+                          </div>
                         )}
                       </div>
                     </div>
                   );
                 })}
-              </div>
-
-              {/* Interactive Selected Day Agenda Section */}
-              <div className="mt-4 p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-xs space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-[#1C73E8]" />
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Agenda for {selectedDate.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
-                    </h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleOpenPlusOptions}
-                    className="px-3 py-1 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1C73E8] text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    <Plus size={13} strokeWidth={2.5} />
-                    <span>Add on this day</span>
-                  </button>
-                </div>
-
-                {filteredEvents.filter((e) => isSameDay(e.rawDate, selectedDate)).length > 0 ? (
-                  <div className="space-y-2 pt-1">
-                    {filteredEvents
-                      .filter((e) => isSameDay(e.rawDate, selectedDate))
-                      .map((ev) => (
-                        <div
-                          key={ev.id}
-                          onClick={() => {
-                            setSelectedEvent(ev);
-                            setIsDetailsOpen(true);
-                          }}
-                          className={`p-3 rounded-xl border ${ev.colorBg} ${ev.colorBorder} ${ev.colorText} flex items-center justify-between cursor-pointer hover:shadow-xs transition-all`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-white/80 flex items-center justify-center font-bold text-xs shrink-0">
-                              {ev.itemType === 'task' ? <CheckSquare size={16} /> : <CalendarIcon size={16} />}
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold">{ev.title}</p>
-                              <p className="text-xs opacity-80 mt-0.5">{ev.timeStr} {ev.notes ? `· ${ev.notes}` : ''}</p>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-white/70 uppercase shrink-0">
-                            {ev.itemType}
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 italic py-1">
-                    No scheduled tasks or reminders on this date. Click (+ Add on this day) to create one.
-                  </p>
-                )}
               </div>
             </div>
           )}
@@ -898,82 +928,87 @@ export default function CalendarLightView() {
         </div>
       </div>
 
-
-
-      {/* ── 7. Modal: Create Task ── */}
+      {/* ── 5. MODAL: CREATE TASK POP-UP ── */}
       {isTaskModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+          data-modal-backdrop="true"
+          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={() => setIsTaskModalOpen(false)}
         >
-          <div
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 text-slate-900"
+            className="w-full max-w-md rounded-3xl bg-white border border-slate-100 shadow-2xl p-6 text-slate-900 space-y-4"
           >
-            <div className="px-6 pt-5 pb-3 flex items-center justify-between border-b border-slate-100">
-              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
-                <CheckSquare size={16} className="text-indigo-600" />
-                <span>New Task</span>
-              </h2>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <CheckSquare size={18} />
+                </div>
+                <h3 className="text-base font-extrabold">Create New Task</h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsTaskModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveTask} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleSaveTask} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Task Title *</label>
+                <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider">
+                  Task Title *
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Complete quarterly balance sheet"
+                  placeholder="e.g. Complete financial audit presentation"
                   value={taskTitle}
                   onChange={(e) => setTaskTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-sm font-medium"
+                  autoFocus
+                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Due Date</label>
+                  <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider">
+                    Due Date
+                  </label>
                   <input
                     type="date"
                     value={taskDueDate}
                     onChange={(e) => setTaskDueDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-xs font-medium"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Priority</label>
-                  <div className="relative">
-                    <select
-                      value={taskPriority}
-                      onChange={(e) => setTaskPriority(e.target.value as any)}
-                      className="w-full appearance-none px-3.5 py-2 pr-8 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-xs font-semibold text-slate-800 transition-all cursor-pointer"
-                    >
-                      <option value="low">Low Priority</option>
-                      <option value="medium">Medium Priority</option>
-                      <option value="high">High Priority</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
-                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  </div>
+                  <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider">
+                    Priority
+                  </label>
+                  <CustomSelect
+                    value={taskPriority}
+                    onChange={(val) => setTaskPriority(val as any)}
+                    options={TASK_PRIORITY_OPTIONS}
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Description / Notes</label>
+                <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider">
+                  Description / Context
+                </label>
                 <textarea
                   rows={3}
-                  placeholder="Task context or sub-steps..."
+                  placeholder="Add notes, sub-goals or checklist items..."
                   value={taskDescription}
                   onChange={(e) => setTaskDescription(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-xs"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-normal focus:outline-none resize-none"
                 />
               </div>
 
@@ -987,120 +1022,121 @@ export default function CalendarLightView() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md cursor-pointer"
+                  className="flex-1 py-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold shadow-md shadow-indigo-500/25 cursor-pointer hover:opacity-95 active:scale-95"
                 >
                   Create Task
                 </button>
               </div>
             </form>
-          </div>
+          </motion.div>
         </div>
       )}
 
-      {/* ── 8. Modal: Create / Edit Schedule Event ── */}
+      {/* ── 6. MODAL: CREATE / EDIT SCHEDULE EVENT ── */}
       {isScheduleModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+          data-modal-backdrop="true"
+          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={() => setIsScheduleModalOpen(false)}
         >
-          <div
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 text-slate-900"
+            className="w-full max-w-md rounded-3xl bg-white border border-slate-100 shadow-2xl p-6 text-slate-900 space-y-4"
           >
-            <div className="px-6 pt-5 pb-3 flex items-center justify-between border-b border-slate-100">
-              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
-                <Sparkles size={16} className="text-[#1C73E8]" />
+            <div className="px-1 flex items-center justify-between border-b border-slate-100 pb-3">
+              <h2 className="text-base font-extrabold flex items-center gap-2">
+                <CalendarIcon size={18} className="text-blue-600" />
                 <span>{isEditingSchedule ? 'Edit Schedule Event' : 'New Schedule Event'}</span>
               </h2>
               <button
                 type="button"
                 onClick={() => setIsScheduleModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveSchedule} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleSaveSchedule} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Event Title *</label>
+                <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider">
+                  Event Title *
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Zoom meeting with team"
+                  placeholder="e.g. Zoom sync with product lead"
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-sm font-medium"
+                  className="w-full px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Date</label>
+                  <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider">
+                    Date
+                  </label>
                   <input
                     type="date"
                     required
                     value={formDate}
                     onChange={(e) => setFormDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-xs font-medium"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Time</label>
+                  <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider">
+                    Time
+                  </label>
                   <input
                     type="time"
                     required
                     value={formTime}
                     onChange={(e) => setFormTime(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-xs font-medium"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Recurrence</label>
-                  <div className="relative">
-                    <select
-                      value={formRecurrence}
-                      onChange={(e) => setFormRecurrence(e.target.value)}
-                      className="w-full appearance-none px-3.5 py-2 pr-8 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-xs font-semibold text-slate-800 transition-all cursor-pointer"
-                    >
-                      <option value="none">One-time event</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  </div>
+                  <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider">
+                    Recurrence
+                  </label>
+                  <CustomSelect
+                    value={formRecurrence}
+                    onChange={(val) => setFormRecurrence(val)}
+                    options={RECURRENCE_OPTIONS}
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 font-bold mb-1">Priority</label>
-                  <div className="relative">
-                    <select
-                      value={formPriority}
-                      onChange={(e) => setFormPriority(e.target.value)}
-                      className="w-full appearance-none px-3.5 py-2 pr-8 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-xs font-semibold text-slate-800 transition-all cursor-pointer"
-                    >
-                      <option value="normal">Normal</option>
-                      <option value="high">High Priority</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
-                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  </div>
+                  <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider">
+                    Priority
+                  </label>
+                  <CustomSelect
+                    value={formPriority}
+                    onChange={(val) => setFormPriority(val as any)}
+                    options={PRIORITY_OPTIONS}
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Notes / Details</label>
+                <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider">
+                  Notes / Location
+                </label>
                 <textarea
                   rows={3}
-                  placeholder="Meeting agenda, notes or location..."
+                  placeholder="Meeting agenda, links or location..."
                   value={formNotes}
                   onChange={(e) => setFormNotes(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-xs"
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs focus:outline-none resize-none"
                 />
               </div>
 
@@ -1114,198 +1150,171 @@ export default function CalendarLightView() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-full bg-[#1C73E8] hover:bg-[#1557B0] text-white font-bold shadow-md cursor-pointer"
+                  className="flex-1 py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-500/25 cursor-pointer hover:opacity-95 active:scale-95"
                 >
                   {isEditingSchedule ? 'Save Changes' : 'Create Event'}
                 </button>
               </div>
             </form>
-          </div>
+          </motion.div>
         </div>
       )}
 
-      {/* ── 9. Modal: Event Details ── */}
+      {/* ── 7. MODAL: EVENT DETAILS ── */}
       {isDetailsOpen && selectedEvent && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+          data-modal-backdrop="true"
+          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={() => setIsDetailsOpen(false)}
         >
-          <div
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 text-slate-900"
+            className="w-full max-w-md rounded-3xl bg-white border border-slate-100 shadow-2xl p-6 text-slate-900 space-y-4"
           >
-            <div className="px-6 pt-5 pb-3 flex items-center justify-between border-b border-slate-100">
-              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h2 className="text-sm font-extrabold uppercase tracking-wide">
                 {selectedEvent.itemType === 'task' ? 'Task Details' : 'Event Details'}
               </h2>
               <button
                 type="button"
                 onClick={() => setIsDetailsOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
-              <div className={`p-5 rounded-2xl ${selectedEvent.itemType === 'task' ? 'bg-indigo-50 border border-indigo-200' : 'bg-blue-50 border border-blue-200'} space-y-2.5`}>
-                <h3 className={`text-lg font-bold ${selectedEvent.itemType === 'task' ? 'text-indigo-950' : 'text-blue-950'} leading-snug`}>
-                  {selectedEvent.title}
-                </h3>
-                <div className={`inline-flex items-center gap-2 text-xs font-semibold ${selectedEvent.itemType === 'task' ? 'text-indigo-800' : 'text-blue-800'}`}>
-                  <Clock size={14} className="shrink-0" />
-                  <span>
-                    {selectedEvent.rawDate.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}, {selectedEvent.timeStr}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-3 divide-y divide-slate-100 text-xs">
-                {selectedEvent.itemType === 'reminder' && (
-                  <div className="pt-2 flex items-center justify-between">
-                    <span className="text-slate-400 font-medium">Repeat</span>
-                    <span className="text-slate-800 font-bold capitalize">
-                      {selectedEvent.recurrence && selectedEvent.recurrence !== 'none'
-                        ? `Every ${selectedEvent.recurrence}`
-                        : 'One-time event'}
-                    </span>
-                  </div>
-                )}
-
-                <div className="pt-3 flex items-center justify-between">
-                  <span className="text-slate-400 font-medium">Priority</span>
-                  <span className="text-slate-800 font-bold uppercase">
-                    {selectedEvent.priority || 'Normal'}
-                  </span>
-                </div>
-
-                {selectedEvent.notes && (
-                  <div className="pt-3 space-y-1">
-                    <span className="text-slate-400 font-medium block">Notes & Details</span>
-                    <p className="text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed font-normal">
-                      {selectedEvent.notes}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Bottom Action Buttons */}
-              <div className="flex items-center gap-3 pt-2">
-                {selectedEvent.itemType === 'reminder' && (
-                  <button
-                    type="button"
-                    onClick={() => openEditModal(selectedEvent)}
-                    className="flex-1 py-2.5 rounded-full border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <Edit2 size={14} />
-                    <span>Edit</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => handleDeleteEvent(selectedEvent)}
-                  className="flex-1 py-2.5 rounded-full border border-rose-200 hover:bg-rose-50 text-rose-600 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Trash2 size={14} />
-                  <span>Delete</span>
-                </button>
+            <div className={`p-4.5 rounded-2xl ${selectedEvent.itemType === 'task' ? 'bg-indigo-50 border border-indigo-200' : 'bg-blue-50 border border-blue-200'} space-y-2`}>
+              <h3 className="text-base font-extrabold leading-snug">
+                {selectedEvent.title}
+              </h3>
+              <div className="inline-flex items-center gap-1.5 text-xs font-semibold opacity-90">
+                <Clock size={14} />
+                <span>
+                  {selectedEvent.rawDate.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}, {selectedEvent.timeStr}
+                </span>
               </div>
             </div>
-          </div>
+
+            <div className="space-y-2.5 text-xs">
+              {selectedEvent.notes && (
+                <div className="space-y-1">
+                  <span className="text-slate-400 font-bold uppercase tracking-wider block">Notes</span>
+                  <p className="p-3 rounded-xl bg-slate-50 border border-slate-100 leading-relaxed font-normal">
+                    {selectedEvent.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              {selectedEvent.itemType === 'reminder' && (
+                <button
+                  type="button"
+                  onClick={() => openEditModal(selectedEvent)}
+                  className="flex-1 py-2.5 rounded-full border border-slate-200 hover:bg-slate-50 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Edit2 size={14} />
+                  <span>Edit</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleDeleteEvent(selectedEvent)}
+                className="flex-1 py-2.5 rounded-full border border-rose-200 hover:bg-rose-50 text-rose-600 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Trash2 size={14} />
+                <span>Delete</span>
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
 
-      {/* ── 10. Modal: Selected Day Agenda Pop-up ── */}
+      {/* ── 8. MODAL: DAY AGENDA POP-UP ── */}
       {isDayAgendaModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
+          data-modal-backdrop="true"
+          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={() => setIsDayAgendaModalOpen(false)}
         >
-          <div
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 text-slate-900"
+            className="w-full max-w-md rounded-3xl bg-white border border-slate-100 shadow-2xl p-6 text-slate-900 space-y-4"
           >
-            <div className="px-6 pt-5 pb-3 flex items-center justify-between border-b border-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
-                <CalendarIcon size={18} className="text-[#1C73E8]" />
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                <CalendarIcon size={18} className="text-blue-600" />
+                <h2 className="text-sm font-extrabold uppercase tracking-wide">
                   {selectedDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setIsDayAgendaModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">
-                  {filteredEvents.filter((e) => isSameDay(e.rawDate, selectedDate)).length} items scheduled
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsDayAgendaModalOpen(false);
-                    handleOpenPlusOptions();
-                  }}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 text-[#1C73E8] text-xs font-bold transition-all cursor-pointer"
-                >
-                  <Plus size={13} strokeWidth={2.5} />
-                  <span>New Item</span>
-                </button>
-              </div>
-
-              <div className="space-y-2.5 max-h-72 overflow-y-auto no-scrollbar">
-                {filteredEvents.filter((e) => isSameDay(e.rawDate, selectedDate)).length > 0 ? (
-                  filteredEvents
-                    .filter((e) => isSameDay(e.rawDate, selectedDate))
-                    .map((ev) => (
-                      <div
-                        key={ev.id}
-                        onClick={() => {
-                          setIsDayAgendaModalOpen(false);
-                          setSelectedEvent(ev);
-                          setIsDetailsOpen(true);
-                        }}
-                        className={`p-3.5 rounded-2xl border ${ev.colorBg} ${ev.colorBorder} ${ev.colorText} flex items-center justify-between cursor-pointer hover:shadow-xs transition-all`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-9 h-9 rounded-xl bg-white/80 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                            {ev.itemType === 'task' ? <CheckSquare size={17} /> : <CalendarIcon size={17} />}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold truncate">{ev.title}</p>
-                            <p className="text-xs opacity-80 mt-0.5">{ev.timeStr} {ev.notes ? `· ${ev.notes}` : ''}</p>
-                          </div>
-                        </div>
-                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-white/70 uppercase shrink-0 ml-2">
-                          {ev.itemType}
-                        </span>
+            <div className="space-y-2.5 max-h-72 overflow-y-auto no-scrollbar">
+              {filteredEvents
+                .filter((e) => isSameDay(e.rawDate, selectedDate))
+                .map((ev) => (
+                  <div
+                    key={ev.id}
+                    onClick={() => {
+                      setIsDayAgendaModalOpen(false);
+                      setSelectedEvent(ev);
+                      setIsDetailsOpen(true);
+                    }}
+                    className={`p-3.5 rounded-2xl border ${ev.colorBg} ${ev.colorBorder} ${ev.colorText} flex items-center justify-between cursor-pointer hover:shadow-xs transition-all`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-white/90 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                        {ev.itemType === 'task' ? <CheckSquare size={17} /> : <CalendarIcon size={17} />}
                       </div>
-                    ))
-                ) : (
-                  <p className="text-xs text-slate-400 italic py-6 text-center">
-                    No events or tasks scheduled for this day
-                  </p>
-                )}
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsDayAgendaModalOpen(false)}
-                  className="px-5 py-2 rounded-full border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold truncate">{ev.title}</p>
+                        <p className="text-xs opacity-80 mt-0.5">{ev.timeStr} {ev.notes ? `· ${ev.notes}` : ''}</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-white/80 uppercase shrink-0 ml-2">
+                      {ev.itemType}
+                    </span>
+                  </div>
+                ))}
             </div>
-          </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDayAgendaModalOpen(false);
+                  openScheduleCreateModal();
+                }}
+                className="px-4 py-2 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+              >
+                <Plus size={14} />
+                <span>Add Item</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsDayAgendaModalOpen(false)}
+                className="px-5 py-2 rounded-full border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
 

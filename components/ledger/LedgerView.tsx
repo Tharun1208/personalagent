@@ -40,6 +40,11 @@ const LEDGER_CATEGORIES: SelectOption[] = [
   { value: 'loan', label: 'Loan / Borrowed' },
 ];
 
+const DUE_TYPE_OPTIONS: SelectOption[] = [
+  { value: 'give', label: 'You Owe (Give)', badgeColor: '#EA580C' },
+  { value: 'receive', label: 'Owed to You (Receive)', badgeColor: '#10B981' },
+];
+
 // ── Daily Spending Types ──────────────────────────────────────────────────────
 interface SpendingEntry {
   id: string;
@@ -63,6 +68,12 @@ const SPENDING_CATEGORIES = [
   { key: 'phone',     label: 'Phone & Internet', icon: Smartphone,    color: '#06B6D4', bg: 'bg-cyan-500' },
   { key: 'other',     label: 'Other',            icon: MoreHorizontal,color: '#94A3B8', bg: 'bg-slate-400' },
 ] as const;
+
+const SPENDING_SELECT_OPTIONS: SelectOption[] = SPENDING_CATEGORIES.map((c) => ({
+  value: c.key,
+  label: c.label,
+  badgeColor: c.color,
+}));
 
 const getCatMeta = (key: string) =>
   SPENDING_CATEGORIES.find((c) => c.key === key) ?? SPENDING_CATEGORIES[SPENDING_CATEGORIES.length - 1];
@@ -697,14 +708,11 @@ export default function LedgerView() {
 
                 <div>
                   <label className="block text-slate-700 font-bold mb-1">Type</label>
-                  <select
+                  <CustomSelect
                     value={dueType}
-                    onChange={(e) => setDueType(e.target.value as any)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:outline-none focus:bg-white"
-                  >
-                    <option value="give">You Owe (Give)</option>
-                    <option value="receive">Owed to You (Receive)</option>
-                  </select>
+                    onChange={(val) => setDueType(val as any)}
+                    options={DUE_TYPE_OPTIONS}
+                  />
                 </div>
               </div>
 
@@ -720,15 +728,11 @@ export default function LedgerView() {
                 </div>
                 <div>
                   <label className="block text-slate-700 font-bold mb-1">Category</label>
-                  <select
+                  <CustomSelect
                     value={dueCategory}
-                    onChange={(e) => setDueCategory(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:outline-none focus:bg-white"
-                  >
-                    {LEDGER_CATEGORIES.map((c) => (
-                      <option key={c.value} value={c.value}>{c.label}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setDueCategory(val)}
+                    options={LEDGER_CATEGORIES}
+                  />
                 </div>
               </div>
 
@@ -766,6 +770,7 @@ export default function LedgerView() {
       {/* ── Modal: Add Daily Expense ── */}
       {isExpenseModalOpen && (
         <div
+          data-modal-backdrop="true"
           className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={() => setIsExpenseModalOpen(false)}
         >
@@ -803,15 +808,11 @@ export default function LedgerView() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-700 font-bold mb-1">Category</label>
-                  <select
+                  <CustomSelect
                     value={expCategory}
-                    onChange={(e) => setExpCategory(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:outline-none focus:bg-white"
-                  >
-                    {SPENDING_CATEGORIES.map((c) => (
-                      <option key={c.key} value={c.key}>{c.label}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setExpCategory(val)}
+                    options={SPENDING_SELECT_OPTIONS}
+                  />
                 </div>
 
                 <div>
