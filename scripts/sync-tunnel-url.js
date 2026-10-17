@@ -60,7 +60,7 @@ const configContent = `import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.assistance.ai',
   appName: 'Personal Agent',
-  webDir: 'public',
+  webDir: 'out',
   server: {
     // Public Cloudflare tunnel URL — works on all networks globally
     url: '${tunnelUrl}',

@@ -53,7 +53,7 @@ const configContent = `import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.assistance.ai',
   appName: 'Personal Agent',
-  webDir: 'public',
+  webDir: 'out',
   server: {
     // Points the Android WebView to the Next.js dev server on the LAN.
     // Change to your Vercel/production URL for a release build.

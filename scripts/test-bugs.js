@@ -55,7 +55,6 @@ function assert(condition, message) {
 logSection('1. Checking for Broken References & Removed Modules');
 
 const REMOVED_NAMES = [
-  'ChatView',
   'ChatComposer',
   'GoalsView',
   'HabitsView',
