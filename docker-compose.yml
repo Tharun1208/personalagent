@@ -1,0 +1,18 @@
+services:
+  personal-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: personal-agent:latest
+    container_name: personal-agent
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
