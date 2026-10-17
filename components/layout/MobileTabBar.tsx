@@ -102,7 +102,8 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {
     commandPaletteOpen ||
     notificationDrawerOpen ||
     !!confirmDialog?.isOpen ||
-    activeTab === 'notifications';
+    activeTab === 'notifications' ||
+    activeTab === 'chat';
 
   const navItems: NavItem[] = [
     {

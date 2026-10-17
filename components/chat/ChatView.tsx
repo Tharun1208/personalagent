@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   XCircle,
   ArrowDownToLine,
+  ArrowLeft,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { apiFetch, safeJson } from '@/lib/api';
@@ -43,6 +44,7 @@ export default function ChatView() {
     activeConversationId,
     conversations,
     showToast,
+    setActiveTab,
   } = useApp() as any;
 
   const [input, setInput] = useState('');
@@ -100,7 +102,16 @@ export default function ChatView() {
     <div className="flex-1 flex flex-col h-full bg-transparent overflow-hidden">
       {/* Header */}
       <div className="shrink-0 px-4 sm:px-8 py-3.5 border-b border-white/60 bg-white/70 backdrop-blur-2xl flex items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => setActiveTab('dashboard')}
+            className="md:hidden p-2 -ml-1.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+            title="Back to Home"
+            aria-label="Back to Home"
+          >
+            <ArrowLeft size={19} className="stroke-[2.2]" />
+          </button>
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-sky-500 text-white flex items-center justify-center shadow-md shadow-indigo-600/25 shrink-0">
             <Bot size={22} className="stroke-[2.2]" />
           </div>
