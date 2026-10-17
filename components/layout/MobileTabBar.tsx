@@ -6,7 +6,7 @@ import {
   Home,
   CheckSquare,
   Wallet,
-  Calendar,
+  Bot,
   type LucideIcon,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
@@ -34,17 +34,16 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {
   } = useApp();
 
   const [hasDomModal, setHasDomModal] = useState(false);
+  const [isTypingInNotes, setIsTypingInNotes] = useState(false);
 
   // Check for any open pop-up / modal in context or DOM
   useEffect(() => {
     const checkDomModals = () => {
-      // Find any modal backdrops or active dialogs in the DOM
       const backdrops = document.querySelectorAll(
-        '.fixed.inset-0:not(.pointer-events-none):not(#animated-bottom-bar-container), [role="dialog"], [data-modal-backdrop="true"], .animate-top-modal'
+        '.fixed.inset-0:not(.pointer-events-none):not(#animated-bottom-bar-container), [role="dialog"], [data-modal-backdrop="true"], .animate-top-modal, [data-notes-editor="true"], [data-hide-bottom-bar="true"]'
       );
       let isOpen = false;
       backdrops.forEach((el) => {
-        // Exclude the bottom bar itself
         if (el.closest('#animated-bottom-bar-container')) return;
         const style = window.getComputedStyle(el);
         if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
@@ -54,16 +53,28 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {
       setHasDomModal(isOpen);
     };
 
-    // Initial check
-    checkDomModals();
+    const handleFocusChange = () => {
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT') &&
+        (activeEl.closest('[data-notes-view="true"]') || activeEl.closest('[data-notes-editor="true"]'))
+      ) {
+        setIsTypingInNotes(true);
+      } else {
+        setIsTypingInNotes(false);
+      }
+    };
 
-    // DOM observer to react immediately when modals are mounted/unmounted
+    checkDomModals();
+    handleFocusChange();
+
     const observer = new MutationObserver(checkDomModals);
     observer.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'style', 'data-modal-backdrop'],
+      attributeFilter: ['class', 'style', 'data-modal-backdrop', 'data-notes-editor'],
     });
 
     const handleCustomEvent = (e: any) => {
@@ -73,16 +84,20 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {
     };
 
     window.addEventListener('app_modal_state', handleCustomEvent);
+    document.addEventListener('focusin', handleFocusChange);
+    document.addEventListener('focusout', handleFocusChange);
 
     return () => {
       observer.disconnect();
       window.removeEventListener('app_modal_state', handleCustomEvent);
+      document.removeEventListener('focusin', handleFocusChange);
+      document.removeEventListener('focusout', handleFocusChange);
     };
   }, []);
 
-  // Is any modal currently open or is active view one that hides bottom bar?
   const isAnyModalOpen =
     hasDomModal ||
+    isTypingInNotes ||
     authModalOpen ||
     commandPaletteOpen ||
     notificationDrawerOpen ||
@@ -112,11 +127,11 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {
       activeBg: 'bg-[#0E9488]/15',
     },
     {
-      key: 'calendar',
-      label: 'Calendar',
-      icon: Calendar,
-      activeColor: 'text-[#0284C7]',
-      activeBg: 'bg-[#0284C7]/15',
+      key: 'chat',
+      label: 'AI',
+      icon: Bot,
+      activeColor: 'text-[#1C73E8]',
+      activeBg: 'bg-[#1C73E8]/15',
     },
   ];
 
@@ -141,66 +156,66 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {
             transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
             className="md:hidden fixed bottom-5 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none safe-area-bottom select-none"
           >
-            {/* ── Exact Re-creation of original-fd08cffe70a8d2d872c30e33f6165690.gif ── */}
+            {/* ── Exact Light Theme Bottom Navigation Bar with Expanding Active Pill ── */}
             <LayoutGroup id="animated-bottom-bar">
               <nav className="pointer-events-auto relative flex items-center justify-between bg-white px-3 py-2.5 rounded-[32px] shadow-[0_16px_40px_rgba(0,0,0,0.08),0_4px_12px_rgba(0,0,0,0.03)] border border-slate-100 max-w-md w-full">
-              {navItems.map((item) => {
-                const isActive = activeTab === item.key;
-                const Icon = item.icon;
+                {navItems.map((item) => {
+                  const isActive = activeTab === item.key;
+                  const Icon = item.icon;
 
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setActiveTab(item.key as any)}
-                    className={`relative flex items-center justify-center py-2.5 rounded-full transition-colors duration-200 cursor-pointer active:scale-95 ${
-                      isActive ? 'px-4' : 'px-3 text-slate-800 hover:text-slate-900'
-                    }`}
-                  >
-                    {/* Animated Sliding Pill Highlight */}
-                    {isActive && (
-                      <motion.div
-                        layoutId="active-nav-pill"
-                        transition={{
-                          type: 'spring',
-                          stiffness: 420,
-                          damping: 32,
-                        }}
-                        className={`absolute inset-0 rounded-full ${item.activeBg}`}
-                      />
-                    )}
-
-                    {/* Content: Icon + Label (Label expands smoothly when active) */}
-                    <div
-                      className={`relative z-10 flex items-center gap-2 ${
-                        isActive ? item.activeColor : 'text-slate-800'
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setActiveTab(item.key as any)}
+                      className={`relative flex items-center justify-center py-2.5 rounded-full transition-colors duration-200 cursor-pointer active:scale-95 ${
+                        isActive ? 'px-4' : 'px-3 text-slate-800 hover:text-slate-900'
                       }`}
                     >
-                      <Icon
-                        size={20}
-                        className={`shrink-0 transition-transform duration-200 ${
-                          isActive ? 'stroke-[2.5]' : 'stroke-[2]'
-                        }`}
-                      />
-
+                      {/* Animated Sliding Pill Highlight */}
                       {isActive && (
-                        <motion.span
-                          initial={{ opacity: 0, width: 0 }}
-                          animate={{ opacity: 1, width: 'auto' }}
-                          exit={{ opacity: 0, width: 0 }}
-                          transition={{ duration: 0.22, ease: 'easeOut' }}
-                          className="text-[13.5px] font-bold tracking-tight whitespace-nowrap overflow-hidden"
-                        >
-                          {item.label}
-                        </motion.span>
+                        <motion.div
+                          layoutId="active-nav-pill"
+                          transition={{
+                            type: 'spring',
+                            stiffness: 420,
+                            damping: 32,
+                          }}
+                          className={`absolute inset-0 rounded-full ${item.activeBg}`}
+                        />
                       )}
-                    </div>
-                  </button>
-                );
-              })}
-            </nav>
-          </LayoutGroup>
-        </motion.div>
+
+                      {/* Content: Icon + Label (Label expands smoothly when active) */}
+                      <div
+                        className={`relative z-10 flex items-center gap-2 ${
+                          isActive ? item.activeColor : 'text-slate-800'
+                        }`}
+                      >
+                        <Icon
+                          size={20}
+                          className={`shrink-0 transition-transform duration-200 ${
+                            isActive ? 'stroke-[2.5]' : 'stroke-[2]'
+                          }`}
+                        />
+
+                        {isActive && (
+                          <motion.span
+                            initial={{ opacity: 0, width: 0 }}
+                            animate={{ opacity: 1, width: 'auto' }}
+                            exit={{ opacity: 0, width: 0 }}
+                            transition={{ duration: 0.22, ease: 'easeOut' }}
+                            className="text-[13.5px] font-bold tracking-tight whitespace-nowrap overflow-hidden"
+                          >
+                            {item.label}
+                          </motion.span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </nav>
+            </LayoutGroup>
+          </motion.div>
         </>
       )}
     </AnimatePresence>

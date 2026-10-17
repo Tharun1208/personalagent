@@ -87,11 +87,11 @@ export default function CustomConfirmModal({ dialog, onClose }: CustomConfirmMod
   return (
     <div
       data-modal-backdrop="true"
-      className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-12 sm:pt-16 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md bg-(--bg-card) border border-(--border-subtle) rounded-3xl shadow-2xl p-6 overflow-hidden animate-top-modal text-(--text-primary)"
+        className="w-full max-w-md transio-glass-card bg-white/95 backdrop-blur-2xl border border-white/80 rounded-[28px] shadow-2xl p-6 overflow-hidden animate-in zoom-in-95 duration-200 text-slate-900"
       >
         <div className="flex items-start gap-4">
           {getIcon()}

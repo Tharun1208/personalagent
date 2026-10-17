@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   Bell,
   X,
   ArrowRight,
   Trash2,
-  CheckCheck,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '@/lib/context/AppContext';
@@ -23,21 +22,21 @@ export default function NotificationDrawer() {
     setActiveTab,
   } = useApp();
 
-  const [activeFilter, setActiveFilter] = useState<'all' | 'unread'>('all');
-  const [showAllView, setShowAllView] = useState(false);
+  const uniqueNotifications = useMemo(() => {
+    const map = new Map<string, any>();
+    notifications.forEach((n) => {
+      if (n && n.id) map.set(n.id, n);
+    });
+    return Array.from(map.values());
+  }, [notifications]);
+
+  const unreadCount = uniqueNotifications.filter((n) => !n.read).length;
+
+  const filteredNotifications = useMemo(() => uniqueNotifications, [uniqueNotifications]);
+
+  const displayedNotifications = filteredNotifications;
 
   if (!notificationDrawerOpen) return null;
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  const filteredNotifications = notifications.filter((n) => {
-    if (activeFilter === 'unread') return !n.read;
-    return true;
-  });
-
-  const displayedNotifications = showAllView
-    ? filteredNotifications
-    : filteredNotifications.slice(0, 5);
 
   const getAvatarForNotif = (notif: any) => {
     const title = (notif.title || '').toLowerCase();
@@ -67,10 +66,10 @@ export default function NotificationDrawer() {
         emoji: '🐶',
       };
     }
-    if (type === 'reminder' || title.includes('reminder') || title.includes('alarm')) {
+    if (type === 'reminder' || title.includes('reminder')) {
       return {
-        bg: 'bg-rose-100 text-rose-900 border-rose-200',
-        emoji: '⏰',
+        bg: 'bg-blue-100 text-blue-900 border-blue-200',
+        emoji: '🔔',
       };
     }
     if (type === 'task_deadline' || title.includes('task')) {
@@ -150,46 +149,7 @@ export default function NotificationDrawer() {
           </div>
         </div>
 
-        {/* Segmented Tab Switcher (ALL / UNREAD) */}
-        <div className="px-6 pb-3">
-          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/70">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveFilter('all');
-                setShowAllView(false);
-              }}
-              className={`flex-1 py-2 text-center text-xs font-extrabold rounded-xl transition-all cursor-pointer ${
-                activeFilter === 'all'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              ALL
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveFilter('unread');
-                setShowAllView(false);
-              }}
-              className={`flex-1 py-2 text-center text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeFilter === 'unread'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <span>UNREAD</span>
-              {unreadCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-bold">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Notification Items List */}
+        {/*{ Notification Items List */}
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100 custom-scrollbar max-h-[380px]">
           {displayedNotifications.length === 0 ? (
             <div className="py-14 text-center px-6">
@@ -197,20 +157,18 @@ export default function NotificationDrawer() {
                 🔔
               </div>
               <h3 className="text-sm font-bold text-slate-900 mb-1">
-                {activeFilter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
+                No notifications yet
               </h3>
               <p className="text-xs text-slate-500">
-                {activeFilter === 'unread'
-                  ? "You've read all your notifications."
-                  : 'Important updates and scheduled reminders will appear here.'}
+                Important updates and scheduled reminders will appear here.
               </p>
             </div>
           ) : (
-            displayedNotifications.map((notif) => {
+            displayedNotifications.map((notif, index) => {
               const avatar = getAvatarForNotif(notif);
               return (
                 <div
-                  key={notif.id}
+                  key={`${notif.id}_${index}`}
                   onClick={() => handleAction(notif)}
                   className={`px-6 py-4 flex items-center gap-3.5 transition-colors cursor-pointer group relative ${
                     !notif.read ? 'bg-blue-50/30 hover:bg-blue-50/50' : 'bg-white hover:bg-slate-50'
@@ -269,28 +227,9 @@ export default function NotificationDrawer() {
           )}
         </div>
 
-        {/* Footer: "See all" or "Clear all" */}
-        {filteredNotifications.length > 5 && !showAllView ? (
-          <div className="border-t border-slate-100 bg-slate-50/60 text-center">
-            <button
-              type="button"
-              onClick={() => setShowAllView(true)}
-              className="w-full py-3.5 text-xs sm:text-sm font-extrabold text-slate-800 hover:text-slate-950 hover:bg-slate-100/70 transition-colors cursor-pointer"
-            >
-              See all ({filteredNotifications.length})
-            </button>
-          </div>
-        ) : filteredNotifications.length > 0 ? (
+        {/* Footer: "Clear all" */}
+        {filteredNotifications.length > 0 ? (
           <div className="border-t border-slate-100 px-6 py-3 bg-slate-50/50 flex items-center justify-between text-xs">
-            {showAllView && (
-              <button
-                type="button"
-                onClick={() => setShowAllView(false)}
-                className="font-bold text-slate-600 hover:text-slate-900 cursor-pointer"
-              >
-                Show less
-              </button>
-            )}
             <button
               type="button"
               onClick={clearAllNotifications}

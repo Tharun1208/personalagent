@@ -30,13 +30,13 @@ export default function TopNavbar({
   } = useApp();
 
   return (
-    <header className="h-14 md:h-16 px-3.5 sm:px-6 border-b border-(--border-subtle)/50 flex items-center justify-between shrink-0 bg-(--bg-primary)/90 backdrop-blur-xl z-30 select-none">
+    <header className="h-14 md:h-16 px-3.5 sm:px-6 border-b border-white/60 flex items-center justify-between shrink-0 bg-white/70 backdrop-blur-2xl z-30 select-none shadow-[0_1px_15px_rgba(0,0,0,0.03)]">
       {/* Left Area: Distinct Sidebar Toggle & Branding */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {/* Mobile Sidebar Toggle Button */}
         <button
           onClick={onOpenMobileMenu}
-          className="md:hidden p-2 rounded-2xl bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-elevated) transition-all cursor-pointer shadow-2xs flex items-center justify-center active:scale-95 group"
+          className="md:hidden p-2 rounded-2xl bg-white/70 backdrop-blur-md border border-white/80 text-slate-700 hover:text-slate-900 hover:bg-white/95 transition-all cursor-pointer shadow-2xs flex items-center justify-center active:scale-95 group"
           title="Open Navigation Menu"
         >
           <AlignLeft size={18} className="text-[#4E82EE] group-hover:scale-110 transition-transform" />
@@ -46,7 +46,7 @@ export default function TopNavbar({
         {sidebarCollapsed && (
           <button
             onClick={onToggleSidebar}
-            className="hidden md:flex p-2 rounded-2xl bg-(--bg-card) border border-(--border-subtle) text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-elevated) transition-all cursor-pointer shadow-2xs items-center justify-center mr-1 group active:scale-95"
+            className="hidden md:flex p-2 rounded-2xl bg-white/70 backdrop-blur-md border border-white/80 text-slate-700 hover:text-slate-900 hover:bg-white/95 transition-all cursor-pointer shadow-2xs items-center justify-center mr-1 group active:scale-95"
             title="Expand Sidebar"
           >
             <AlignLeft size={18} className="text-[#4E82EE] group-hover:scale-110 transition-transform" />
@@ -104,7 +104,7 @@ export default function TopNavbar({
         {/* User Profile Avatar */}
         <button
           onClick={() => setActiveTab('settings')}
-          className="flex items-center gap-2 pl-1 sm:pl-1.5 pr-1 sm:pr-3 py-1 rounded-full bg-(--bg-card) border border-(--border-subtle) hover:border-[#4E82EE]/40 transition-all cursor-pointer shadow-2xs group active:scale-95"
+          className="flex items-center gap-2 pl-1 sm:pl-1.5 pr-1 sm:pr-3 py-1 rounded-full bg-white/70 backdrop-blur-md border border-white/80 hover:border-[#4E82EE]/40 transition-all cursor-pointer shadow-2xs group active:scale-95"
           title={`Profile: ${user?.name || 'User'} (Click to open Settings)`}
         >
           <div className="relative shrink-0">

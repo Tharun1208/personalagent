@@ -111,20 +111,79 @@ export default function SplashScreen({
             </motion.div>
           </motion.div>
 
-          {/* Bottom pulse loading bar */}
-          <motion.div
-            initial={{ opacity: 0, scaleX: 0 }}
-            animate={{ opacity: phase === 'slide-up' ? 0 : 1, scaleX: 1 }}
-            transition={{ delay: 0.35, duration: 0.8, ease: 'easeInOut' }}
-            className="absolute bottom-12 w-36 h-1.5 rounded-full bg-slate-100 overflow-hidden shadow-2xs"
-          >
+          {/* Google-Style 4-Color Animated Bouncing Dots & Minimal Loading Bar */}
+          <div className="absolute bottom-14 flex flex-col items-center gap-4">
+            {/* 4 Google-style colored pulsing dots */}
+            <div className="flex items-center gap-2.5">
+              <motion.span
+                animate={{
+                  y: [0, -9, 0],
+                  scale: [1, 1.25, 1],
+                }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 0.9,
+                  ease: 'easeInOut',
+                  delay: 0,
+                }}
+                className="w-3 h-3 rounded-full bg-[#4285F4] shadow-sm shadow-blue-500/40"
+              />
+              <motion.span
+                animate={{
+                  y: [0, -9, 0],
+                  scale: [1, 1.25, 1],
+                }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 0.9,
+                  ease: 'easeInOut',
+                  delay: 0.18,
+                }}
+                className="w-3 h-3 rounded-full bg-[#EA4335] shadow-sm shadow-red-500/40"
+              />
+              <motion.span
+                animate={{
+                  y: [0, -9, 0],
+                  scale: [1, 1.25, 1],
+                }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 0.9,
+                  ease: 'easeInOut',
+                  delay: 0.36,
+                }}
+                className="w-3 h-3 rounded-full bg-[#FBBC05] shadow-sm shadow-amber-500/40"
+              />
+              <motion.span
+                animate={{
+                  y: [0, -9, 0],
+                  scale: [1, 1.25, 1],
+                }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 0.9,
+                  ease: 'easeInOut',
+                  delay: 0.54,
+                }}
+                className="w-3 h-3 rounded-full bg-[#34A853] shadow-sm shadow-emerald-500/40"
+              />
+            </div>
+
+            {/* Micro loading progress pill */}
             <motion.div
-              initial={{ x: '-100%' }}
-              animate={{ x: '100%' }}
-              transition={{ repeat: Infinity, duration: 1.1, ease: 'linear' }}
-              className="w-full h-full bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 rounded-full"
-            />
-          </motion.div>
+              initial={{ opacity: 0, scaleX: 0 }}
+              animate={{ opacity: phase === 'slide-up' ? 0 : 1, scaleX: 1 }}
+              transition={{ delay: 0.3, duration: 0.6 }}
+              className="w-32 h-1 rounded-full bg-slate-100 overflow-hidden"
+            >
+              <motion.div
+                initial={{ x: '-100%' }}
+                animate={{ x: '100%' }}
+                transition={{ repeat: Infinity, duration: 1.2, ease: 'easeInOut' }}
+                className="w-full h-full bg-gradient-to-r from-[#4285F4] via-[#EA4335] via-[#FBBC05] to-[#34A853] rounded-full"
+              />
+            </motion.div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

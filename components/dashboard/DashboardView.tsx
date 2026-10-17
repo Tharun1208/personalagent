@@ -2,29 +2,28 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  Wifi,
-  MoreHorizontal,
-  Plus,
+  Bot,
+  Send,
+  Loader2,
   CheckCircle2,
   Calendar,
   Clock,
   CheckSquare,
-  Sparkles,
   ArrowRight,
   ArrowUpRight,
   TrendingUp,
-  Zap,
-  Sliders,
-  QrCode,
-  Layers,
-  Lightbulb,
-  Radio,
-  Wind,
   Wallet,
   FileText,
   IndianRupee,
+  Plus,
+  Flame,
+  ChevronRight,
+  MessageSquare,
+  Bell,
+  Search,
+  Edit2,
 } from 'lucide-react';
-import { useApp, AppTab } from '@/lib/context/AppContext';
+import { useApp } from '@/lib/context/AppContext';
 
 // Storage key used across the application for daily spending entries
 const SPENDING_STORAGE_KEY = 'assistance_daily_spending';
@@ -68,22 +67,67 @@ function loadSpending(): SpendingEntry[] {
   }
 }
 
+const ASSISTANCE_PROMPT_CHIPS = [
+  { label: '⚡ Summarize today', prompt: 'Summarize my priorities and schedule for today' },
+  { label: '📋 Pending tasks', prompt: 'What tasks are pending and high priority?' },
+  { label: '📅 Upcoming events', prompt: 'What is on my calendar this week?' },
+  { label: '💰 Check dues', prompt: 'How much do people owe me and what do I owe?' },
+  { label: '📝 Quick note', prompt: "Take a quick note for me about today's key goals" },
+];
+
 export default function DashboardView() {
   const {
+    user,
     tasks,
     ledgerEntries,
     reminders,
     setActiveTab,
     toggleTask,
+    sendMessage,
+    isSending,
   } = useApp();
 
+  const [quickPrompt, setQuickPrompt] = useState('');
   const [spendingEntries, setSpendingEntries] = useState<SpendingEntry[]>(loadSpending);
   const [localNoteCount, setLocalNoteCount] = useState<number>(0);
+  const [todayReminders, setTodayReminders] = useState<number>(0);
 
-  // Toggle states for the bento cards
-  const [socketToggle, setSocketToggle] = useState(true);
-  const [purifierToggle, setPurifierToggle] = useState(false);
-  const [lampToggle, setLampToggle] = useState(true);
+  // Dynamic greeting based on current hour
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+
+  // Today's formatted display date
+  const todayFormatted = useMemo(() => {
+    return new Date().toLocaleDateString(undefined, {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+    });
+  }, []);
+
+  const handleQuickSend = async (textToSend?: string) => {
+    const text = (textToSend || quickPrompt).trim();
+    if (!text || isSending) return;
+    setQuickPrompt('');
+    setActiveTab('chat');
+    await sendMessage(text);
+  };
+
+  // Calculate today's reminders count
+  useEffect(() => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const count =
+      reminders?.filter((r) => {
+        const due = r.dueDateTime;
+        return due && new Date(due).toISOString().startsWith(todayStr);
+      }).length || 0;
+    setTodayReminders(count);
+  }, [reminders]);
 
   // Sync latest spending and note counts from localStorage and realtime window events
   const syncStorageData = useCallback(() => {
@@ -114,46 +158,19 @@ export default function DashboardView() {
   }, [syncStorageData]);
 
   // ── 1. KPI Counts ──────────────────────────────────────────────────
-  const pendingTasksList = tasks.filter((t) => t.status !== 'completed');
-  const completedTasksList = tasks.filter((t) => t.status === 'completed');
+  const pendingTasksList = useMemo(() => tasks.filter((t) => t.status !== 'completed'), [tasks]);
+  const completedTasksList = useMemo(() => tasks.filter((t) => t.status === 'completed'), [tasks]);
   const pendingTasks = pendingTasksList.length;
   const totalNotes = localNoteCount;
-  const pendingDues = (ledgerEntries || []).filter((e) => e.status === 'pending');
-  const totalDueAmount = pendingDues.reduce((sum, e) => sum + (e.amount - (e.paidAmount || 0)), 0);
+  const pendingDues = useMemo(() => (ledgerEntries || []).filter((e) => e.status === 'pending'), [ledgerEntries]);
+  const totalDueAmount = useMemo(() => {
+    return pendingDues.reduce((sum, e) => sum + (e.amount - (e.paidAmount || 0)), 0);
+  }, [pendingDues]);
 
-  // ── 1.1 7-Day Activity Pill Heights for Hero Lime Card ─────────────
-  const weekDayStats = useMemo(() => {
-    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-    const todayDay = new Date().getDay();
-    const counts = [0, 0, 0, 0, 0, 0, 0];
-
-    // Compute task counts across days of week
-    tasks.forEach((t) => {
-      const dateStr = t.dueDate || t.createdAt || (t as any).updatedAt;
-      if (dateStr) {
-        const d = new Date(dateStr);
-        if (!isNaN(d.getTime())) {
-          counts[d.getDay()] += 1;
-        }
-      }
-    });
-
-    const maxCount = Math.max(...counts, 1);
-
-    return days.map((day, idx) => {
-      const isToday = idx === todayDay;
-      const count = counts[idx];
-      // Normalize height between 35% and 92%
-      const pct = Math.round(35 + (count / maxCount) * 55);
-      const height = `${Math.min(95, Math.max(30, count === 0 ? (isToday ? 85 : 45 + (idx * 7) % 35) : pct))}%`;
-      return {
-        day,
-        height,
-        count,
-        isHatched: isToday,
-      };
-    });
-  }, [tasks]);
+  const taskCompletionRate = useMemo(() => {
+    if (tasks.length === 0) return 0;
+    return Math.round((completedTasksList.length / tasks.length) * 100);
+  }, [tasks.length, completedTasksList.length]);
 
   // ── 2. Real Daily Spending Graph (Pulled from Ledger / Daily Spending) ──
   const last7DaysKeys = useMemo(() => {
@@ -169,8 +186,10 @@ export default function DashboardView() {
 
   const dailyTotals = useMemo(() => {
     const map: Record<string, number> = {};
-    last7DaysKeys.forEach((d) => { map[d] = 0; });
-    
+    last7DaysKeys.forEach((d) => {
+      map[d] = 0;
+    });
+
     spendingEntries.forEach((e) => {
       const d = normalizeDateStr(e.date) || normalizeDateStr(e.createdAt);
       if (d && map[d] !== undefined) {
@@ -217,17 +236,35 @@ export default function DashboardView() {
       return { x, y, val, date: dateStr, dayLabel };
     });
 
-    const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-    const areaD = `${pathD} L ${pts[pts.length - 1].x.toFixed(1)} ${height} L ${pts[0].x.toFixed(1)} ${height} Z`;
+    // Smooth cubic bezier spline through points
+    let smoothD = '';
+    if (pts.length > 0) {
+      smoothD = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i === 0 ? 0 : i - 1];
+        const p1 = pts[i];
+        const p2 = pts[i + 1];
+        const p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
 
-    return { pts, pathD, areaD, width, height };
+        const cp1x = p1.x + (p2.x - p0.x) / 6;
+        const cp1y = p1.y + (p2.y - p0.y) / 6;
+        const cp2x = p2.x - (p3.x - p1.x) / 6;
+        const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+        smoothD += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+      }
+    }
+
+    const areaD = `${smoothD} L ${pts[pts.length - 1].x.toFixed(1)} ${height} L ${pts[0].x.toFixed(1)} ${height} Z`;
+
+    return { pts, pathD: smoothD, areaD, width, height };
   }, [last7DaysKeys, dailyTotals, maxDailySpend]);
 
   const total7DaySpend = useMemo(() => {
     return Object.values(dailyTotals).reduce((sum, v) => sum + v, 0);
   }, [dailyTotals]);
 
-  // ── 3. Upcoming Schedule Data (Pure Reminders & Events, No Tasks) ──
+  // ── 3. Upcoming Schedule Data (Pure Reminders & Events) ──
   const upcomingScheduleItems = useMemo(() => {
     const list: Array<{
       id: string;
@@ -281,334 +318,414 @@ export default function DashboardView() {
     return list;
   }, [reminders]);
 
+  const userName = user?.name ? user.name.split(' ')[0] : 'there';
+
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#F4F5F8] text-slate-900 select-none font-sans">
-      <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 no-scrollbar pb-28 md:pb-12 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        <div className="max-w-6xl mx-auto space-y-6">
+    <div className="flex-1 flex overflow-hidden bg-transparent text-slate-900 select-none font-sans">
+      <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-8 no-scrollbar pb-36 md:pb-20 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* 1. TOP CARDS: 1st RECTANGLE, MIDDLE 2 SQUARES, LAST RECTANGLE  */}
+          {/* 3. SEARCH PILL INPUT                                          */}
           {/* ───────────────────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 lg:grid-cols-12 gap-3.5 sm:gap-4.5 items-stretch">
-
-            {/* ── 1. FIRST CARD: Tasks & Activity (Indigo Accent) ── */}
-            <div
-              onClick={() => setActiveTab('tasks')}
-              className="col-span-2 lg:col-span-6 rounded-[26px] sm:rounded-[28px] bg-white border border-slate-100 hover:border-indigo-200 shadow-2xs hover:shadow-md transition-all cursor-pointer p-4.5 sm:p-5 flex flex-col justify-between group overflow-hidden min-h-[160px] sm:min-h-[195px]"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5 sm:gap-3">
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-2xs shrink-0">
-                    <CheckSquare size={19} strokeWidth={2.2} />
-                  </div>
-                  <div>
-                    <h2 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors leading-tight">
-                      Tasks & Activity
-                    </h2>
-                    <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium">
-                      Weekly completion & streak
-                    </p>
-                  </div>
-                </div>
-
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100/70 shrink-0">
-                  {pendingTasks} Due
-                </span>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleQuickSend();
+            }}
+            className="relative flex items-center"
+          >
+            <div className="relative w-full">
+              <div className="absolute left-4.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                <Search size={18} />
               </div>
-
-              {/* Metrics Row */}
-              <div className="pt-3 flex items-end justify-between">
-                <div className="flex flex-col justify-end">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-mono tracking-tight">
-                      {pendingTasks}
-                    </span>
-                    <span className="text-xs text-slate-400 font-medium">pending to-dos</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                    <span className="text-indigo-600 font-bold">{completedTasksList.length}</span> completed of {tasks.length} tasks
-                  </p>
-                </div>
-
-                <div className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white font-bold text-xs flex items-center gap-1 transition-all shadow-2xs shrink-0">
-                  <span>View Tasks</span>
-                  <ArrowUpRight size={13} />
-                </div>
-              </div>
-
-              {/* Minimal Progress Line */}
-              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mt-2">
-                <div
-                  className="bg-indigo-600 h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: tasks.length > 0 ? `${Math.round((completedTasksList.length / tasks.length) * 100)}%` : '0%',
-                  }}
-                />
-              </div>
+              <input
+                type="text"
+                value={quickPrompt}
+                onChange={(e) => setQuickPrompt(e.target.value)}
+                placeholder="Search or ask AI anything..."
+                disabled={isSending}
+                className="w-full h-12.5 pl-12 pr-12 rounded-full bg-white border border-slate-200/90 text-sm font-semibold text-slate-900 placeholder:text-slate-400 shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#1C1C1E]/20 transition-all"
+              />
+              {quickPrompt.trim() && (
+                <button
+                  type="submit"
+                  disabled={isSending}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8.5 h-8.5 rounded-full bg-[#1C1C1E] text-white flex items-center justify-center cursor-pointer hover:scale-105 active:scale-90 transition-all"
+                >
+                  <Send size={14} className="ml-0.5" />
+                </button>
+              )}
             </div>
+          </form>
 
-            {/* ── 2. MIDDLE CARD 1: Ledger & Dues (Emerald Accent) ── */}
-            <div
-              onClick={() => setActiveTab('ledger')}
-              className="col-span-1 lg:col-span-3 rounded-[26px] sm:rounded-[28px] bg-white border border-slate-100 hover:border-emerald-200 shadow-2xs hover:shadow-md transition-all cursor-pointer p-4 sm:p-5 flex flex-col justify-between group overflow-hidden min-h-[160px] sm:min-h-[195px]"
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all shadow-2xs shrink-0">
-                  <Wallet size={19} strokeWidth={2.2} />
-                </div>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100/70 shrink-0">
-                  Dues
-                </span>
-              </div>
-
-              <div className="pt-2">
-                <span className="text-xl sm:text-2xl font-extrabold text-slate-900 font-mono tracking-tight block truncate">
-                  ₹{totalDueAmount >= 100000 ? `${(totalDueAmount / 100000).toFixed(1)}L` : totalDueAmount.toLocaleString()}
-                </span>
-                <div className="mt-1">
-                  <h3 className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-emerald-600 transition-colors leading-tight">
-                    Ledger & Dues
-                  </h3>
-                  <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate mt-0.5">
-                    {pendingDues.length > 0 ? `${pendingDues.length} active dues` : 'No dues'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-1.5 flex items-center justify-between text-[11px] font-semibold text-emerald-600 border-t border-slate-100/80">
-                <span>Manage</span>
-                <ArrowUpRight size={13} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </div>
-
-            {/* ── 3. MIDDLE CARD 2: Schedule (Royal Blue Accent) ── */}
-            <div
-              onClick={() => setActiveTab('calendar')}
-              className="col-span-1 lg:col-span-3 rounded-[26px] sm:rounded-[28px] bg-white border border-slate-100 hover:border-blue-200 shadow-2xs hover:shadow-md transition-all cursor-pointer p-4 sm:p-5 flex flex-col justify-between group overflow-hidden min-h-[160px] sm:min-h-[195px]"
-            >
-              <div className="flex items-center justify-between">
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all shadow-2xs shrink-0">
-                  <Calendar size={19} strokeWidth={2.2} />
-                </div>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100/70 shrink-0">
-                  Events
-                </span>
-              </div>
-
-              <div className="pt-2">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-xl sm:text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
-                    {upcomingScheduleItems.filter((i) => !i.isDone).length}
-                  </span>
-                  <span className="text-[10px] sm:text-xs text-slate-400 font-medium">upcoming</span>
-                </div>
-                <div className="mt-1">
-                  <h3 className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-blue-600 transition-colors leading-tight">
-                    Schedule
-                  </h3>
-                  <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate mt-0.5">
-                    {upcomingScheduleItems.length} total events
-                  </p>
-                </div>
-              </div>
-
-              <div className="pt-1.5 flex items-center justify-between text-[11px] font-semibold text-blue-600 border-t border-slate-100/80">
-                <span>Calendar</span>
-                <ArrowUpRight size={13} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </div>
-
-            {/* ── 4. LAST CARD: Notes (Amber Accent) ── */}
-            <div
-              onClick={() => setActiveTab('notes')}
-              className="col-span-2 lg:col-span-12 rounded-[26px] sm:rounded-[28px] bg-white border border-slate-100 hover:border-amber-200 shadow-2xs hover:shadow-md transition-all cursor-pointer p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 group overflow-hidden min-h-[100px]"
-            >
-              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-all shadow-2xs shrink-0">
-                  <FileText size={20} strokeWidth={2.2} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-amber-600 transition-colors">
-                      Notes
-                    </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100/70">
-                      Notes
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
-                    {totalNotes > 0 ? `${totalNotes} notes, documents & memories stored` : 'No notes saved yet'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0 justify-between sm:justify-end border-t sm:border-t-0 pt-2.5 sm:pt-0 border-slate-100">
-                <div className="text-left sm:text-right">
-                  <span className="text-xl sm:text-2xl font-extrabold text-slate-900 font-mono tracking-tight">
-                    {totalNotes}
-                  </span>
-                  <span className="text-[11px] text-slate-400 font-medium ml-1">Saved</span>
-                </div>
-
-                <div className="px-3.5 py-1.5 rounded-xl bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white font-bold text-xs flex items-center gap-1 transition-all shadow-2xs">
-                  <span>Open Notes</span>
-                  <ArrowUpRight size={13} />
-                </div>
-              </div>
-            </div>
-
+          {/* Quick Prompt Chips */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mt-1 pb-1">
+            {ASSISTANCE_PROMPT_CHIPS.map((chip, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleQuickSend(chip.prompt)}
+                className="shrink-0 px-3.5 py-1.5 rounded-full bg-white border border-slate-200/70 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:border-slate-300 transition-all cursor-pointer shadow-2xs"
+              >
+                <span>{chip.label}</span>
+              </button>
+            ))}
           </div>
 
           {/* ───────────────────────────────────────────────────────────── */}
-          {/* 2. DAILY SPENDING LINE GRAPH (7-DAY TREND FROM LEDGER)        */}
+          {/* 4. FEATURED CARDS (NEW TEMPLATES SWIPABLE LEFT TO RIGHT)      */}
           {/* ───────────────────────────────────────────────────────────── */}
-          <div className="p-5 sm:p-6 rounded-3xl bg-white border border-slate-100 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-[15px] font-bold tracking-tight text-slate-900">
-                    Daily Spending Trend
-                  </h2>
-                  <span
-                    onClick={() => setActiveTab('ledger')}
-                    className="text-[11px] font-semibold text-[#1C73E8] cursor-pointer hover:underline"
-                  >
-                    Manage &rarr;
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                Quick Actions
+              </span>
+            </div>
+
+            {/* Horizontal Carousel */}
+            <div className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory gap-4 pb-2.5 pt-1 px-1 sm:px-0 scroll-smooth">
+
+              {/* ── CARD 1: Task Manager (Mint Pistachio Template) ── */}
+              <div
+                onClick={() => setActiveTab('tasks')}
+                className="w-[280px] sm:w-[310px] shrink-0 snap-start agent-mint-card p-6 min-h-[195px] flex flex-col justify-between cursor-pointer group active:scale-[0.98] transition-all"
+              >
+                <div className="agent-mint-ripple" />
+
+                <div className="flex items-center justify-between relative z-10">
+                  <div className="w-11 h-11 rounded-full bg-white text-[#1C1C1E] flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                    <CheckSquare size={20} className="stroke-[2.4]" />
+                  </div>
+                </div>
+
+                <div className="relative z-10 my-3">
+                  <h3 className="text-lg sm:text-xl font-black text-[#1C1C1E] tracking-tight leading-snug">
+                    Task Manager
+                  </h3>
+                  <p className="text-xs sm:text-[13px] font-semibold text-[#1C1C1E]/75 mt-0.5">
+                    {pendingTasks} tasks due &amp; daily goals
+                  </p>
+                </div>
+
+                <div className="flex items-center relative z-10 pt-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-[#1C1C1E]/80 bg-white/40 px-3 py-1 rounded-full backdrop-blur-xs">
+                    Template
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400">
-                  7-Day Real Expense Trend from your Ledger
+              </div>
+
+              {/* ── CARD 2: Personal AI (Lavender Periwinkle Template) ── */}
+              <div
+                onClick={() => setActiveTab('chat')}
+                className="w-[280px] sm:w-[310px] shrink-0 snap-start agent-lavender-card p-6 min-h-[195px] flex flex-col justify-between cursor-pointer group active:scale-[0.98] transition-all"
+              >
+                <div className="agent-lavender-ripple" />
+
+                <div className="flex items-center justify-between relative z-10">
+                  <div className="w-11 h-11 rounded-full bg-white p-0.5 shadow-xs overflow-hidden flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <div className="w-full h-full rounded-full bg-indigo-600 text-white flex items-center justify-center font-black text-sm">
+                      {userName[0]?.toUpperCase() || 'A'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative z-10 my-3">
+                  <h3 className="text-lg sm:text-xl font-black text-[#1C1C1E] tracking-tight leading-snug">
+                    Personal AI
+                  </h3>
+                  <p className="text-xs sm:text-[13px] font-semibold text-[#1C1C1E]/75 mt-0.5">
+                    Continue daily workflow &amp; briefing
+                  </p>
+                </div>
+
+                <div className="flex items-center relative z-10 pt-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-[#1C1C1E]/80 bg-white/40 px-3 py-1 rounded-full backdrop-blur-xs">
+                    Personal AI
+                  </span>
+                </div>
+              </div>
+
+              {/* ── CARD 3: Ledger & Dues (Butter Yellow Template with Dot Matrix) ── */}
+              <div
+                onClick={() => setActiveTab('ledger')}
+                className="w-[280px] sm:w-[310px] shrink-0 snap-start agent-yellow-card p-6 min-h-[195px] flex flex-col justify-between cursor-pointer group active:scale-[0.98] transition-all"
+              >
+                <div className="agent-yellow-ripple" />
+
+                <div className="flex items-center justify-between relative z-10">
+                  <div className="w-11 h-11 rounded-full bg-white text-[#1C1C1E] flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                    <Wallet size={20} className="stroke-[2.4]" />
+                  </div>
+                </div>
+
+                <div className="relative z-10 my-3">
+                  <h3 className="text-lg sm:text-xl font-black text-[#1C1C1E] tracking-tight leading-snug">
+                    Ledger &amp; Dues
+                  </h3>
+                  <p className="text-xs sm:text-[13px] font-semibold text-[#1C1C1E]/75 mt-0.5">
+                    ₹{totalDueAmount >= 100000 ? `${(totalDueAmount / 100000).toFixed(1)}L` : totalDueAmount.toLocaleString()} active due balance
+                  </p>
+                </div>
+
+                <div className="flex items-center relative z-10 pt-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-[#1C1C1E]/80 bg-black/5 px-3 py-1 rounded-full backdrop-blur-xs">
+                    Finance
+                  </span>
+                </div>
+              </div>
+
+              {/* ── CARD 4: My Schedule (Soft Coral Rose Template) ── */}
+              <div
+                onClick={() => setActiveTab('calendar')}
+                className="w-[280px] sm:w-[310px] shrink-0 snap-start agent-coral-card p-6 min-h-[195px] flex flex-col justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-2xs"
+              >
+                <div className="agent-coral-ripple" />
+
+                <div className="flex items-center justify-between relative z-10">
+                  <div className="w-11 h-11 rounded-full bg-white text-[#1C1C1E] flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                    <Calendar size={20} className="stroke-[2.4]" />
+                  </div>
+                </div>
+
+                <div className="relative z-10 my-3">
+                  <h3 className="text-lg sm:text-xl font-black text-[#1C1C1E] tracking-tight leading-snug">
+                    My Schedule
+                  </h3>
+                  <p className="text-xs sm:text-[13px] font-semibold text-[#1C1C1E]/75 mt-0.5">
+                    {todayReminders} reminders &amp; appointments today
+                  </p>
+                </div>
+
+                <div className="flex items-center relative z-10 pt-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-[#1C1C1E]/80 bg-black/5 px-3 py-1 rounded-full backdrop-blur-xs">
+                    Schedule
+                  </span>
+                </div>
+              </div>
+
+              {/* ── CARD 5: Notes & Ideas (Soft Lilac Template) ── */}
+              <div
+                onClick={() => setActiveTab('notes')}
+                className="w-[280px] sm:w-[310px] shrink-0 snap-start agent-lilac-card p-6 min-h-[195px] flex flex-col justify-between cursor-pointer group active:scale-[0.98] transition-all shadow-2xs"
+              >
+                <div className="agent-lilac-ripple" />
+
+                <div className="flex items-center justify-between relative z-10">
+                  <div className="w-11 h-11 rounded-full bg-white text-[#1C1C1E] flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                    <FileText size={20} className="stroke-[2.4]" />
+                  </div>
+                </div>
+
+                <div className="relative z-10 my-3">
+                  <h3 className="text-lg sm:text-xl font-black text-[#1C1C1E] tracking-tight leading-snug">
+                    Notes &amp; Ideas
+                  </h3>
+                  <p className="text-xs sm:text-[13px] font-semibold text-[#1C1C1E]/75 mt-0.5">
+                    {totalNotes} stored documents &amp; drafts
+                  </p>
+                </div>
+
+                <div className="flex items-center relative z-10 pt-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-[#1C1C1E]/80 bg-black/5 px-3 py-1 rounded-full backdrop-blur-xs">
+                    Documents
+                  </span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* ───────────────────────────────────────────────────────────── */}
+          {/* 5. SPENDING CARD (REAL MONEY SPENDING GRAPH)                  */}
+          {/* ───────────────────────────────────────────────────────────── */}
+          <div className="rounded-[32px] bg-white border border-slate-200/80 p-6 sm:p-7 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-black text-[#1C1C1E] tracking-tight">
+                  Spending
+                </h3>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                  7-day money spending trend
                 </p>
               </div>
-              <div className="text-right">
-                <span className="text-sm font-extrabold text-slate-900 font-mono">
-                  ₹{total7DaySpend.toLocaleString()}
-                </span>
-                <p className="text-[10px] text-slate-400">past 7 days</p>
-              </div>
-            </div>
-
-            {/* Sparkline Canvas Area */}
-            <div className="relative pt-2 pb-1">
-              <svg
-                viewBox={`0 0 ${spendingChartPoints.width} ${spendingChartPoints.height}`}
-                className="w-full h-32 sm:h-36 overflow-visible"
-                preserveAspectRatio="none"
-              >
-                <defs>
-                  <linearGradient id="dashboardSpendGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#A855F7" stopOpacity="0.25" />
-                    <stop offset="100%" stopColor="#A855F7" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-
-                {/* Horizontal grid lines */}
-                <line x1="0" y1="20" x2="380" y2="20" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
-                <line x1="0" y1="50" x2="380" y2="50" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
-                <line x1="0" y1="80" x2="380" y2="80" stroke="#F1F5F9" strokeWidth="1" />
-
-                {/* Area Gradient */}
-                <path d={spendingChartPoints.areaD} fill="url(#dashboardSpendGrad)" />
-
-                {/* Line Graph */}
-                <path
-                  d={spendingChartPoints.pathD}
-                  fill="none"
-                  stroke="#A855F7"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-
-                {/* Data Points */}
-                {spendingChartPoints.pts.map((pt, i) => (
-                  <circle
-                    key={i}
-                    cx={pt.x}
-                    cy={pt.y}
-                    r="4"
-                    fill="#FFFFFF"
-                    stroke="#A855F7"
-                    strokeWidth="2"
-                    className="cursor-pointer hover:scale-125 transition-transform"
-                  />
-                ))}
-              </svg>
-
-              {/* Day Labels & Spend Amounts */}
-              <div className="flex justify-between px-2 pt-2 text-[11px] font-bold text-slate-600">
-                {spendingChartPoints.pts.map((pt, i) => (
-                  <div key={i} className="flex flex-col items-center">
-                    <span>{pt.dayLabel}</span>
-                    <span className="text-[10px] font-mono text-slate-400 font-normal">
-                      {pt.val > 0 ? `₹${pt.val}` : '—'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* ───────────────────────────────────────────────────────────── */}
-          {/* 3. UPCOMING SCHEDULE (PURE REMINDERS & CALENDAR EVENTS)       */}
-          {/* ───────────────────────────────────────────────────────────── */}
-          <div className="p-5 sm:p-6 rounded-3xl bg-white border border-slate-100 shadow-2xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-[#5B67F6]">
-                  <Calendar size={18} />
-                </div>
-                <div>
-                  <h2 className="text-[15px] font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                    Upcoming Schedule
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#5B67F6]/10 text-[#5B67F6]">
-                      {upcomingScheduleItems.filter((i) => !i.isDone).length}
-                    </span>
-                  </h2>
-                  <p className="text-[11px] text-slate-400">
-                    Scheduled reminders, meetings, and calendar events
-                  </p>
-                </div>
-              </div>
-
               <button
                 type="button"
-                onClick={() => setActiveTab('calendar')}
-                className="text-xs font-semibold text-[#5B67F6] hover:underline flex items-center gap-1 cursor-pointer"
+                onClick={() => setActiveTab('ledger')}
+                className="text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer flex items-center gap-1"
               >
-                <span>Calendar & Schedule</span>
+                <span>Ledger</span>
                 <span>&rarr;</span>
               </button>
             </div>
 
-            {/* List of Upcoming Schedule Items */}
-            {upcomingScheduleItems.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {upcomingScheduleItems.slice(0, 6).map((item) => {
+            {/* Metrics Row */}
+            <div className="pt-1 pb-1">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-3xl sm:text-4xl font-black text-[#1C1C1E]">
+                    ₹{total7DaySpend >= 100000 ? `${(total7DaySpend / 100000).toFixed(1)}L` : total7DaySpend.toLocaleString()}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#E8F8EE] text-[#1E9E4A] text-[11px] font-black flex items-center gap-1">
+                    <TrendingUp size={12} className="stroke-[2.5]" />
+                    <span>Last 7 days</span>
+                  </span>
+                </div>
+                <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                  Total weekly spend
+                </p>
+              </div>
+            </div>
+
+            {/* Enhanced Smooth Curve SVG Graph */}
+            <div className="relative pt-3 pb-1">
+              <svg
+                viewBox="0 0 380 120"
+                className="w-full h-32 sm:h-36 overflow-visible"
+              >
+                <defs>
+                  <linearGradient id="spendingCurveGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#1C1C1E" stopOpacity="0.18" />
+                    <stop offset="70%" stopColor="#1C1C1E" stopOpacity="0.03" />
+                    <stop offset="100%" stopColor="#1C1C1E" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+
+                {/* Subtle Horizontal Reference Guidelines */}
+                <line x1="20" y1="20" x2="360" y2="20" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
+                <line x1="20" y1="52" x2="360" y2="52" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
+                <line x1="20" y1="84" x2="360" y2="84" stroke="#E2E8F0" strokeWidth="1" strokeDasharray="2 2" />
+
+                {/* Shaded Area fill under graph */}
+                <path
+                  d={spendingChartPoints.areaD}
+                  fill="url(#spendingCurveGradient)"
+                />
+
+                {/* Main Smooth Spline Curve Line */}
+                <path
+                  d={spendingChartPoints.pathD}
+                  fill="none"
+                  stroke="#1C1C1E"
+                  strokeWidth="3.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+
+                {/* Data Points and Weekday Labels */}
+                {spendingChartPoints.pts.map((pt, idx) => {
+                  const isLatest = idx === spendingChartPoints.pts.length - 1;
                   return (
+                    <g key={idx}>
+                      {isLatest && (
+                        <circle
+                          cx={pt.x}
+                          cy={pt.y}
+                          r="9"
+                          className="fill-[#1C1C1E]/15 animate-ping"
+                        />
+                      )}
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r={isLatest ? "4.5" : "3.5"}
+                        fill={isLatest ? "#1C1C1E" : "#FFFFFF"}
+                        stroke="#1C1C1E"
+                        strokeWidth={isLatest ? "2" : "2.4"}
+                      />
+                      <text
+                        x={pt.x}
+                        y={118}
+                        textAnchor="middle"
+                        className={`text-[10px] select-none ${
+                          isLatest ? "font-black fill-slate-900" : "font-semibold fill-slate-400"
+                        }`}
+                      >
+                        {pt.dayLabel}
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+          </div>
+
+          {/* ───────────────────────────────────────────────────────────── */}
+          {/* SECTION HEADER: LIVE ACTIVITY (MATCHES "LIVE SHIPMENTS")      */}
+          {/* ───────────────────────────────────────────────────────────── */}
+          <div className="flex items-center justify-between pt-1">
+            <div>
+              <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
+                Live Activity
+              </h2>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Real-time schedules and actionable to-dos
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-slate-500 bg-white/60 px-3 py-1 rounded-full border border-white/80">
+              {upcomingScheduleItems.filter((i) => !i.isDone).length + pendingTasks} items
+            </span>
+          </div>
+
+          {/* TWO COLUMN SECTION: UPCOMING SCHEDULE & PENDING TASKS         */}
+          {/* ───────────────────────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6 items-start">
+
+            {/* ── LEFT: UPCOMING SCHEDULE ── */}
+            <div className="p-6 sm:p-7 rounded-[32px] transio-glass-card space-y-4">
+              <div className="flex items-center justify-between border-b border-white/60 pb-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50/90 flex items-center justify-center text-blue-600 shadow-2xs">
+                    <Calendar size={17} />
+                  </div>
+                  <div>
+                    <h2 className="text-[15px] font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                      Upcoming Schedule
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50/80 text-blue-600 border border-blue-200/60 backdrop-blur-xs">
+                        {upcomingScheduleItems.filter((i) => !i.isDone).length}
+                      </span>
+                    </h2>
+                    <p className="text-[11px] text-slate-400">
+                      Reminders and scheduled calendar items
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('calendar')}
+                  className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Calendar</span>
+                  <span>&rarr;</span>
+                </button>
+              </div>
+
+              {/* List of Upcoming Schedule Items */}
+              {upcomingScheduleItems.length > 0 ? (
+                <div className="space-y-2.5">
+                  {upcomingScheduleItems.slice(0, 5).map((item) => (
                     <div
                       key={item.id}
                       onClick={() => setActiveTab('calendar')}
-                      className="p-3.5 sm:p-4 rounded-xl bg-slate-50/70 hover:bg-slate-100/90 border border-slate-200/70 transition-all cursor-pointer flex items-center justify-between gap-3 group"
+                      className="p-3 sm:p-3.5 rounded-2xl transio-glass-chip cursor-pointer flex items-center justify-between gap-3 group"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-8 h-8 rounded-xl bg-violet-100/80 text-violet-600 flex items-center justify-center shrink-0 shadow-xs">
+                        <div className="w-8 h-8 rounded-xl bg-blue-100/60 text-blue-600 flex items-center justify-center shrink-0">
                           <Clock size={15} />
                         </div>
 
                         <div className="min-w-0 flex-1">
                           <p
-                            className={`text-sm font-semibold truncate transition-colors ${
+                            className={`text-xs sm:text-sm font-semibold truncate transition-colors ${
                               item.isDone
                                 ? 'line-through text-slate-400'
-                                : 'text-slate-900 group-hover:text-[#5B67F6]'
+                                : 'text-slate-900 group-hover:text-blue-600'
                             }`}
                           >
                             {item.title}
                           </p>
                           <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                            <Clock size={11} className="shrink-0 text-slate-400" />
                             <span className="truncate font-medium text-slate-500">{item.dateStr}</span>
                             {item.subtitle && (
                               <span className="hidden sm:inline truncate text-slate-400">
@@ -619,117 +736,121 @@ export default function DashboardView() {
                         </div>
                       </div>
 
-                      {/* Tag Badge */}
-                      <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold border shrink-0 bg-violet-50 text-violet-700 border-violet-100">
-                        SCHEDULE
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-bold border shrink-0 bg-blue-50/80 text-blue-700 border-blue-200/80 flex items-center gap-1.5 shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                        Scheduled
                       </span>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="py-8 rounded-xl bg-slate-50/50 border border-dashed border-slate-200 text-center space-y-1.5">
-                <p className="text-sm font-semibold text-slate-700">No upcoming schedules! 🎉</p>
-                <p className="text-xs text-slate-400">You are completely caught up with your calendar and reminders.</p>
-              </div>
-            )}
-          </div>
-
-          {/* ───────────────────────────────────────────────────────────── */}
-          {/* 4. PENDING TASKS SECTION (COMES DIRECTLY AFTER SCHEDULE)      */}
-          {/* ───────────────────────────────────────────────────────────── */}
-          <div className="p-5 sm:p-6 rounded-3xl bg-white border border-slate-100 shadow-2xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-[#FF5000]">
-                  <CheckSquare size={18} />
+                  ))}
                 </div>
-                <div>
-                  <h2 className="text-[15px] font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                    Pending Tasks
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#FF5000]/10 text-[#FF5000]">
-                      {pendingTasks}
-                    </span>
-                  </h2>
-                  <p className="text-[11px] text-slate-400">
-                    Actionable to-dos and project task items
-                  </p>
+              ) : (
+                <div className="py-8 rounded-2xl bg-slate-50/50 border border-dashed border-slate-200 text-center space-y-1.5">
+                  <p className="text-sm font-semibold text-slate-700">No upcoming schedules! 🎉</p>
+                  <p className="text-xs text-slate-400">You are completely caught up with your calendar and reminders.</p>
                 </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('tasks')}
-                className="text-xs font-semibold text-[#FF5000] hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <span>View all tasks</span>
-                <span>&rarr;</span>
-              </button>
+              )}
             </div>
 
-            {/* List of Pending Tasks */}
-            {pendingTasksList.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {pendingTasksList.slice(0, 6).map((task) => {
-                  const isHigh = task.priority === 'high' || task.priority === 'urgent';
-                  return (
-                    <div
-                      key={task.id}
-                      className="p-3.5 sm:p-4 rounded-xl bg-slate-50/70 hover:bg-slate-100/90 border border-slate-200/70 transition-all flex items-center justify-between gap-3 group"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleTask(task.id, task.status);
-                          }}
-                          className="w-5 h-5 rounded-md border-2 border-slate-300 hover:border-[#FF5000] flex items-center justify-center text-transparent hover:text-[#FF5000] transition-colors shrink-0 cursor-pointer"
-                          title="Mark complete"
-                        >
-                          <CheckCircle2 size={13} className="opacity-0 hover:opacity-100" />
-                        </button>
+            {/* ── RIGHT: PENDING TASKS ── */}
+            <div className="p-6 sm:p-7 rounded-[32px] transio-glass-card space-y-4">
+              <div className="flex items-center justify-between border-b border-white/60 pb-3.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-50/90 flex items-center justify-center text-indigo-600 shadow-2xs">
+                    <CheckSquare size={17} />
+                  </div>
+                  <div>
+                    <h2 className="text-[15px] font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                      Pending Tasks
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-50/80 text-indigo-600 border border-indigo-200/60 backdrop-blur-xs">
+                        {pendingTasks}
+                      </span>
+                    </h2>
+                    <p className="text-[11px] text-slate-400">
+                      Actionable to-dos and project items
+                    </p>
+                  </div>
+                </div>
 
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-slate-900 group-hover:text-[#FF5000] transition-colors truncate">
-                            {task.title}
-                          </p>
-                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
-                            {task.dueDate && (
-                              <span className="flex items-center gap-1 font-medium text-slate-500">
-                                <Clock size={10} />
-                                {new Date(task.dueDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                              </span>
-                            )}
-                            {task.description && (
-                              <span className="hidden sm:inline truncate text-slate-400">
-                                · {task.description}
-                              </span>
-                            )}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('tasks')}
+                  className="text-xs font-semibold text-indigo-600 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>View all</span>
+                  <span>&rarr;</span>
+                </button>
+              </div>
+
+              {/* List of Pending Tasks */}
+              {pendingTasksList.length > 0 ? (
+                <div className="space-y-2.5">
+                  {pendingTasksList.slice(0, 5).map((task) => {
+                    const isHigh = task.priority === 'high' || task.priority === 'urgent';
+                    return (
+                      <div
+                        key={task.id}
+                        className="p-3 sm:p-3.5 rounded-2xl transio-glass-chip transition-all flex items-center justify-between gap-3 group"
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleTask(task.id, task.status);
+                            }}
+                            className="w-5 h-5 rounded-md border-2 border-slate-300 hover:border-indigo-600 flex items-center justify-center text-transparent hover:text-indigo-600 transition-colors shrink-0 cursor-pointer"
+                            title="Mark complete"
+                          >
+                            <CheckCircle2 size={13} className="opacity-0 hover:opacity-100" />
+                          </button>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs sm:text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
+                              {task.title}
+                            </p>
+                            <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                              {task.dueDate && (
+                                <span className="flex items-center gap-1 font-medium text-slate-500">
+                                  <Clock size={10} />
+                                  {new Date(task.dueDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                </span>
+                              )}
+                              {task.description && (
+                                <span className="hidden sm:inline truncate text-slate-400">
+                                  · {task.description}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Priority Tag */}
-                      <span
-                        className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border shrink-0 uppercase ${
-                          isHigh
-                            ? 'bg-rose-50 text-rose-600 border-rose-100'
-                            : 'bg-slate-100 text-slate-600 border-slate-200'
-                        }`}
-                      >
-                        {task.priority || 'Normal'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="py-8 rounded-xl bg-slate-50/50 border border-dashed border-slate-200 text-center space-y-1.5">
-                <p className="text-sm font-semibold text-slate-700">All tasks completed! 🚀</p>
-                <p className="text-xs text-slate-400">Great job! You have no pending to-dos right now.</p>
-              </div>
-            )}
+                        {/* Priority Tag */}
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold border shrink-0 flex items-center gap-1.5 shadow-2xs ${
+                            isHigh
+                              ? 'bg-rose-50/80 text-rose-600 border-rose-200/80'
+                              : 'bg-slate-100/80 text-slate-600 border-slate-200/80'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              isHigh ? 'bg-rose-500 animate-pulse' : 'bg-slate-400'
+                            }`}
+                          />
+                          {task.priority ? task.priority.toUpperCase() : 'NORMAL'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-8 rounded-2xl bg-slate-50/50 border border-dashed border-slate-200 text-center space-y-1.5">
+                  <p className="text-sm font-semibold text-slate-700">All tasks completed! 🚀</p>
+                  <p className="text-xs text-slate-400">Great job! You have no pending to-dos right now.</p>
+                </div>
+              )}
+            </div>
+
           </div>
 
         </div>

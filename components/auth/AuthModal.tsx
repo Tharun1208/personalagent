@@ -18,6 +18,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
+import { apiFetch } from '@/lib/api';
 import { isGuestEmail } from '@/lib/guest';
 
 interface AuthModalProps {
@@ -80,7 +81,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     try {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
       const body = mode === 'login' ? { email, password } : { name, email, password };
-      const res = await fetch(endpoint, {
+      const res = await apiFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

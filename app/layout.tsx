@@ -1,40 +1,6 @@
 import type { Metadata } from 'next';
-import { Inter, IBM_Plex_Sans, JetBrains_Mono, Cormorant_Garamond, Cutive_Mono } from 'next/font/google';
 import './globals.css';
 import { AppProvider } from '@/lib/context/AppContext';
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-jetbrains-mono',
-  display: 'swap',
-});
-
-const cormorantGaramond = Cormorant_Garamond({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  variable: '--font-cormorant',
-  display: 'swap',
-});
-
-const cutiveMono = Cutive_Mono({
-  subsets: ['latin'],
-  weight: '400',
-  variable: '--font-cutive-mono',
-  display: 'swap',
-});
-
-const ibmPlexSans = IBM_Plex_Sans({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  variable: '--font-ibm-plex-sans',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: 'Assistance — Personal AI Agent',
@@ -62,24 +28,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${ibmPlexSans.variable} ${jetbrainsMono.variable} ${cormorantGaramond.variable} ${cutiveMono.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wdth,wght@75..100,500&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
-          rel="stylesheet"
-        />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#ffffff" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
-      <body className={`${ibmPlexSans.className} ibm-plex-sans antialiased select-none font-sans`} suppressHydrationWarning>
+      <body className="ibm-plex-sans antialiased select-none font-sans" suppressHydrationWarning>
         <AppProvider>{children}</AppProvider>
       </body>
     </html>

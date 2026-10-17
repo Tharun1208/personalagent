@@ -229,6 +229,17 @@ class SoundEngine {
   }
 
   /**
+   * Play subtle notification tone
+   */
+  public playNotification(volume: number = 0.35): void {
+    this.playAlarm('chime', volume);
+  }
+
+  public playChime(volume: number = 0.35): void {
+    this.playAlarm('gentle', volume);
+  }
+
+  /**
    * Play single alarm preview tone
    */
   public playAlarm(tone: string = 'digital', volume: number = 1.0, customUrl?: string): void {

@@ -32,8 +32,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '@/lib/context/AppContext';
 import { Reminder, Task } from '@/types';
 import CustomSelect, { SelectOption } from '@/components/common/CustomSelect';
+import DatePickerDropdown from '@/components/common/DatePickerDropdown';
+import TimePickerDropdown from '@/components/common/TimePickerDropdown';
 
 export type CalendarViewMode = 'day' | 'week' | 'month';
+
+const TIME_FORMAT = 'HH:mm';
 
 const PRIORITY_OPTIONS: SelectOption[] = [
   { value: 'normal', label: 'Normal Priority', badgeColor: '#3b82f6' },
@@ -66,6 +70,15 @@ const SHORT_MONTH_NAMES = [
 ];
 
 const WEEKDAY_NAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+// Color palettes for event categories
+const CATEGORY_COLORS: Record<NonNullable<FormattedEvent['category']>, { bg: string; border: string; text: string }> = {
+  meeting: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-[#1C73E8]' },
+  birthday: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800' },
+  task: { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-800' },
+  general: { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-600' },
+  reminder: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-800' },
+};
 
 interface FormattedEvent {
   id: string;
@@ -106,6 +119,7 @@ export default function CalendarLightView() {
   
   // Dropdown states
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [isYearSelectorMode, setIsYearSelectorMode] = useState(false);
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   
   // Modals state
@@ -164,28 +178,24 @@ export default function CalendarLightView() {
       const baseDate = parseDateSafe(rawDateStr);
       const timeStr = baseDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      let colorBg = 'bg-blue-50';
-      let colorBorder = 'border-blue-200';
-      let colorText = 'text-[#1C73E8]';
-      let category: FormattedEvent['category'] = 'meeting';
-
+      let category: NonNullable<FormattedEvent['category']> = (r as any).category || 'general';
       const lower = (r.title + ' ' + (r.notes || '')).toLowerCase();
-      if (lower.includes('birthday') || lower.includes('party') || lower.includes('anniversary')) {
-        category = 'birthday';
-        colorBg = 'bg-amber-50';
-        colorBorder = 'border-amber-200';
-        colorText = 'text-amber-800';
-      } else if (lower.includes('zoom') || lower.includes('call') || lower.includes('meet') || lower.includes('sync')) {
-        category = 'meeting';
-        colorBg = 'bg-blue-50';
-        colorBorder = 'border-blue-200';
-        colorText = 'text-[#1C73E8]';
-      } else if (lower.includes('exam') || lower.includes('assignment') || lower.includes('project') || lower.includes('deadline')) {
-        category = 'task';
-        colorBg = 'bg-indigo-50';
-        colorBorder = 'border-indigo-200';
-        colorText = 'text-indigo-800';
+      // Refine category based on title keywords if not already set
+      if (category === 'general') {
+        if (lower.includes('birthday') || lower.includes('party') || lower.includes('anniversary')) {
+          category = 'birthday';
+        } else if (lower.includes('zoom') || lower.includes('call') || lower.includes('meet') || lower.includes('sync')) {
+          category = 'meeting';
+        } else if (lower.includes('exam') || lower.includes('assignment') || lower.includes('project') || lower.includes('deadline')) {
+          category = 'task';
+        }
       }
+
+      // Use category-based color palette for consistent theming
+      const categoryColor = CATEGORY_COLORS[category] || CATEGORY_COLORS['general'];
+      let colorBg = categoryColor.bg;
+      let colorBorder = categoryColor.border;
+      let colorText = categoryColor.text;
 
       const createEventObj = (d: Date, occId: string): FormattedEvent => ({
         id: occId,
@@ -288,6 +298,7 @@ export default function CalendarLightView() {
       d.setDate(start.getDate() + i);
       const isToday = new Date().toDateString() === d.toDateString();
       const isSelected = selectedDate.toDateString() === d.toDateString();
+      const hasEvents = (filteredEvents || []).some((e) => isSameDay(e.rawDate, d));
 
       return {
         date: d,
@@ -295,10 +306,11 @@ export default function CalendarLightView() {
         dayNum: d.getDate(),
         isToday,
         isSelected,
+        hasEvents,
         isWeekend: d.getDay() === 0 || d.getDay() === 6,
       };
     });
-  }, [selectedDate]);
+  }, [selectedDate, filteredEvents]);
 
   // Calendar Grid for Month View
   const monthCalendarDays = useMemo(() => {
@@ -487,6 +499,7 @@ export default function CalendarLightView() {
   const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim()) return;
+    if (!formDate) return;
 
     const dueDateTime = `${formDate}T${formTime}:00`;
 
@@ -540,23 +553,24 @@ export default function CalendarLightView() {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-white text-slate-900 select-none font-sans relative">
       
       {/* ── 1. Top Header ── */}
-      <header className="relative z-30 px-4 sm:px-6 pt-4 pb-3 flex items-center justify-between border-b border-slate-100 bg-white shrink-0">
+      <header className="relative z-30 px-3 sm:px-6 pt-4 pb-3 flex items-center justify-between border-b border-slate-100 bg-white shrink-0">
         {/* Left: Year & Month Title with interactive dropdown */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
           <div className="relative">
             <button
               type="button"
               onClick={() => {
                 setIsMonthPickerOpen((p) => !p);
                 setIsPlusMenuOpen(false);
+                setIsYearSelectorMode(false);
               }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-2xl hover:bg-slate-100 transition-all cursor-pointer group"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-2xl hover:bg-slate-100 transition-all cursor-pointer group whitespace-nowrap"
             >
-              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 flex items-center gap-1.5">
+              <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 inline-flex items-center gap-1.5 whitespace-nowrap">
                 <span>{headerTitle}</span>
                 <ChevronDown
-                  size={18}
-                  className={`text-slate-400 group-hover:text-slate-900 transition-transform duration-200 ${
+                  size={16}
+                  className={`shrink-0 text-slate-400 group-hover:text-slate-900 transition-transform duration-200 ${
                     isMonthPickerOpen ? 'rotate-180 text-blue-600' : ''
                   }`}
                 />
@@ -569,56 +583,112 @@ export default function CalendarLightView() {
                 <>
                   <div
                     className="fixed inset-0 z-40 bg-black/20"
-                    onClick={() => setIsMonthPickerOpen(false)}
+                    onClick={() => {
+                      setIsMonthPickerOpen(false);
+                      setIsYearSelectorMode(false);
+                    }}
                   />
                   <motion.div
                     initial={{ opacity: 0, y: 8, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 8, scale: 0.95 }}
                     transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute left-0 top-full mt-2 z-50 w-72 p-3.5 rounded-3xl bg-white border border-slate-200 shadow-[0_20px_45px_rgba(0,0,0,0.16)] ring-1 ring-black/5"
+                    className="absolute left-0 top-full mt-2 z-50 w-72 sm:w-80 p-3.5 rounded-3xl bg-white border border-slate-200 shadow-[0_20px_45px_rgba(0,0,0,0.16)] ring-1 ring-black/5"
                   >
                     {/* Year Switcher */}
-                    <div className="flex items-center justify-between px-2 pb-3 mb-2 border-b border-slate-100">
+                    <div className="flex items-center justify-between px-1 pb-2.5 mb-2 border-b border-slate-100">
                       <button
                         type="button"
                         onClick={() => handleStepYear(-1)}
-                        className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors"
+                        className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors cursor-pointer"
+                        title="Previous year"
                       >
                         <ChevronLeft size={15} />
                       </button>
-                      <span className="text-sm font-extrabold text-slate-900">
-                        {year}
-                      </span>
+
+                      {/* Clickable Year that reveals selectable year options */}
+                      <button
+                        type="button"
+                        onClick={() => setIsYearSelectorMode((prev) => !prev)}
+                        className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center gap-1.5 text-xs font-black text-slate-900 cursor-pointer transition-colors"
+                        title="Click to select year"
+                      >
+                        <span>{year}</span>
+                        <ChevronDown size={13} className={`transition-transform duration-150 ${isYearSelectorMode ? 'rotate-180' : ''}`} />
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => handleStepYear(1)}
-                        className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors"
+                        className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors cursor-pointer"
+                        title="Next year"
                       >
                         <ChevronRight size={15} />
                       </button>
                     </div>
 
-                    {/* 12 Months Grid */}
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {SHORT_MONTH_NAMES.map((mName, idx) => {
-                        const isCurrent = idx === month;
-                        return (
+                    {isYearSelectorMode ? (
+                      /* Year Selection Options Grid */
+                      <div className="space-y-2 py-1">
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                            Select Year
+                          </span>
                           <button
-                            key={mName}
                             type="button"
-                            onClick={() => handleSelectMonth(idx)}
-                            className={`py-2 px-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                              isCurrent
-                                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25'
-                                : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
-                            }`}
+                            onClick={() => setIsYearSelectorMode(false)}
+                            className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
                           >
-                            {mName}
+                            Back to Months
                           </button>
-                        );
-                      })}
-                    </div>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5 max-h-48 overflow-y-auto no-scrollbar">
+                          {[2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030].map((y) => {
+                            const isSelectedYear = y === year;
+                            return (
+                              <button
+                                key={y}
+                                type="button"
+                                onClick={() => {
+                                  const newD = new Date(y, month, 1);
+                                  setCurrentDate(newD);
+                                  setSelectedDate(newD);
+                                  setIsYearSelectorMode(false);
+                                }}
+                                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                  isSelectedYear
+                                    ? 'bg-[#1C1C1E] text-white shadow-xs'
+                                    : 'text-slate-700 bg-slate-50 hover:bg-slate-100'
+                                }`}
+                              >
+                                {y}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      /* 12 Months Grid */
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {SHORT_MONTH_NAMES.map((mName, idx) => {
+                          const isCurrent = idx === month;
+                          return (
+                            <button
+                              key={mName}
+                              type="button"
+                              onClick={() => handleSelectMonth(idx)}
+                              className={`py-2 px-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                isCurrent
+                                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
+                                  : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+                              }`}
+                            >
+                              {mName}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </motion.div>
                 </>
               )}
@@ -646,7 +716,7 @@ export default function CalendarLightView() {
             <button
               type="button"
               onClick={handleToday}
-              className="px-3 py-1 rounded-full bg-blue-50 hover:bg-blue-100 text-xs font-bold text-blue-700 border border-blue-200 shadow-2xs transition-all cursor-pointer ml-1 active:scale-95"
+              className="px-3 py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 text-sm font-medium text-blue-700 border border-blue-200 shadow-sm transition-all cursor-pointer ml-1 active:scale-95"
             >
               Today
             </button>
@@ -662,7 +732,7 @@ export default function CalendarLightView() {
               placeholder="Search schedule..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-3 py-1.5 rounded-full text-xs bg-slate-50 border border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 w-44 transition-all"
+              className="pl-10 pr-3 py-2 rounded-full bg-slate-50 border border-slate-300 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all w-72"
             />
           </div>
 
@@ -670,7 +740,7 @@ export default function CalendarLightView() {
             <button
               type="button"
               onClick={handleTogglePlusMenu}
-              className={`w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 flex items-center justify-center transition-all cursor-pointer active:scale-95 hover:opacity-95 ${
+              className={`w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25 flex items-center justify-center transition-all cursor-pointer active:scale-95 hover:opacity-95 ${
                 isPlusMenuOpen ? 'ring-3 ring-blue-500/30 scale-105' : ''
               }`}
               title="Create Event or Task"
@@ -719,7 +789,7 @@ export default function CalendarLightView() {
                             New Event
                           </p>
                           <p className="text-[10.5px] text-slate-400 leading-tight">
-                            Meetings, alarms & reminders
+                            Meetings & reminders
                           </p>
                         </div>
                       </div>
@@ -757,11 +827,11 @@ export default function CalendarLightView() {
 
       {/* ── 2. View Mode Selector (Day, Week, Month) ── */}
       <div className="px-4 sm:px-6 py-2.5 flex items-center justify-between border-b border-slate-100 bg-white shrink-0">
-        <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar">
+        <div className="p-1 rounded-full bg-slate-100 border border-slate-200/80 inline-flex items-center gap-1 shadow-2xs">
           {[
-            { key: 'day', label: 'Day', icon: Clock },
+            { key: 'day', label: 'Daily', icon: Clock },
             { key: 'week', label: 'Week', icon: SlidersHorizontal },
-            { key: 'month', label: 'Month', icon: CalendarIcon },
+            { key: 'month', label: 'Monthly', icon: CalendarIcon },
           ].map((mode) => {
             const isActive = viewMode === mode.key;
             const Icon = mode.icon;
@@ -770,27 +840,27 @@ export default function CalendarLightView() {
                 key={mode.key}
                 type="button"
                 onClick={() => setViewMode(mode.key as CalendarViewMode)}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/70'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
                 }`}
               >
-                <Icon size={14} className={isActive ? 'text-white' : 'text-slate-500'} />
+                <Icon size={13} className={isActive ? 'text-white stroke-[2.4]' : 'text-slate-400'} />
                 <span>{mode.label}</span>
               </button>
             );
           })}
         </div>
 
-        <span className="text-[11px] font-semibold text-slate-400 hidden md:inline">
+        <span className="text-[11px] font-semibold text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-200/80 hidden md:inline">
           {filteredEvents.length} items scheduled
         </span>
       </div>
 
-      {/* ── 3. Horizontal Weekday Selector Strip (Day & Week views) ── */}
+      {/* ── 3. Horizontal Weekday Selector Strip (Clean & Unboxed) ── */}
       {viewMode !== 'month' && (
-        <div className="px-4 sm:px-6 py-3 bg-[#F8FAFC] border-b border-slate-100 shrink-0">
+        <div className="px-3 sm:px-6 py-2.5 bg-white border-b border-slate-100 shrink-0">
           <div className="grid grid-cols-7 gap-1 sm:gap-2 max-w-2xl mx-auto">
             {currentWeekDays.map((item, idx) => {
               return (
@@ -798,27 +868,33 @@ export default function CalendarLightView() {
                   key={idx}
                   type="button"
                   onClick={() => setSelectedDate(item.date)}
-                  className="flex flex-col items-center gap-1.5 py-1.5 rounded-2xl transition-all cursor-pointer group"
+                  className="flex flex-col items-center justify-center py-2 px-1 rounded-2xl transition-all cursor-pointer active:scale-95 group hover:bg-slate-50"
                 >
-                  <span
-                    className={`text-[11px] font-bold tracking-wider ${
-                      item.isWeekend ? 'text-rose-500 font-extrabold' : 'text-slate-500'
-                    }`}
-                  >
-                    {item.dayName}
+                  <span className={`text-[11px] font-bold tracking-wider uppercase mb-1.5 transition-colors ${
+                    item.isWeekend ? 'text-rose-500' : item.isSelected ? 'text-blue-600 font-extrabold' : 'text-slate-400'
+                  }`}>
+                    {item.dayName.slice(0, 2)}
                   </span>
 
                   <span
-                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-sm font-extrabold transition-all duration-200 ${
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black transition-all ${
                       item.isSelected
-                        ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-105'
+                        ? 'bg-[#1C1C1E] text-white shadow-xs scale-105'
                         : item.isToday
-                        ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                        : 'text-slate-800 hover:bg-slate-200/60'
+                        ? 'text-blue-600 bg-blue-50 font-black'
+                        : 'text-slate-800 group-hover:text-slate-900'
                     }`}
                   >
                     {item.dayNum}
                   </span>
+
+                  {item.hasEvents ? (
+                    <span className={`w-1.5 h-1.5 rounded-full mt-1.5 transition-colors ${
+                      item.isSelected ? 'bg-blue-500' : 'bg-slate-400'
+                    }`} />
+                  ) : (
+                    <span className="w-1.5 h-1.5 rounded-full mt-1.5 bg-transparent" />
+                  )}
                 </button>
               );
             })}
@@ -827,119 +903,281 @@ export default function CalendarLightView() {
       )}
 
       {/* ── 4. Main Scrollable Content Area ── */}
-      <div className="flex-1 overflow-y-auto no-scrollbar px-4 sm:px-6 py-4 pb-20">
-        <div className="max-w-3xl mx-auto">
+      <div className="flex-1 overflow-y-auto no-scrollbar px-4 sm:px-6 py-5 pb-24">
+        <div className="max-w-2xl mx-auto">
 
-          {/* VIEW 1: DAY VIEW */}
+          {/* VIEW 1: DAY VIEW (Exact match to reference Screen 2) */}
           {viewMode === 'day' && (
-            <div className="space-y-4">
-              <div className="p-4 sm:p-5 rounded-3xl bg-white border border-slate-200/80 shadow-xs space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">
-                      {selectedDate.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {filteredEvents.filter((e) => isSameDay(e.rawDate, selectedDate)).length} scheduled items
-                    </p>
+            <div className="space-y-5">
+              {/* Day Title and Prev/Next Navigation */}
+              <div className="flex items-center justify-between pb-1">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-black text-[#1C1C1E] tracking-tight">
+                    {selectedDate.toLocaleDateString([], { weekday: 'long', day: 'numeric' })}
+                  </h2>
+                  <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                    {filteredEvents.filter((e) => isSameDay(e.rawDate, selectedDate)).length} scheduled appointments
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const prev = new Date(selectedDate);
+                      prev.setDate(prev.getDate() - 1);
+                      setSelectedDate(prev);
+                    }}
+                    className="w-9 h-9 rounded-full bg-white border border-slate-200/80 hover:bg-slate-50 flex items-center justify-center text-slate-700 shadow-2xs transition-all cursor-pointer active:scale-95"
+                    title="Previous day"
+                  >
+                    <ChevronLeft size={17} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = new Date(selectedDate);
+                      next.setDate(next.getDate() + 1);
+                      setSelectedDate(next);
+                    }}
+                    className="w-9 h-9 rounded-full bg-white border border-slate-200/80 hover:bg-slate-50 flex items-center justify-center text-slate-700 shadow-2xs transition-all cursor-pointer active:scale-95"
+                    title="Next day"
+                  >
+                    <ChevronRight size={17} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Timeline Items */}
+              {filteredEvents.filter((e) => isSameDay(e.rawDate, selectedDate)).length > 0 ? (
+                <div className="space-y-4 pt-1">
+                  {filteredEvents
+                    .filter((e) => isSameDay(e.rawDate, selectedDate))
+                    .map((ev, i) => {
+                      const isFeaturedYellow = i === 1 || ev.priority === 'urgent' || ev.priority === 'high';
+
+                      return (
+                        <div key={ev.id} className="flex items-start gap-3.5">
+                          {/* Time label on left */}
+                          <div className="w-16 pt-3 shrink-0 text-right">
+                            <span className="text-xs font-black text-slate-400">
+                              {ev.timeStr || '09:00 AM'}
+                            </span>
+                          </div>
+
+                          {/* Event Card on right */}
+                          <div className="flex-1 min-w-0">
+                            {isFeaturedYellow ? (
+                              /* ── Active Butter Yellow Card with Dot Pattern & Diagonal Arrow ── */
+                              <div
+                                onClick={() => {
+                                  setSelectedEvent(ev);
+                                  setIsDetailsOpen(true);
+                                }}
+                                className="agent-yellow-card p-4.5 flex items-center justify-between gap-3 cursor-pointer group active:scale-[0.99] transition-all"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="text-sm font-black text-[#1C1C1E] tracking-tight truncate">
+                                    {ev.title}
+                                  </h4>
+                                  <p className="text-xs font-semibold text-[#1C1C1E]/75 mt-0.5 truncate">
+                                    {ev.category || 'Focus'} · {ev.timeStr} {ev.notes ? `· ${ev.notes}` : ''}
+                                  </p>
+                                </div>
+
+                                <div className="w-10 h-10 rounded-full bg-[#1C1C1E] text-white flex items-center justify-center shadow-xs shrink-0 group-hover:scale-105 group-hover:-translate-y-0.5 transition-transform">
+                                  <ArrowRight size={17} className="-rotate-45 stroke-[2.5]" />
+                                </div>
+                              </div>
+                            ) : (
+                              /* ── Clean White Card with Checkmark Circle ── */
+                              <div
+                                onClick={() => {
+                                  setSelectedEvent(ev);
+                                  setIsDetailsOpen(true);
+                                }}
+                                className="bg-white rounded-[26px] p-4.5 border border-slate-200/80 shadow-2xs hover:shadow-xs flex items-center justify-between gap-3 cursor-pointer transition-all group"
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-black text-xs text-slate-700 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                                    {ev.title[0]?.toUpperCase() || 'E'}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <h4 className="text-sm font-black text-[#1C1C1E] tracking-tight truncate">
+                                      {ev.title}
+                                    </h4>
+                                    <p className="text-xs text-slate-400 font-medium mt-0.5 truncate">
+                                      {ev.itemType} · {ev.timeStr} {ev.notes ? `· ${ev.notes}` : ''}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="w-6 h-6 rounded-full bg-[#E8F8EE] text-[#1E9E4A] flex items-center justify-center text-xs font-black shrink-0 shadow-2xs">
+                                  ✓
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <div className="py-14 text-center rounded-[30px] bg-white border border-slate-200/80 p-8">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-3">
+                    <CalendarIcon size={22} />
                   </div>
+                  <h4 className="text-sm font-bold text-slate-700">No events scheduled for this day</h4>
+                  <p className="text-xs text-slate-400 mt-1">Tap the plus button to schedule an event or task</p>
                   <button
                     type="button"
                     onClick={openScheduleCreateModal}
-                    className="px-3.5 py-1.5 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                    className="mt-4 px-4 py-2 rounded-full bg-[#1C1C1E] text-white text-xs font-bold shadow-xs hover:scale-105 transition-transform cursor-pointer"
                   >
-                    <Plus size={14} />
-                    <span>Add Item</span>
+                    + Add New Event
                   </button>
                 </div>
-
-                {filteredEvents.filter((e) => isSameDay(e.rawDate, selectedDate)).length > 0 ? (
-                  <div className="space-y-2.5 pt-1">
-                    {filteredEvents
-                      .filter((e) => isSameDay(e.rawDate, selectedDate))
-                      .map((ev) => (
-                        <div
-                          key={ev.id}
-                          onClick={() => {
-                            setSelectedEvent(ev);
-                            setIsDetailsOpen(true);
-                          }}
-                          className={`p-3.5 rounded-2xl border ${ev.colorBg} ${ev.colorBorder} ${ev.colorText} flex items-center justify-between cursor-pointer hover:shadow-xs transition-all`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-9 h-9 rounded-xl bg-white/90 flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                              {ev.itemType === 'task' ? <CheckSquare size={17} /> : <CalendarIcon size={17} />}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold truncate">{ev.title}</p>
-                              <p className="text-xs opacity-80 mt-0.5">{ev.timeStr} {ev.notes ? `· ${ev.notes}` : ''}</p>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-white/80 uppercase shrink-0 ml-2">
-                            {ev.itemType}
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                ) : (
-                  <div className="py-12 text-center text-xs text-slate-400 italic">
-                    No events or tasks scheduled for this day. Click "+ Add Item" above.
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           )}
 
-          {/* VIEW 2: WEEK VIEW */}
+          {/* VIEW 2: WEEK VIEW (Modern Agenda & Day Spotlight) */}
           {viewMode === 'week' && (
-            <div className="space-y-3">
-              {currentWeekDays.map((dayItem, idx) => {
-                const dayEvents = filteredEvents.filter((e) => isSameDay(e.rawDate, dayItem.date));
+            <div className="space-y-4">
+              {(() => {
+                const selectedDayEvents = filteredEvents.filter((e) => isSameDay(e.rawDate, selectedDate));
+                const otherDaysWithEvents = currentWeekDays.filter(
+                  (d) => !isSameDay(d.date, selectedDate) && filteredEvents.some((e) => isSameDay(e.rawDate, d.date))
+                );
+
                 return (
-                  <div
-                    key={idx}
-                    className={`p-4 rounded-3xl border transition-all ${
-                      dayItem.isSelected
-                        ? 'bg-blue-50/40 border-blue-200'
-                        : 'bg-white border-slate-200/80'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs font-extrabold ${dayItem.isWeekend ? 'text-rose-500' : 'text-slate-500'}`}>
-                          {dayItem.dayName}
-                        </span>
-                        <span className="text-xs font-bold text-slate-800">
-                          {dayItem.date.toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                        </span>
+                  <>
+                    {/* Active Selected Day Spotlight */}
+                    <div className="rounded-[28px] bg-white border border-slate-200/80 p-5 shadow-2xs space-y-3.5">
+                      <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
+                            {selectedDate.toLocaleDateString([], { weekday: 'short' })}
+                          </span>
+                          <h3 className="text-sm sm:text-base font-extrabold text-[#1C1C1E]">
+                            {selectedDate.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}
+                          </h3>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={openScheduleCreateModal}
+                          className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <Plus size={14} />
+                          <span>Add</span>
+                        </button>
                       </div>
-                      <span className="text-[11px] text-slate-400 font-semibold">
-                        {dayEvents.length} items
-                      </span>
+
+                      {selectedDayEvents.length > 0 ? (
+                        <div className="space-y-2">
+                          {selectedDayEvents.map((ev) => (
+                            <div
+                              key={ev.id}
+                              onClick={() => {
+                                setSelectedEvent(ev);
+                                setIsDetailsOpen(true);
+                              }}
+                              className="p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/70 hover:bg-slate-100/80 transition-all flex items-center justify-between gap-3 cursor-pointer group"
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 text-[#1C1C1E] flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                                  {ev.timeStr ? ev.timeStr.slice(0, 5) : '09:00'}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="text-xs sm:text-sm font-bold text-[#1C1C1E] tracking-tight truncate group-hover:text-blue-600 transition-colors">
+                                    {ev.title}
+                                  </h4>
+                                  <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
+                                    {ev.category || 'General'} {ev.notes ? `· ${ev.notes}` : ''}
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600 shrink-0">
+                                {ev.itemType}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-6 text-center">
+                          <p className="text-xs font-semibold text-slate-500">
+                            No events scheduled for this day
+                          </p>
+                          <button
+                            type="button"
+                            onClick={openScheduleCreateModal}
+                            className="mt-2 text-xs font-bold text-blue-600 hover:underline cursor-pointer"
+                          >
+                            + Schedule an event
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    {dayEvents.length > 0 ? (
-                      <div className="space-y-1.5">
-                        {dayEvents.map((ev) => (
-                          <div
-                            key={ev.id}
-                            onClick={() => {
-                              setSelectedEvent(ev);
-                              setIsDetailsOpen(true);
-                            }}
-                            className={`p-2.5 rounded-xl border text-xs font-semibold ${ev.colorBg} ${ev.colorBorder} ${ev.colorText} flex items-center justify-between cursor-pointer`}
-                          >
-                            <span className="truncate">{ev.title}</span>
-                            <span className="text-[10px] opacity-75 shrink-0 ml-2">{ev.timeStr}</span>
-                          </div>
-                        ))}
+                    {/* Other Days with Events This Week */}
+                    {otherDaysWithEvents.length > 0 && (
+                      <div className="space-y-2.5 pt-1">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 px-1">
+                          Other Events This Week
+                        </span>
+                        {otherDaysWithEvents.map((dayItem, idx) => {
+                          const dayEvents = filteredEvents.filter((e) => isSameDay(e.rawDate, dayItem.date));
+                          return (
+                            <div
+                              key={idx}
+                              className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2"
+                            >
+                              <div className="flex items-center justify-between pb-1 border-b border-slate-50">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedDate(dayItem.date)}
+                                  className="text-xs font-bold text-slate-800 hover:text-blue-600 flex items-center gap-1.5 cursor-pointer transition-colors"
+                                >
+                                  <span className={dayItem.isWeekend ? 'text-rose-500 font-extrabold' : 'text-slate-500'}>
+                                    {dayItem.dayName}
+                                  </span>
+                                  <span>{dayItem.date.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                                </button>
+                                <span className="text-[10px] font-semibold text-slate-400">
+                                  {dayEvents.length} {dayEvents.length === 1 ? 'event' : 'events'}
+                                </span>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                {dayEvents.map((ev) => (
+                                  <div
+                                    key={ev.id}
+                                    onClick={() => {
+                                      setSelectedEvent(ev);
+                                      setIsDetailsOpen(true);
+                                    }}
+                                    className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-all flex items-center justify-between cursor-pointer group"
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                                      <span className="text-xs font-semibold text-slate-800 truncate group-hover:text-blue-600 transition-colors">
+                                        {ev.title}
+                                      </span>
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-medium shrink-0 ml-2">
+                                      {ev.timeStr}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ) : (
-                      <p className="text-[11px] text-slate-400 italic py-1">No items</p>
                     )}
-                  </div>
+                  </>
                 );
-              })}
+              })()}
             </div>
           )}
 
@@ -970,13 +1208,13 @@ export default function CalendarLightView() {
                           setIsDayAgendaModalOpen(true);
                         }
                       }}
-                      className={`min-h-[80px] sm:min-h-[92px] p-1.5 sm:p-2 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+className={`min-h-[82px] sm:min-h-[94px] p-2 sm:p-2.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
                         isSelected
-                          ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/30'
+                          ? 'border-blue-500 ring-2 ring-blue-500/25 bg-blue-50/35'
                           : cell.isCurrentMonth
-                          ? 'bg-white border-slate-200/70 hover:border-slate-300'
-                          : 'bg-slate-50/50 border-transparent opacity-40'
-                      }`}
+                          ? 'bg-white border border-slate-200/60 hover:border-slate-300/50'
+                          : 'bg-slate-50/40 border border-slate-300/30'
+                        }`}
                     >
                       {/* Top Date Number */}
                       <div className="flex items-center justify-between">
@@ -996,11 +1234,11 @@ export default function CalendarLightView() {
 
                       {/* Event Chips Preview */}
                       <div className="space-y-1 overflow-hidden">
-                        {dayEvents.slice(0, 2).map((ev) => (
-                          <div
-                            key={ev.id}
-                            className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-md truncate ${ev.colorBg} ${ev.colorText}`}
-                          >
+{dayEvents.slice(0, 2).map((ev) => (
+                            <div
+                              key={ev.id}
+                              className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-md truncate ${ev.colorBg} ${ev.colorText} hover:bg-opacity-80 hover:transition-colors`}
+                            >
                             {ev.title}
                           </div>
                         ))}
@@ -1071,11 +1309,10 @@ export default function CalendarLightView() {
                   <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider">
                     Due Date
                   </label>
-                  <input
-                    type="date"
+                  <DatePickerDropdown
                     value={taskDueDate}
-                    onChange={(e) => setTaskDueDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none"
+                    onChange={setTaskDueDate}
+                    placeholder="Select date"
                   />
                 </div>
 
@@ -1172,12 +1409,11 @@ export default function CalendarLightView() {
                   <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider">
                     Date
                   </label>
-                  <input
-                    type="date"
-                    required
+                  <DatePickerDropdown
                     value={formDate}
-                    onChange={(e) => setFormDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none"
+                    onChange={setFormDate}
+                    required
+                    placeholder="Select date"
                   />
                 </div>
 
@@ -1185,12 +1421,11 @@ export default function CalendarLightView() {
                   <label className="block text-slate-700 font-bold mb-1.5 uppercase tracking-wider">
                     Time
                   </label>
-                  <input
-                    type="time"
-                    required
+                  <TimePickerDropdown
                     value={formTime}
-                    onChange={(e) => setFormTime(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold focus:outline-none"
+                    onChange={setFormTime}
+                    required
+                    placeholder="Select time"
                   />
                 </div>
               </div>
