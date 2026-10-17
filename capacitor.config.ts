@@ -15,8 +15,8 @@ const config: CapacitorConfig = {
   appName: 'Personal Agent',
   webDir: 'out',
   server: {
-    // Public Cloudflare tunnel URL — works on all networks globally
-    url: 'https://fathers-printable-lil-evidence.trycloudflare.com',
+    // Vercel production deployment URL — permanent, works 24/7 globally
+    url: 'https://personalagent-one.vercel.app',
     cleartext: false,
     androidScheme: 'https',
   },

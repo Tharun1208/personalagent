@@ -5,7 +5,7 @@
  * and gracefully falls back on offline errors without crashing the application.
  */
 
-export const REMOTE_API_URL = 'https://fathers-printable-lil-evidence.trycloudflare.com';
+export const REMOTE_API_URL = 'https://personalagent-one.vercel.app';
 
 export function getRemoteApiUrl(): string {
   if (typeof window !== 'undefined') {
