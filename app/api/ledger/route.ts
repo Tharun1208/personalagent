@@ -23,37 +23,36 @@ export async function POST(req: NextRequest) {
     const user = auth.getUserFromRequest(req);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const body = await req.json();
-    const { personName, amount, currency, type, description, dueDate, category } = body;
+    const body = await req.json().catch(() => ({}));
+    const { personName, amount, currency, type, description, dueDate, category, status, paidAmount, payments, settledAt } = body || {};
 
-    if (!personName || !amount || !type) {
-      return NextResponse.json({ error: 'Missing required fields: personName, amount, type' }, { status: 400 });
-    }
-
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
-    }
+    const cleanName = (personName || body?.name || 'Unnamed').toString().trim();
+    const numAmount = typeof amount === 'number' ? amount : parseFloat(amount || '0');
+    const validAmount = isNaN(numAmount) ? 0 : Math.max(0, numAmount);
+    const validType = type === 'receive' ? 'receive' : 'give';
 
     const newEntry: LedgerEntry = {
-      id: body.id || `ledg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: body?.id || `ledg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       userId: user.id,
-      personName: personName.trim(),
-      amount: numAmount,
+      personName: cleanName || 'Unnamed',
+      amount: validAmount,
       currency: currency || '₹',
-      type: type === 'give' ? 'give' : 'receive',
-      status: 'pending',
-      description: description?.trim() || undefined,
+      type: validType,
+      status: status || 'pending',
+      paidAmount: paidAmount || (status === 'settled' ? validAmount : 0),
+      payments: Array.isArray(payments) ? payments : [],
+      settledAt: settledAt,
+      description: description?.toString()?.trim() || undefined,
       dueDate: dueDate || undefined,
       category: category || 'personal',
-      createdAt: new Date().toISOString(),
+      createdAt: body?.createdAt || new Date().toISOString(),
     };
 
     const saved = db.createLedgerEntry(newEntry);
-    return NextResponse.json({ entry: saved }, { status: 201 });
+    return NextResponse.json({ entry: saved, success: true }, { status: 201 });
   } catch (error: any) {
     console.error('Error in POST /api/ledger:', error);
-    return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: error?.message || 'Internal Server Error', success: false }, { status: 500 });
   }
 }
 
@@ -72,8 +71,7 @@ export async function PATCH(req: NextRequest) {
 
     if (action === 'settle') {
       const settled = db.settleLedgerEntry(id, user.id);
-      if (!settled) return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
-      return NextResponse.json({ entry: settled });
+      return NextResponse.json({ entry: settled, success: true });
     }
 
     if (action === 'partial_payment') {
@@ -83,14 +81,11 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid payment amount' }, { status: 400 });
       }
       const updated = db.recordPartialPayment(id, user.id, numPayment, note);
-      if (!updated) return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
-      return NextResponse.json({ entry: updated });
+      return NextResponse.json({ entry: updated, success: true });
     }
 
     const updated = db.updateLedgerEntry(id, user.id, updates);
-    if (!updated) return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
-
-    return NextResponse.json({ entry: updated });
+    return NextResponse.json({ entry: updated, success: true });
   } catch (error: any) {
     console.error('Error in PATCH /api/ledger:', error);
     return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 });

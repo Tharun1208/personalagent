@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  Plus,
   Search,
   Download,
   Trash2,
@@ -13,11 +12,11 @@ import {
   Pin,
   ArrowLeft,
   Check,
-  Type,
   List,
+  ListOrdered,
   Grid,
-  CheckSquare,
-  Edit3,
+  Plus,
+  FolderPlus,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '@/lib/context/AppContext';
@@ -27,9 +26,13 @@ import {
   StandaloneNote,
 } from '@/lib/utils/goalExport';
 import CustomSelect, { SelectOption } from '@/components/common/CustomSelect';
+import MarkdownNoteRenderer from './MarkdownNoteRenderer';
+import VisualTableModal from './VisualTableModal';
 
 const NOTES_STORAGE_KEY = 'recall_strategic_notes';
 const FOLDERS_STORAGE_KEY = 'recall_note_folders';
+const FOLDERS_INIT_KEY = 'recall_note_folders_initialized';
+const NOTES_INIT_KEY = 'recall_strategic_notes_initialized';
 
 export interface NoteFolder {
   id: string;
@@ -46,14 +49,14 @@ export interface AppNote extends StandaloneNote {
   isPinned?: boolean;
 }
 
-// Clean White cards with subtle category accent dots
+// Personal agent crisp cards with pastel accents
 const NOTE_COLOR_THEMES = {
   cream: {
     id: 'cream',
     name: 'Classic White',
     cardBg: 'bg-white',
-    cardBorder: 'border-slate-200',
-    titleColor: 'text-slate-900',
+    cardBorder: 'border-slate-200/80',
+    titleColor: 'text-[#1C1C1E]',
     textColor: 'text-slate-600',
     timeColor: 'text-slate-400',
     dotColor: 'bg-amber-400',
@@ -61,29 +64,29 @@ const NOTE_COLOR_THEMES = {
   mint: {
     id: 'mint',
     name: 'Fresh Mint',
-    cardBg: 'bg-white',
-    cardBorder: 'border-slate-200',
-    titleColor: 'text-slate-900',
+    cardBg: 'bg-[#B8F2A6]/25',
+    cardBorder: 'border-[#B8F2A6]',
+    titleColor: 'text-[#1C1C1E]',
     textColor: 'text-slate-600',
     timeColor: 'text-slate-400',
     dotColor: 'bg-emerald-500',
   },
   peach: {
     id: 'peach',
-    name: 'Coral Peach',
-    cardBg: 'bg-white',
-    cardBorder: 'border-slate-200',
-    titleColor: 'text-slate-900',
+    name: 'Butter Yellow',
+    cardBg: 'bg-[#FEF9D9]',
+    cardBorder: 'border-[#F4EBAC]',
+    titleColor: 'text-[#1C1C1E]',
     textColor: 'text-slate-600',
     timeColor: 'text-slate-400',
-    dotColor: 'bg-rose-500',
+    dotColor: 'bg-amber-500',
   },
   lavender: {
     id: 'lavender',
-    name: 'Soft Violet',
-    cardBg: 'bg-white',
-    cardBorder: 'border-slate-200',
-    titleColor: 'text-slate-900',
+    name: 'Soft Lavender',
+    cardBg: 'bg-[#B5C4FF]/25',
+    cardBorder: 'border-[#B5C4FF]',
+    titleColor: 'text-[#1C1C1E]',
     textColor: 'text-slate-600',
     timeColor: 'text-slate-400',
     dotColor: 'bg-indigo-500',
@@ -92,8 +95,8 @@ const NOTE_COLOR_THEMES = {
     id: 'slate',
     name: 'Pure Slate',
     cardBg: 'bg-white',
-    cardBorder: 'border-slate-200',
-    titleColor: 'text-slate-900',
+    cardBorder: 'border-slate-200/80',
+    titleColor: 'text-[#1C1C1E]',
     textColor: 'text-slate-600',
     timeColor: 'text-slate-400',
     dotColor: 'bg-slate-400',
@@ -103,38 +106,38 @@ const NOTE_COLOR_THEMES = {
 const FOLDER_COLOR_THEMES = {
   amber: {
     bg: 'bg-white',
-    border: 'border-slate-200',
-    titleColor: 'text-slate-900',
+    border: 'border-slate-200/80',
+    titleColor: 'text-[#1C1C1E]',
     pillBg: 'bg-amber-50',
     pillText: 'text-amber-700',
   },
   peach: {
-    bg: 'bg-white',
-    border: 'border-slate-200',
-    titleColor: 'text-slate-900',
-    pillBg: 'bg-rose-50',
-    pillText: 'text-rose-700',
+    bg: 'bg-[#FEF9D9]/50',
+    border: 'border-[#F4EBAC]',
+    titleColor: 'text-[#1C1C1E]',
+    pillBg: 'bg-amber-100/70',
+    pillText: 'text-amber-800',
   },
   slate: {
     bg: 'bg-white',
-    border: 'border-slate-200',
-    titleColor: 'text-slate-900',
+    border: 'border-slate-200/80',
+    titleColor: 'text-[#1C1C1E]',
     pillBg: 'bg-slate-100',
     pillText: 'text-slate-700',
   },
   mint: {
-    bg: 'bg-white',
-    border: 'border-slate-200',
-    titleColor: 'text-slate-900',
+    bg: 'bg-[#B8F2A6]/20',
+    border: 'border-[#B8F2A6]/60',
+    titleColor: 'text-[#1C1C1E]',
     pillBg: 'bg-emerald-50',
     pillText: 'text-emerald-700',
   },
   lavender: {
-    bg: 'bg-white',
-    border: 'border-slate-200',
-    titleColor: 'text-slate-900',
-    pillBg: 'bg-purple-50',
-    pillText: 'text-purple-700',
+    bg: 'bg-[#B5C4FF]/20',
+    border: 'border-[#B5C4FF]/60',
+    titleColor: 'text-[#1C1C1E]',
+    pillBg: 'bg-indigo-50',
+    pillText: 'text-indigo-700',
   },
 };
 
@@ -212,24 +215,36 @@ const DEFAULT_NOTES: AppNote[] = [
 function loadLocalFolders(): NoteFolder[] {
   if (typeof window === 'undefined') return DEFAULT_FOLDERS;
   try {
+    const isInit = localStorage.getItem(FOLDERS_INIT_KEY);
     const raw = localStorage.getItem(FOLDERS_STORAGE_KEY);
-    if (!raw) return DEFAULT_FOLDERS;
+    if (!isInit) {
+      localStorage.setItem(FOLDERS_INIT_KEY, 'true');
+      localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(DEFAULT_FOLDERS));
+      return DEFAULT_FOLDERS;
+    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_FOLDERS;
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return DEFAULT_FOLDERS;
+    return [];
   }
 }
 
 function loadLocalNotes(): AppNote[] {
   if (typeof window === 'undefined') return DEFAULT_NOTES;
   try {
+    const isInit = localStorage.getItem(NOTES_INIT_KEY);
     const raw = localStorage.getItem(NOTES_STORAGE_KEY);
-    if (!raw) return DEFAULT_NOTES;
+    if (!isInit) {
+      localStorage.setItem(NOTES_INIT_KEY, 'true');
+      localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(DEFAULT_NOTES));
+      return DEFAULT_NOTES;
+    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_NOTES;
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return DEFAULT_NOTES;
+    return [];
   }
 }
 
@@ -253,6 +268,7 @@ export default function NotesView() {
 
   // Active view: 'home' | 'folder' | 'editor' | 'all'
   const [viewMode, setViewMode] = useState<'home' | 'folder' | 'editor' | 'all'>('home');
+  const [homeSubTab, setHomeSubTab] = useState<'notes' | 'folders'>('notes');
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [currentEditingNote, setCurrentEditingNote] = useState<AppNote | null>(null);
 
@@ -266,6 +282,7 @@ export default function NotesView() {
   const [editorFolderId, setEditorFolderId] = useState<string>('');
   const [editorColor, setEditorColor] = useState<keyof typeof NOTE_COLOR_THEMES>('cream');
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [isTableModalOpen, setIsTableModalOpen] = useState(false);
 
   // Folder modal state
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
@@ -316,6 +333,15 @@ export default function NotesView() {
 
   // Derived active folder
   const activeFolder = useMemo(() => {
+    if (activeFolderId === '__unassigned__') {
+      return {
+        id: '__unassigned__',
+        name: 'Quick Notes (No Folder)',
+        icon: '📄',
+        themeColor: 'slate' as const,
+        createdAt: '',
+      };
+    }
     return folders.find((f) => f.id === activeFolderId) || null;
   }, [folders, activeFolderId]);
 
@@ -328,10 +354,15 @@ export default function NotesView() {
     return counts;
   }, [folders, notes]);
 
+  const unassignedNotesCount = useMemo(() => {
+    return notes.filter((n) => !n.folderId).length;
+  }, [notes]);
+
   const folderNotes = useMemo(() => {
     if (!activeFolderId) return [];
     return notes.filter((n) => {
-      const matchFolder = n.folderId === activeFolderId;
+      const matchFolder =
+        activeFolderId === '__unassigned__' ? !n.folderId : n.folderId === activeFolderId;
       const matchSearch =
         !folderSearchQuery.trim() ||
         n.title.toLowerCase().includes(folderSearchQuery.toLowerCase()) ||
@@ -351,6 +382,18 @@ export default function NotesView() {
     return filtered.slice(0, 6);
   }, [notes, homeSearchQuery]);
 
+  // Hide bottom bar when inside editor view mode
+  useEffect(() => {
+    if (viewMode === 'editor') {
+      window.dispatchEvent(new CustomEvent('app_modal_state', { detail: { open: true } }));
+    } else {
+      window.dispatchEvent(new CustomEvent('app_modal_state', { detail: { open: false } }));
+    }
+    return () => {
+      window.dispatchEvent(new CustomEvent('app_modal_state', { detail: { open: false } }));
+    };
+  }, [viewMode]);
+
   // Handlers
   const handleOpenFolder = (folderId: string) => {
     setActiveFolderId(folderId);
@@ -362,7 +405,14 @@ export default function NotesView() {
     setCurrentEditingNote(null);
     setEditorTitle('');
     setEditorContent('');
-    setEditorFolderId(folderIdToUse || activeFolderId || folders[0]?.id || '');
+    // If not specified or called from home, default to unassigned (no folder)
+    const initialFolder =
+      folderIdToUse !== undefined
+        ? folderIdToUse
+        : activeFolderId && activeFolderId !== '__unassigned__'
+        ? activeFolderId
+        : '';
+    setEditorFolderId(initialFolder);
     setEditorColor('cream');
     setShowColorPicker(false);
     setViewMode('editor');
@@ -372,11 +422,66 @@ export default function NotesView() {
     setCurrentEditingNote(note);
     setEditorTitle(note.title);
     setEditorContent(note.content);
-    setEditorFolderId(note.folderId || folders[0]?.id || '');
+    setEditorFolderId(note.folderId || '');
     setEditorColor(note.color || 'cream');
     setShowColorPicker(false);
     setViewMode('editor');
   };
+
+  // Auto-save state
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Persist editor contents without leaving the editor (used by auto-save + Done)
+  const persistEditorNote = (): boolean => {
+    if (!editorTitle.trim() && !editorContent.trim()) return false;
+
+    const now = new Date().toISOString();
+    const cleanTitle = editorTitle.trim() || 'Untitled Note';
+    const finalFolderId = editorFolderId.trim() ? editorFolderId.trim() : undefined;
+
+    if (currentEditingNote) {
+      const updated: AppNote = {
+        ...currentEditingNote,
+        title: cleanTitle,
+        content: editorContent,
+        folderId: finalFolderId,
+        color: editorColor,
+        updatedAt: now,
+      };
+      setNotes((prev) => prev.map((n) => (n.id === currentEditingNote.id ? updated : n)));
+      setCurrentEditingNote(updated);
+    } else {
+      const newNote: AppNote = {
+        id: `note_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        title: cleanTitle,
+        content: editorContent,
+        folderId: finalFolderId,
+        color: editorColor,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setNotes((prev) => [newNote, ...prev]);
+      setCurrentEditingNote(newNote);
+    }
+
+    setLastSavedAt(now);
+    return true;
+  };
+
+  // Auto-save: debounce 800ms after the last keystroke
+  useEffect(() => {
+    if (viewMode !== 'editor') return;
+    if (!editorTitle.trim() && !editorContent.trim()) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      persistEditorNote();
+    }, 800);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorTitle, editorContent, editorFolderId, editorColor, viewMode]);
 
   const handleSaveEditorNote = () => {
     if (!editorTitle.trim() && !editorContent.trim()) {
@@ -384,38 +489,9 @@ export default function NotesView() {
       return;
     }
 
-    const now = new Date().toISOString();
-    const cleanTitle = editorTitle.trim() || 'Untitled Note';
-
-    if (currentEditingNote) {
-      setNotes((prev) =>
-        prev.map((n) =>
-          n.id === currentEditingNote.id
-            ? {
-                ...n,
-                title: cleanTitle,
-                content: editorContent,
-                folderId: editorFolderId,
-                color: editorColor,
-                updatedAt: now,
-              }
-            : n
-        )
-      );
-      showToast?.('Note updated', 'success');
-    } else {
-      const newNote: AppNote = {
-        id: `note_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-        title: cleanTitle,
-        content: editorContent,
-        folderId: editorFolderId,
-        color: editorColor,
-        createdAt: now,
-        updatedAt: now,
-      };
-      setNotes((prev) => [newNote, ...prev]);
-      showToast?.('Note created', 'success');
-    }
+    const isNew = !currentEditingNote;
+    persistEditorNote();
+    showToast?.(isNew ? 'Note created' : 'Note updated', 'success');
 
     if (activeFolderId) {
       setViewMode('folder');
@@ -431,7 +507,11 @@ export default function NotesView() {
       confirmText: 'Delete',
       type: 'danger',
       onConfirm: () => {
-        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+        setNotes((prev) => {
+          const next = prev.filter((n) => n.id !== noteId);
+          try { localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(next)); } catch {}
+          return next;
+        });
         showToast?.('Note deleted', 'info');
         if (viewMode === 'editor') {
           setViewMode(activeFolderId ? 'folder' : 'home');
@@ -450,7 +530,11 @@ export default function NotesView() {
       badge: newFolderBadge.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
-    setFolders((prev) => [...prev, newF]);
+    setFolders((prev) => {
+      const next = [...prev, newF];
+      try { localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
     setNewFolderName('');
     setNewFolderBadge('');
     setIsFolderModalOpen(false);
@@ -458,16 +542,23 @@ export default function NotesView() {
   };
 
   const handleDeleteFolder = (folder: NoteFolder) => {
+    if (folder.id === '__unassigned__') return;
     showConfirm({
       title: 'Delete Folder?',
       message: `Delete folder "${folder.name}"? Notes inside will become unassigned.`,
       confirmText: 'Delete',
       type: 'danger',
       onConfirm: () => {
-        setFolders((prev) => prev.filter((f) => f.id !== folder.id));
-        setNotes((prev) =>
-          prev.map((n) => (n.folderId === folder.id ? { ...n, folderId: undefined } : n))
+        const nextFolders = folders.filter((f) => f.id !== folder.id);
+        const nextNotes = notes.map((n) =>
+          n.folderId === folder.id ? { ...n, folderId: undefined } : n
         );
+        setFolders(nextFolders);
+        setNotes(nextNotes);
+        try {
+          localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(nextFolders));
+          localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(nextNotes));
+        } catch {}
         showToast?.('Folder deleted', 'info');
         if (activeFolderId === folder.id) {
           setActiveFolderId(null);
@@ -477,65 +568,244 @@ export default function NotesView() {
     });
   };
 
-  // Editor formatting tools
-  const insertFormatting = (prefix: string, suffix: string = '') => {
+  // Smart List Formatting: Bullet & Numbered lists
+  const toggleLinePrefix = (type: 'bullet' | 'number') => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const selectedText = editorContent.substring(start, end);
-    const replacement = `${prefix}${selectedText || 'text'}${suffix}`;
 
+    // Expand selection to include full lines
+    const textBefore = editorContent.substring(0, start);
+    const lineStart = textBefore.lastIndexOf('\n') + 1;
+    const textAfter = editorContent.substring(end);
+    const lineEnd = end + (textAfter.indexOf('\n') === -1 ? textAfter.length : textAfter.indexOf('\n'));
+
+    const selectedLinesText = editorContent.substring(lineStart, lineEnd);
+    const lines = selectedLinesText.split('\n');
+
+    let isAllAlreadyFormatted = true;
+    for (const line of lines) {
+      if (type === 'bullet' && !line.match(/^\s*•\s+/)) {
+        isAllAlreadyFormatted = false;
+        break;
+      }
+      if (type === 'number' && !line.match(/^\s*\d+\.\s+/)) {
+        isAllAlreadyFormatted = false;
+        break;
+      }
+    }
+
+    let modifiedLines: string[];
+    if (isAllAlreadyFormatted) {
+      // Toggle OFF: remove bullet or number prefix
+      modifiedLines = lines.map((line) => {
+        if (type === 'bullet') return line.replace(/^(\s*)•\s+/, '$1');
+        return line.replace(/^(\s*)\d+\.\s+/, '$1');
+      });
+    } else {
+      // Toggle ON: apply bullet or number (also replace existing bullets/numbers)
+      let startNum = 1;
+      if (type === 'number') {
+        const linesBefore = editorContent.substring(0, lineStart).split('\n');
+        for (let i = linesBefore.length - 1; i >= 0; i--) {
+          const match = linesBefore[i].match(/^\s*(\d+)\.\s+/);
+          if (match) {
+            startNum = parseInt(match[1], 10) + 1;
+            break;
+          }
+        }
+      }
+
+      modifiedLines = lines.map((line, idx) => {
+        // Strip any existing bullet, number, or checklist prefix
+        const clean = line
+          .replace(/^(\s*)[•\-\*]\s+/, '$1')
+          .replace(/^(\s*)\d+[\.\)]\s+/, '$1')
+          .replace(/^(\s*)-\s\[[ xX]\]\s+/, '$1');
+
+        const indentMatch = clean.match(/^(\s*)/);
+        const indent = indentMatch ? indentMatch[1] : '';
+        const contentOnly = clean.substring(indent.length);
+
+        if (type === 'bullet') {
+          return `${indent}• ${contentOnly}`;
+        } else {
+          return `${indent}${startNum + idx}. ${contentOnly}`;
+        }
+      });
+    }
+
+    const replacement = modifiedLines.join('\n');
     const newContent =
-      editorContent.substring(0, start) + replacement + editorContent.substring(end);
+      editorContent.substring(0, lineStart) + replacement + editorContent.substring(lineEnd);
     setEditorContent(newContent);
 
     setTimeout(() => {
       textarea.focus();
-      textarea.setSelectionRange(
-        start + prefix.length,
-        start + prefix.length + (selectedText ? selectedText.length : 4)
-      );
+      textarea.setSelectionRange(lineStart, lineStart + replacement.length);
     }, 50);
   };
 
-  const insertBulletItem = () => {
+  const insertBulletItem = () => toggleLinePrefix('bullet');
+  const insertNumberedItem = () => toggleLinePrefix('number');
+
+  // Smart keyboard handling for notes: auto-continue bullets, numbers, and checklists
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const start = textarea.selectionStart;
-    const before = editorContent.substring(0, start);
-    const after = editorContent.substring(start);
-    const needNewline = before.length > 0 && !before.endsWith('\n');
-    const newContent = `${before}${needNewline ? '\n' : ''}• ${after}`;
-    setEditorContent(newContent);
-    setTimeout(() => {
-      textarea.focus();
-      const pos = start + (needNewline ? 3 : 2);
-      textarea.setSelectionRange(pos, pos);
-    }, 50);
+
+    if (e.key === 'Enter') {
+      const cursor = textarea.selectionStart;
+      const textBeforeCursor = editorContent.substring(0, cursor);
+      const textAfterCursor = editorContent.substring(cursor);
+
+      // Find the current line the user is typing on
+      const lastNewlineIndex = textBeforeCursor.lastIndexOf('\n');
+      const currentLine = textBeforeCursor.substring(lastNewlineIndex + 1);
+
+      // 1. Checklist item (- [ ] or - [x])
+      const checkMatch = currentLine.match(/^(\s*)-\s\[([ xX])\]\s*(.*)$/);
+      if (checkMatch) {
+        e.preventDefault();
+        const indent = checkMatch[1] || '';
+        const itemText = checkMatch[3] || '';
+        if (itemText.trim().length === 0) {
+          // Empty checklist item: Clear the checklist prefix and make it a clean line
+          const newBefore = textBeforeCursor.substring(0, lastNewlineIndex + 1) + indent;
+          const newContent = newBefore + textAfterCursor;
+          setEditorContent(newContent);
+          setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = newBefore.length;
+          }, 0);
+        } else {
+          // Continue checklist
+          const insertText = `\n${indent}- [ ] `;
+          const newContent = textBeforeCursor + insertText + textAfterCursor;
+          setEditorContent(newContent);
+          setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = cursor + insertText.length;
+          }, 0);
+        }
+        return;
+      }
+
+      // 2. Bullet list item (• or - or *)
+      const bulletMatch = currentLine.match(/^(\s*)([•\-\*])\s*(.*)$/);
+      if (bulletMatch) {
+        e.preventDefault();
+        const indent = bulletMatch[1] || '';
+        const bulletChar = bulletMatch[2] === '-' || bulletMatch[2] === '*' ? '•' : bulletMatch[2];
+        const itemText = bulletMatch[3] || '';
+        if (itemText.trim().length === 0) {
+          // Empty bullet item: Clear the bullet prefix
+          const newBefore = textBeforeCursor.substring(0, lastNewlineIndex + 1) + indent;
+          const newContent = newBefore + textAfterCursor;
+          setEditorContent(newContent);
+          setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = newBefore.length;
+          }, 0);
+        } else {
+          // Continue bullet list
+          const insertText = `\n${indent}${bulletChar} `;
+          const newContent = textBeforeCursor + insertText + textAfterCursor;
+          setEditorContent(newContent);
+          setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = cursor + insertText.length;
+          }, 0);
+        }
+        return;
+      }
+
+      // 3. Numbered list item (e.g. "1. " or "1) ")
+      const numMatch = currentLine.match(/^(\s*)(\d+)[\.\)]\s*(.*)$/);
+      if (numMatch) {
+        e.preventDefault();
+        const indent = numMatch[1] || '';
+        const currentNum = parseInt(numMatch[2], 10);
+        const itemText = numMatch[3] || '';
+        if (itemText.trim().length === 0) {
+          // Empty numbered item: Clear the number prefix
+          const newBefore = textBeforeCursor.substring(0, lastNewlineIndex + 1) + indent;
+          const newContent = newBefore + textAfterCursor;
+          setEditorContent(newContent);
+          setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = newBefore.length;
+          }, 0);
+        } else {
+          // Continue numbered list with next number
+          const insertText = `\n${indent}${currentNum + 1}. `;
+          const newContent = textBeforeCursor + insertText + textAfterCursor;
+          setEditorContent(newContent);
+          setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = cursor + insertText.length;
+          }, 0);
+        }
+        return;
+      }
+    }
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const cursor = textarea.selectionStart;
+      const textBeforeCursor = editorContent.substring(0, cursor);
+      const textAfterCursor = editorContent.substring(cursor);
+      const newContent = textBeforeCursor + '  ' + textAfterCursor;
+      setEditorContent(newContent);
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = cursor + 2;
+      }, 0);
+    }
   };
 
   const insertTableTemplate = () => {
-    const tableStr = '\n| Item | Description | Status |\n| --- | --- | --- |\n| Item 1 | Details here | Done |\n';
-    insertFormatting(tableStr);
+    setIsTableModalOpen(true);
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#FFFFFF] text-[#2C2416] overflow-hidden font-sans select-none sm:select-auto">
+    <div data-notes-view="true" className="flex-1 flex flex-col h-full bg-transparent text-[#2C2416] overflow-hidden font-sans select-none sm:select-auto">
       
       {/* ───────────────────────────────────────────────────────────── */}
       {/* SCREEN 1: "MY NOTES" HOME SCREEN                              */}
       {/* ───────────────────────────────────────────────────────────── */}
       {viewMode === 'home' && (
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-transparent">
           {/* Top Header */}
           <div className="shrink-0 pt-6 px-6 md:px-10 pb-2 max-w-4xl w-full mx-auto">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1C1C1E] tracking-tight">
                   My Notes
                 </h1>
+              </div>
+
+              {/* Note / Folder switcher — switching only */}
+              <div className="flex items-center p-1 rounded-full transio-glass-chip">
+                <button
+                  type="button"
+                  onClick={() => setHomeSubTab('notes')}
+                  className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                    homeSubTab === 'notes'
+                      ? 'bg-[#1C73E8] text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                  }`}
+                >
+                  <FileText size={14} strokeWidth={2.5} />
+                  Note
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHomeSubTab('folders')}
+                  className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                    homeSubTab === 'folders'
+                      ? 'bg-[#1C73E8] text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+                  }`}
+                >
+                  <FolderPlus size={14} strokeWidth={2.5} />
+                  Folder
+                </button>
               </div>
             </div>
 
@@ -546,7 +816,7 @@ export default function NotesView() {
                 placeholder="Search your notes"
                 value={homeSearchQuery}
                 onChange={(e) => setHomeSearchQuery(e.target.value)}
-                className="w-full pl-6 pr-12 py-3.5 rounded-full bg-white border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-3 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-[0_2px_10px_rgba(0,0,0,0.03)]"
+                className="w-full pl-6 pr-12 py-3.5 rounded-full transio-glass-input text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none transition-all shadow-[0_2px_10px_rgba(0,0,0,0.03)]"
               />
               <div className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
                 <Search size={20} strokeWidth={2.5} />
@@ -566,158 +836,213 @@ export default function NotesView() {
           {/* Main Scrollable Content */}
           <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-32 md:pb-20 max-w-4xl w-full mx-auto custom-scrollbar">
             
-            {/* ── Recent Section ── */}
-            <div className="mt-6">
-              <div className="flex items-center justify-between mb-3.5">
-                <h2 className="text-lg font-extrabold text-[#1C1C1E] tracking-tight">
-                  Recent
-                </h2>
-                {notes.length > 2 && (
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('all')}
-                    className="text-xs font-bold text-[#8E8E93] hover:text-[#1C1C1E] transition-colors cursor-pointer"
-                  >
-                    See all
-                  </button>
+            {/* ── Recent Notes Section (Active when Note tab is selected) ── */}
+            {homeSubTab === 'notes' && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-3.5">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-extrabold text-[#1C1C1E] tracking-tight">
+                      Recent
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => handleCreateNewNote()}
+                      className="w-8 h-8 rounded-full bg-[#1C73E8] hover:bg-[#1557B0] text-white flex items-center justify-center shadow-xs transition-all cursor-pointer active:scale-95"
+                      title="Create note"
+                      aria-label="Create note"
+                    >
+                      <Plus size={18} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                  {notes.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('all')}
+                      className="text-xs font-bold text-[#8E8E93] hover:text-[#1C1C1E] transition-colors cursor-pointer"
+                    >
+                      See all
+                    </button>
+                  )}
+                </div>
+
+                {recentNotes.length === 0 ? (
+                  <div className="p-8 rounded-3xl bg-slate-50 border border-slate-200 text-center">
+                    <p className="text-sm font-semibold text-slate-700">No notes found</p>
+                    <p className="text-xs text-slate-500 mt-1 mb-4">Click the + button to create your first note.</p>
+                    <button
+                      type="button"
+                      onClick={() => handleCreateNewNote()}
+                      className="px-4 py-2 rounded-full bg-[#1C73E8] hover:bg-[#1557B0] text-white text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+                    >
+                      <Plus size={15} strokeWidth={2.5} />
+                      <span>Create Note</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {recentNotes.map((note) => {
+                      const themeKey = (note.color as keyof typeof NOTE_COLOR_THEMES) || 'cream';
+                      const theme = NOTE_COLOR_THEMES[themeKey] || NOTE_COLOR_THEMES.cream;
+
+                      return (
+                        <motion.div
+                          key={note.id}
+                          whileHover={{ y: -2 }}
+                          onClick={() => handleEditNote(note)}
+                          className={`rounded-[24px] p-4.5 sm:p-5 border ${theme.cardBg} ${theme.cardBorder} shadow-2xs hover:shadow-md transition-all cursor-pointer flex items-center justify-between gap-3.5 group relative`}
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                            <div className="w-11 h-11 rounded-2xl transio-glass-icon-circle flex items-center justify-center text-blue-600 shrink-0 group-hover:scale-105 transition-transform">
+                              <FileText size={20} className="stroke-[2.2]" />
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <h3 className={`text-sm sm:text-base font-extrabold tracking-tight truncate ${theme.titleColor}`}>
+                                  {note.title || 'Untitled Document'}
+                                </h3>
+                                {note.isPinned && (
+                                  <Pin size={13} className="text-blue-500 shrink-0 fill-current" />
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1.5 mt-0.5">
+                                <span>{formatRelativeTime(note.updatedAt)}</span>
+                                <span>·</span>
+                                <span>{note.content ? `${note.content.length} chars` : 'Empty file'}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-500/80 group-hover:scale-125 transition-transform" />
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
+            )}
 
-              {recentNotes.length === 0 ? (
-                <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200 text-center">
-                  <p className="text-xs text-slate-500">No matching notes found.</p>
+            {/* ── Folder Section (Active when Folder tab is selected) ── */}
+            {homeSubTab === 'folders' && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-3.5">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-extrabold text-[#1C1C1E] tracking-tight">
+                      Folder
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setIsFolderModalOpen(true)}
+                      className="w-8 h-8 rounded-full bg-[#1C73E8] hover:bg-[#1557B0] text-white flex items-center justify-center shadow-xs transition-all cursor-pointer active:scale-95"
+                      title="Create folder"
+                      aria-label="Create folder"
+                    >
+                      <Plus size={18} strokeWidth={2.5} />
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {recentNotes.map((note) => {
-                    const themeKey = (note.color as keyof typeof NOTE_COLOR_THEMES) || 'cream';
-                    const theme = NOTE_COLOR_THEMES[themeKey] || NOTE_COLOR_THEMES.cream;
 
-                    return (
-                      <motion.div
-                        key={note.id}
-                        whileHover={{ y: -2 }}
-                        onClick={() => handleEditNote(note)}
-                        className={`rounded-[26px] p-5 border ${theme.cardBg} ${theme.cardBorder} shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-md transition-all cursor-pointer flex flex-col justify-between min-h-[140px] group relative`}
-                      >
-                        <div>
-                          {/* Note Title */}
-                          <div className="flex items-center justify-between gap-2 mb-2">
-                            <h3 className={`text-base font-extrabold tracking-tight line-clamp-1 ${theme.titleColor}`}>
-                              {note.title || 'Untitled'}
-                            </h3>
-                            {note.isPinned && (
-                              <Pin size={13} className="text-blue-500 shrink-0 fill-current" />
-                            )}
-                          </div>
-
-                          {/* Note Content Preview */}
-                          <p className={`text-xs sm:text-[13px] font-normal leading-relaxed line-clamp-3 whitespace-pre-wrap ${theme.textColor}`}>
-                            {note.content || <span className="italic opacity-60">Empty note...</span>}
-                          </p>
-                        </div>
-
-                        <div className="mt-4 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                          <span className={theme.timeColor}>
-                            {formatRelativeTime(note.updatedAt)}
-                          </span>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* ── Folder Section ── */}
-            <div className="mt-8">
-              <div className="flex items-center justify-between mb-3.5">
-                <h2 className="text-lg font-extrabold text-[#1C1C1E] tracking-tight">
-                  Folder
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setIsFolderModalOpen(true)}
-                  className="w-7 h-7 rounded-full border border-slate-300 hover:border-slate-500 bg-white text-slate-800 flex items-center justify-center transition-all cursor-pointer shadow-2xs active:scale-95"
-                  title="Add folder"
-                >
-                  <Plus size={15} strokeWidth={2.5} />
-                </button>
-              </div>
-
-              <div className="space-y-3.5">
-                {folders.map((folder) => {
-                  const count = folderNoteCounts[folder.id] || 0;
-                  const themeKey = folder.themeColor || 'amber';
-                  const theme = FOLDER_COLOR_THEMES[themeKey] || FOLDER_COLOR_THEMES.amber;
-
-                  return (
+                <div className="space-y-3.5">
+                  {unassignedNotesCount > 0 && (
                     <motion.div
-                      key={folder.id}
                       whileHover={{ scale: 1.01 }}
                       whileTap={{ scale: 0.99 }}
-                      onClick={() => handleOpenFolder(folder.id)}
-                      className={`rounded-[28px] p-4.5 border ${theme.bg} ${theme.border} shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-md transition-all cursor-pointer flex items-center justify-between group`}
+                      onClick={() => handleOpenFolder('__unassigned__')}
+                      className="rounded-[28px] p-4.5 border bg-white border-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-md transition-all cursor-pointer flex items-center justify-between group"
                     >
                       <div className="flex items-center gap-4">
-                        {/* Folder Icon container */}
-                        <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-2xl shadow-2xs shrink-0 relative">
-                          <span>{folder.icon || '📁'}</span>
-                          {folder.badge && (
-                            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 border-2 border-white rounded-full" />
-                          )}
+                        <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-2xl shadow-2xs shrink-0">
+                          <span>📄</span>
                         </div>
-
-                        {/* Title & Count Badge */}
                         <div>
                           <div className="flex items-center gap-2">
-                            <span
-                              className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold tracking-tight ${theme.pillBg} ${theme.pillText}`}
-                            >
-                              {count} {count === 1 ? 'Note' : 'Notes'}
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold tracking-tight bg-slate-100 text-slate-700">
+                              {unassignedNotesCount} {unassignedNotesCount === 1 ? 'Note' : 'Notes'}
                             </span>
-                            {folder.badge && (
-                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                {folder.badge}
-                              </span>
-                            )}
                           </div>
-                          <h3 className={`text-base font-extrabold tracking-tight mt-1 ${theme.titleColor}`}>
-                            {folder.name}
+                          <h3 className="text-base font-extrabold tracking-tight mt-1 text-slate-900">
+                            Quick Notes (No folder)
                           </h3>
                         </div>
                       </div>
+                    </motion.div>
+                  )}
+                  {folders.map((folder) => {
+                    const count = folderNoteCounts[folder.id] || 0;
+                    const themeKey = folder.themeColor || 'amber';
+                    const theme = FOLDER_COLOR_THEMES[themeKey] || FOLDER_COLOR_THEMES.amber;
 
-                      {/* Delete action */}
+                    return (
+                      <motion.div
+                        key={folder.id}
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => handleOpenFolder(folder.id)}
+                        className={`rounded-[28px] p-4.5 border ${theme.bg} ${theme.border} shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-md transition-all cursor-pointer flex items-center justify-between group`}
+                      >
+                        <div className="flex items-center gap-4">
+                          {/* Folder Icon container */}
+                          <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-2xl shadow-2xs shrink-0 relative">
+                            <span>{folder.icon || '📁'}</span>
+                            {folder.badge && (
+                              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 border-2 border-white rounded-full" />
+                            )}
+                          </div>
+
+                          {/* Title & Count Badge */}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold tracking-tight ${theme.pillBg} ${theme.pillText}`}
+                              >
+                                {count} {count === 1 ? 'Note' : 'Notes'}
+                              </span>
+                              {folder.badge && (
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  {folder.badge}
+                                </span>
+                              )}
+                            </div>
+                            <h3 className={`text-base font-extrabold tracking-tight mt-1 ${theme.titleColor}`}>
+                              {folder.name}
+                            </h3>
+                          </div>
+                        </div>
+
+                        {/* Delete action */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteFolder(folder);
+                          }}
+                          className="opacity-0 group-hover:opacity-80 hover:opacity-100 p-2 rounded-xl hover:bg-slate-100 text-rose-600 transition-opacity"
+                          title="Delete folder"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </motion.div>
+                    );
+                  })}
+                  {folders.length === 0 && unassignedNotesCount === 0 && (
+                    <div className="p-8 rounded-3xl bg-slate-50 border border-slate-200 text-center">
+                      <p className="text-sm font-semibold text-slate-700">No folders yet</p>
+                      <p className="text-xs text-slate-500 mt-1 mb-4">Click the + button to create your first folder.</p>
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteFolder(folder);
-                        }}
-                        className="opacity-0 group-hover:opacity-80 hover:opacity-100 p-2 rounded-xl hover:bg-slate-100 text-rose-600 transition-opacity"
-                        title="Delete folder"
+                        onClick={() => setIsFolderModalOpen(true)}
+                        className="px-4 py-2 rounded-full bg-[#1C73E8] hover:bg-[#1557B0] text-white text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
                       >
-                        <Trash2 size={15} />
+                        <Plus size={15} strokeWidth={2.5} />
+                        <span>Create Folder</span>
                       </button>
-                    </motion.div>
-                  );
-                })}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
-
-          {/* Floating Action Button (FAB) */}
-          <div className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-30">
-            <motion.button
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.92 }}
-              onClick={() => handleCreateNewNote()}
-              className="w-14 h-14 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-[0_8px_24px_rgba(37,99,235,0.35)] flex items-center justify-center border-2 border-white cursor-pointer transition-colors"
-              title="Create note"
-            >
-              <Edit3 size={24} className="stroke-[2.2]" />
-            </motion.button>
+            )}
           </div>
         </div>
       )}
@@ -726,7 +1051,10 @@ export default function NotesView() {
       {/* SCREEN 2: NOTE WRITING / EDITOR SCREEN                        */}
       {/* ───────────────────────────────────────────────────────────── */}
       {viewMode === 'editor' && (
-        <div className="flex-1 flex flex-col h-full bg-white overflow-hidden text-slate-900">
+        <div
+          data-notes-editor="true"
+          className="flex-1 flex flex-col h-full bg-white overflow-hidden text-slate-900"
+        >
           {/* Top Bar Navigation */}
           <div className="shrink-0 px-5 md:px-8 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
             <div className="flex items-center gap-3">
@@ -748,7 +1076,7 @@ export default function NotesView() {
                   value={editorFolderId}
                   onChange={(val) => setEditorFolderId(val)}
                   options={[
-                    { value: '', label: 'Unassigned', icon: <span>📁</span> },
+                    { value: '', label: 'No folder (Unassigned)', icon: <span>📄</span> },
                     ...folders.map((f) => ({
                       value: f.id,
                       label: f.name,
@@ -861,14 +1189,42 @@ export default function NotesView() {
               className="w-full text-2xl sm:text-3xl font-extrabold text-slate-900 placeholder:text-slate-300 bg-transparent border-none focus:outline-none mb-5 tracking-tight"
             />
 
-            {/* Note Content Textarea */}
-            <textarea
-              ref={textareaRef}
-              placeholder="Write your note content here..."
-              value={editorContent}
-              onChange={(e) => setEditorContent(e.target.value)}
-              className="flex-1 w-full bg-transparent border-none text-sm sm:text-base leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-none resize-none font-normal"
-            />
+            <div className="flex-1 flex flex-col min-h-0">
+              {/* Note Content Textarea */}
+              <textarea
+                ref={textareaRef}
+                placeholder="Write your note content here..."
+                value={editorContent}
+                onChange={(e) => setEditorContent(e.target.value)}
+                onKeyDown={handleTextareaKeyDown}
+                onFocus={() =>
+                  window.dispatchEvent(
+                    new CustomEvent('app_modal_state', { detail: { open: true } })
+                  )
+                }
+                className="flex-1 min-h-[220px] w-full bg-transparent border-none text-sm sm:text-base leading-relaxed text-slate-800 placeholder:text-slate-400 focus:outline-none resize-none font-normal"
+              />
+
+              {/* Live Formatted Table Preview in Write Mode if note contains a table */}
+              {editorContent.includes('|') && (
+                <div className="mt-4 pt-4 border-t border-slate-200/80">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                      <Grid size={14} className="text-blue-600" />
+                      <span>Rendered Table Preview</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsTableModalOpen(true)}
+                      className="text-xs font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
+                    >
+                      Edit in Table Builder &rarr;
+                    </button>
+                  </div>
+                  <MarkdownNoteRenderer content={editorContent} />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Reference Bottom Toolbar Strip */}
@@ -886,35 +1242,34 @@ export default function NotesView() {
               <div className="h-4 w-[1px] bg-slate-200" />
               <button
                 type="button"
-                onClick={() => insertFormatting('**', '**')}
-                className="px-3 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-white transition-all cursor-pointer font-bold text-xs flex items-center gap-1"
-                title="Bold Text (Aa)"
-              >
-                <Type size={18} />
-              </button>
-              <div className="h-4 w-[1px] bg-slate-200" />
-              <button
-                type="button"
                 onClick={insertBulletItem}
                 className="px-3 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-white transition-all cursor-pointer"
-                title="Bullet List"
+                title="Bullet Points"
               >
                 <List size={18} />
               </button>
               <div className="h-4 w-[1px] bg-slate-200" />
               <button
                 type="button"
-                onClick={() => insertFormatting('- [ ] ')}
+                onClick={insertNumberedItem}
                 className="px-3 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-white transition-all cursor-pointer"
-                title="Checklist Item"
+                title="Numbered List"
               >
-                <CheckSquare size={18} />
+                <ListOrdered size={18} />
               </button>
             </div>
 
-            {/* Word Count */}
-            <div className="text-[11px] font-medium text-slate-400">
-              {editorContent.trim() ? editorContent.trim().split(/\s+/).length : 0} words
+            {/* Auto-save Status & Word Count */}
+            <div className="flex items-center gap-3">
+              {lastSavedAt && (
+                <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                  <Check size={13} strokeWidth={3} />
+                  Auto-saved
+                </span>
+              )}
+              <div className="text-[11px] font-medium text-slate-400">
+                {editorContent.trim() ? editorContent.trim().split(/\s+/).length : 0} words
+              </div>
             </div>
           </div>
         </div>
@@ -938,14 +1293,26 @@ export default function NotesView() {
                   <ArrowLeft size={18} />
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => handleDeleteFolder(activeFolder)}
-                  className="p-2 rounded-2xl bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer border border-slate-200"
-                  title="Delete Folder"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCreateNewNote(activeFolder.id)}
+                    className="h-9 px-3.5 rounded-2xl bg-[#1C73E8] hover:bg-[#1557B0] text-white flex items-center gap-1.5 text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                    title="Add note to this folder"
+                  >
+                    <Plus size={15} strokeWidth={2.5} />
+                    <span>New Note</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteFolder(activeFolder)}
+                    className="p-2 rounded-2xl bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer border border-slate-200"
+                    title="Delete Folder"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
 
               {/* Title, Badge & Icon */}
@@ -1012,57 +1379,43 @@ export default function NotesView() {
                       key={note.id}
                       whileHover={{ y: -2 }}
                       onClick={() => handleEditNote(note)}
-                      className={`rounded-[28px] p-6 border ${theme.cardBg} ${theme.cardBorder} shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group relative`}
+                      className={`rounded-[24px] p-4.5 sm:p-5 border ${theme.cardBg} ${theme.cardBorder} shadow-2xs hover:shadow-md transition-all cursor-pointer flex items-center justify-between gap-3.5 group relative`}
                     >
-                      <div>
-                        {/* Note Title */}
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <h3 className={`text-base font-extrabold tracking-tight line-clamp-1 ${theme.titleColor}`}>
-                            {note.title || 'Untitled Note'}
-                          </h3>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteCurrentNote(note.id, note.title);
-                            }}
-                            className="opacity-0 group-hover:opacity-80 hover:opacity-100 p-1.5 rounded-xl hover:bg-slate-100 text-rose-600 transition-opacity"
-                            title="Delete note"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                        <div className="w-11 h-11 rounded-2xl transio-glass-icon-circle flex items-center justify-center text-blue-600 shrink-0 group-hover:scale-105 transition-transform">
+                          <FileText size={20} className="stroke-[2.2]" />
                         </div>
 
-                        {/* Note Content */}
-                        <p className={`text-xs sm:text-sm font-normal leading-relaxed whitespace-pre-wrap ${theme.textColor}`}>
-                          {note.content || <span className="italic opacity-60">Empty note...</span>}
-                        </p>
+                        <div className="min-w-0 flex-1">
+                          <h3 className={`text-sm sm:text-base font-extrabold tracking-tight truncate ${theme.titleColor}`}>
+                            {note.title || 'Untitled Document'}
+                          </h3>
+                          <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1.5 mt-0.5">
+                            <span>{formatRelativeTime(note.updatedAt)}</span>
+                            <span>·</span>
+                            <span>{note.content ? `${note.content.length} chars` : 'Empty file'}</span>
+                          </p>
+                        </div>
                       </div>
 
-                      {/* Footer relative time */}
-                      <div className="mt-4 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                        <span className={theme.timeColor}>
-                          {formatRelativeTime(note.updatedAt)}
-                        </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCurrentNote(note.id, note.title);
+                          }}
+                          className="opacity-0 group-hover:opacity-80 hover:opacity-100 p-2 rounded-xl hover:bg-slate-100 text-rose-600 transition-opacity"
+                          title="Delete note"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </motion.div>
                   );
                 })}
               </div>
             )}
-          </div>
-
-          {/* FAB in folder */}
-          <div className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-30">
-            <motion.button
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.92 }}
-              onClick={() => handleCreateNewNote(activeFolder.id)}
-              className="w-14 h-14 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-[0_8px_24px_rgba(37,99,235,0.35)] flex items-center justify-center border-2 border-white cursor-pointer transition-colors"
-              title="Add note to folder"
-            >
-              <Edit3 size={24} className="stroke-[2.2]" />
-            </motion.button>
           </div>
         </div>
       )}
@@ -1084,7 +1437,15 @@ export default function NotesView() {
               <h1 className="text-xl font-extrabold text-[#1C1C1E]">
                 All Notes ({notes.length})
               </h1>
-              <div className="w-9" />
+              <button
+                type="button"
+                onClick={() => handleCreateNewNote()}
+                className="w-9 h-9 rounded-2xl bg-[#1C73E8] hover:bg-[#1557B0] text-white flex items-center justify-center shadow-xs transition-all cursor-pointer active:scale-95"
+                title="Create note"
+                aria-label="Create note"
+              >
+                <Plus size={18} strokeWidth={2.5} />
+              </button>
             </div>
 
             <div className="relative">
@@ -1120,26 +1481,27 @@ export default function NotesView() {
                       key={note.id}
                       whileHover={{ y: -2 }}
                       onClick={() => handleEditNote(note)}
-                      className={`rounded-[26px] p-5 border ${theme.cardBg} ${theme.cardBorder} shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between min-h-[140px]`}
+                      className={`rounded-[24px] p-4.5 border ${theme.cardBg} ${theme.cardBorder} shadow-2xs hover:shadow-md transition-all cursor-pointer flex items-center justify-between gap-3 group`}
                     >
-                      <div>
-                        {folder && (
-                          <span className="text-[10.5px] font-extrabold text-blue-600 uppercase tracking-wider block mb-1">
-                            {folder.icon} {folder.name}
-                          </span>
-                        )}
-                        <h3 className={`text-sm font-extrabold tracking-tight line-clamp-1 mb-1.5 ${theme.titleColor}`}>
-                          {note.title || 'Untitled Note'}
-                        </h3>
-                        <p className={`text-xs leading-relaxed line-clamp-4 whitespace-pre-wrap ${theme.textColor}`}>
-                          {note.content}
-                        </p>
-                      </div>
-
-                      <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10.5px]">
-                        <span className={theme.timeColor}>
-                          {formatRelativeTime(note.updatedAt)}
-                        </span>
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-10 h-10 rounded-2xl transio-glass-icon-circle flex items-center justify-center text-blue-600 shrink-0 group-hover:scale-105 transition-transform">
+                          <FileText size={18} className="stroke-[2.2]" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          {folder && (
+                            <span className="text-[10px] font-extrabold text-blue-600 uppercase tracking-wider block mb-0.5 truncate">
+                              {folder.icon} {folder.name}
+                            </span>
+                          )}
+                          <h3 className={`text-sm font-extrabold tracking-tight truncate ${theme.titleColor}`}>
+                            {note.title || 'Untitled Note'}
+                          </h3>
+                          <p className="text-[10.5px] text-slate-400 font-medium flex items-center gap-1.5 mt-0.5">
+                            <span>{formatRelativeTime(note.updatedAt)}</span>
+                            <span>·</span>
+                            <span>{note.content ? `${note.content.length} chars` : 'Empty file'}</span>
+                          </p>
+                        </div>
                       </div>
                     </motion.div>
                   );
@@ -1237,6 +1599,35 @@ export default function NotesView() {
           </motion.div>
         </div>
       )}
+
+      {/* ── Modal: Visual Table Builder ── */}
+      <VisualTableModal
+        isOpen={isTableModalOpen}
+        onClose={() => setIsTableModalOpen(false)}
+        initialMarkdown={editorContent.includes('|') ? editorContent : undefined}
+        onInsertTable={(markdownTable) => {
+          const textarea = textareaRef.current;
+          if (!textarea) {
+            setEditorContent((prev) => `${prev}\n${markdownTable}\n`);
+            return;
+          }
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          const before = editorContent.substring(0, start);
+          const after = editorContent.substring(end);
+          const needNewlineBefore = before.length > 0 && !before.endsWith('\n');
+          const needNewlineAfter = after.length > 0 && !after.startsWith('\n');
+          const fullInsert = `${needNewlineBefore ? '\n' : ''}${markdownTable}${needNewlineAfter ? '\n' : ''}`;
+          const newContent = before + fullInsert + after;
+          setEditorContent(newContent);
+          setTimeout(() => {
+            textarea.focus();
+            const pos = start + fullInsert.length;
+            textarea.setSelectionRange(pos, pos);
+          }, 50);
+          showToast?.('Table inserted into note', 'success');
+        }}
+      />
 
     </div>
   );

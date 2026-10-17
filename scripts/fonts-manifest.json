@@ -1,0 +1,56 @@
+[
+  {
+    "family": "IBM Plex Sans",
+    "file": "ibm-plex-sans-100-700-normal.woff2",
+    "weight": "100 700",
+    "style": "normal"
+  },
+  {
+    "family": "Inter",
+    "file": "inter-100-900-normal.woff2",
+    "weight": "100 900",
+    "style": "normal"
+  },
+  {
+    "family": "JetBrains Mono",
+    "file": "jetbrains-mono-100-800-normal.woff2",
+    "weight": "100 800",
+    "style": "normal"
+  },
+  {
+    "family": "Cormorant Garamond",
+    "file": "cormorant-garamond-300-normal.woff2",
+    "weight": "300",
+    "style": "normal"
+  },
+  {
+    "family": "Cormorant Garamond",
+    "file": "cormorant-garamond-400-normal.woff2",
+    "weight": "400",
+    "style": "normal"
+  },
+  {
+    "family": "Cormorant Garamond",
+    "file": "cormorant-garamond-500-normal.woff2",
+    "weight": "500",
+    "style": "normal"
+  },
+  {
+    "family": "Cormorant Garamond",
+    "file": "cormorant-garamond-600-normal.woff2",
+    "weight": "600",
+    "style": "normal"
+  },
+  {
+    "family": "Cormorant Garamond",
+    "file": "cormorant-garamond-700-normal.woff2",
+    "weight": "700",
+    "style": "normal"
+  },
+  {
+    "family": "Cutive Mono",
+    "file": "cutive-mono-400-normal.woff2",
+    "weight": "400",
+    "style": "normal"
+  }
+]
