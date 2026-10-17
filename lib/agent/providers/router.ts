@@ -24,6 +24,7 @@ export interface RouteLLMResult {
   provider: string;
   model: string;
   error?: string;
+  isOffline?: boolean;
 }
 
 export async function routeLLMRequest({
@@ -225,5 +226,6 @@ export async function routeLLMRequest({
     content: fallbackReply,
     provider: 'Assistance Core Engine',
     model: 'Rule-Based Neural Hybrid',
+    isOffline: true,
   };
 }

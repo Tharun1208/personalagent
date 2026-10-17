@@ -28,9 +28,11 @@ import {
   notificationIdFromString,
   ScheduledItem,
 } from '@/lib/notifications/scheduler';
+import { apiFetch, safeJson } from '@/lib/api';
 
 export type AppTab =
   | 'dashboard'
+  | 'chat'
   | 'tasks'
   | 'calendar'
   | 'notes'
@@ -43,6 +45,7 @@ export type AppTab =
 
 export const VALID_TABS: AppTab[] = [
   'dashboard',
+  'chat',
   'tasks',
   'calendar',
   'notes',
@@ -100,7 +103,7 @@ interface AppContextType {
   createMemory: (content: string, category?: string, tags?: string[]) => Promise<void>;
   deleteMemory: (id: string) => Promise<void>;
   updateMemory: (id: string, patch: Partial<Memory>) => Promise<void>;
-  createTask: (title: string, priority?: string, dueDate?: string, projectId?: string) => Promise<void>;
+  createTask: (title: string, priority?: string, dueDate?: string, projectId?: string, description?: string) => Promise<void>;
   updateTask: (id: string, patch: Partial<Task>) => Promise<void>;
   toggleTask: (id: string, currentStatus: string) => Promise<void>;
   updateTaskStatus: (id: string, status: Task['status']) => Promise<void>;
@@ -138,30 +141,6 @@ interface AppContextType {
   dismissConfirm: () => void;
 }
 
-async function safeJson<T = any>(res: Response): Promise<T | null> {
-  if (!res.ok) return null;
-  const contentType = res.headers.get('content-type');
-  if (!contentType || !contentType.includes('application/json')) return null;
-  try {
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  }
-}
-
-// Keep API calls authenticated even when the HttpOnly cookie is unavailable
-// (for example after a dev-server restart). The cookie remains the primary
-// mechanism; the persisted token is only a fallback for this client session.
-async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
-  const headers = new Headers(init.headers);
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('recall_token');
-    if (token && !headers.has('Authorization')) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
-  }
-  return fetch(input, { ...init, headers, credentials: 'same-origin' });
-}
 
 function getInitialUser(): User | null {
   if (typeof window === 'undefined') return null;
@@ -246,16 +225,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setActiveTabState(targetTab);
     };
 
-    // Ensure root entry exists in history so back button always returns to Dashboard
-    const initialHash = window.location.hash.replace('#', '') as AppTab;
-    if (isValidTab(initialHash) && initialHash !== 'dashboard') {
-      window.history.replaceState({ tab: 'dashboard' }, '', window.location.pathname);
-      window.history.pushState({ tab: initialHash }, '', `#${initialHash}`);
-      setActiveTabState(initialHash);
-    } else {
-      window.history.replaceState({ tab: 'dashboard' }, '', window.location.pathname);
-      setActiveTabState('dashboard');
-    }
+    // Ensure app always opens to Dashboard on initial load
+    window.history.replaceState({ tab: 'dashboard' }, '', window.location.pathname);
+    setActiveTabState('dashboard');
 
     window.addEventListener('popstate', syncFromLocation);
     window.addEventListener('hashchange', syncFromLocation);
@@ -267,6 +239,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const [conversations, setConversations] = useState<Conversation[]>(() => getInitialList<Conversation>('recall_conversations'));
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const skipNextLoadRef = React.useRef<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [memories, setMemories] = useState<Memory[]>(() => getInitialList<Memory>('recall_memories'));
@@ -708,8 +681,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
         if (!initialLoadedRef.current) {
           initialLoadedRef.current = true;
-          setActiveConversationId(null);
-          setMessages([]);
         }
       }
 
@@ -1027,7 +998,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Load messages whenever active conversation changes
   useEffect(() => {
     if (!activeConversationId) {
-      setMessages([]);
+      return;
+    }
+
+    if (skipNextLoadRef.current === activeConversationId) {
+      skipNextLoadRef.current = null;
       return;
     }
 
@@ -1039,7 +1014,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         const data = await safeJson(res);
-        if (data?.messages) {
+        if (data?.messages && Array.isArray(data.messages)) {
           setMessages(data.messages);
         }
       } catch (err) {
@@ -1050,11 +1025,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     loadMessages();
   }, [activeConversationId]);
 
-  // Real-time Reminder & Notification Checker (1s high-precision local check + 10s API sync)
+  // Real-time Notification & Reminder Sync (clean periodic sync + window focus / online sync)
   useEffect(() => {
     if (!user) return;
 
     const checkNotifications = async () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
       try {
         const res = await apiFetch('/api/notifications');
         const data = await safeJson(res);
@@ -1066,105 +1042,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Instant 1-second local check so alarms trigger to the exact second (mobile app behavior)
-    const checkLocalAlarms = () => {
-      const now = Date.now();
-      const pending = reminders.filter((r) => r.status === 'pending' && r.dueDateTime);
-      let triggeredAny = false;
-
-      for (const r of pending) {
-        const due = new Date(r.dueDateTime).getTime();
-        if (!isNaN(due) && due <= now) {
-          triggeredAny = true;
-          const isOverdueFromPast = now - due > 2 * 60 * 1000; // Overdue by more than 2 minutes before app load
-
-          let nextDueDateTime = r.dueDateTime;
-          let nextStatus: Reminder['status'] = 'triggered';
-
-          // Mobile Alarm auto-repeat logic (iOS/Android clock behavior)
-          if (r.recurrence === 'daily') {
-            nextDueDateTime = new Date(due + 24 * 60 * 60 * 1000).toISOString();
-            nextStatus = 'pending'; // Stays active for the next day
-          } else if (r.recurrence === 'weekly') {
-            nextDueDateTime = new Date(due + 7 * 24 * 60 * 60 * 1000).toISOString();
-            nextStatus = 'pending';
-          }
-
-          // Optimistically update reminder status locally
-          setReminders((prev) =>
-            prev.map((item) =>
-              item.id === r.id
-                ? {
-                    ...item,
-                    status: nextStatus,
-                    dueDateTime: nextDueDateTime,
-                    lastTriggeredAt: new Date().toISOString(),
-                  }
-                : item
-            )
-          );
-
-          if (!isOverdueFromPast) {
-            // Request screen wake lock so phone/desktop display doesn't dim or turn off while ringing
-            if (typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
-              try { (navigator as any).wakeLock.request('screen').catch(() => {}); } catch {}
-            }
-
-            // Create instant reminder banner notification
-            const newNotif: AppNotification = {
-              id: `notif_alarm_${r.id}_${Date.now()}`,
-              userId: user.id,
-              title: r.title || 'Scheduled Reminder',
-              message: r.notes || `Reminder due: ${r.title}`,
-              type: 'reminder',
-              read: false,
-              actionUrl: '/reminders',
-              createdAt: new Date().toISOString(),
-            };
-            setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)]);
-          } else {
-            // Stale past reminder: silently record as missed reminder notification
-            const missedNotif: AppNotification = {
-              id: `notif_missed_${r.id}_${Date.now()}`,
-              userId: user.id,
-              title: `Missed Reminder: ${r.title || 'Alarm'}`,
-              message: r.notes || `Reminder was scheduled for ${new Date(r.dueDateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-              type: 'reminder',
-              read: false,
-              actionUrl: '/reminders',
-              createdAt: new Date(due).toISOString(),
-            };
-            setNotifications((prev) => [missedNotif, ...prev.filter((n) => n.id !== missedNotif.id)]);
-          }
-
-          apiFetch(`/api/reminders/${r.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              status: nextStatus,
-              dueDateTime: nextDueDateTime,
-              lastTriggeredAt: new Date().toISOString(),
-            }),
-          }).catch(() => {});
-        }
-      }
-
-      if (triggeredAny) {
-        checkNotifications();
-      }
-    };
-
     checkNotifications();
-    const localInterval = setInterval(checkLocalAlarms, 1000);
-    const syncInterval = setInterval(checkNotifications, 10000);
+    const syncInterval = setInterval(checkNotifications, 15000);
     window.addEventListener('focus', checkNotifications);
+    window.addEventListener('online', checkNotifications);
 
     return () => {
-      clearInterval(localInterval);
       clearInterval(syncInterval);
       window.removeEventListener('focus', checkNotifications);
+      window.removeEventListener('online', checkNotifications);
     };
-  }, [user, reminders]);
+  }, [user]);
 
   const currentConversation = conversations.find((c) => c.id === activeConversationId) || null;
   const unreadNotificationCount = notifications.filter((n) => !n.read).length;
@@ -1204,19 +1092,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
 
       const data = await safeJson(res);
+
       if (data?.success) {
-        if (!activeConversationId || activeConversationId !== data.conversationId) {
-          setActiveConversationId(data.conversationId);
-          const newConv: Conversation = {
-            id: data.conversationId,
-            userId: user?.id || 'usr_default_main',
-            title: effectiveContent.slice(0, 36) + (effectiveContent.length > 36 ? '...' : ''),
-            pinned: false,
-            model: user?.preferences?.model || 'Recall Core Ultra',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          setConversations((prev) => [newConv, ...prev.filter((c) => c.id !== data.conversationId)]);
+        if (data.conversationId) {
+          skipNextLoadRef.current = data.conversationId;
+          if (!activeConversationId || activeConversationId !== data.conversationId) {
+            setActiveConversationId(data.conversationId);
+            const newConv: Conversation = {
+              id: data.conversationId,
+              userId: user?.id || 'usr_default_main',
+              title: effectiveContent.slice(0, 36) + (effectiveContent.length > 36 ? '...' : ''),
+              pinned: false,
+              model: user?.preferences?.model || 'Recall Core Ultra',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            setConversations((prev) => [newConv, ...prev.filter((c) => c.id !== data.conversationId)]);
+          }
         }
 
         // Replace temp message with server message and append assistant reply
@@ -1229,25 +1121,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Refresh auxiliary data if memory, task, or reminder was updated
         refreshAll();
       } else {
-        const errorContent = data?.error || 'Unable to process your request. Please try again.';
+        const errorContent = data?.error || 'Unable to process your request with AI assistant. Please try again.';
         const errorMsg: Message = {
           id: `err_${Date.now()}`,
           conversationId: activeConversationId || 'error',
           userId: 'system',
           role: 'assistant',
-          content: ` *Notice:* ${errorContent}`,
+          content: errorContent,
           createdAt: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, errorMsg]);
       }
     } catch (err: any) {
       console.warn('Send message notice:', err);
+      const errorContent = `Unable to connect to AI server. Please verify your internet connection and ensure the server is active.`;
       const errorMsg: Message = {
         id: `err_${Date.now()}`,
         conversationId: activeConversationId || 'error',
         userId: 'system',
         role: 'assistant',
-        content: ` *An issue occurred while processing:* ${err.message || 'Please retry.'}`,
+        content: errorContent,
         createdAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -1355,12 +1248,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Task Actions
-  const createTask = async (title: string, priority = 'medium', dueDate?: string, projectId?: string) => {
+  const createTask = async (title: string, priority = 'medium', dueDate?: string, projectId?: string, description?: string) => {
     const tempId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const tempTask: Task = {
       id: tempId,
       userId: user?.id || 'usr_primary_default',
       title: title.trim(),
+      description: description?.trim() || undefined,
       status: 'todo',
       priority: (priority as any) || 'medium',
       dueDate,
@@ -1380,7 +1274,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const res = await apiFetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: tempId, title, priority, dueDate, projectId }),
+        body: JSON.stringify({ id: tempId, title, priority, dueDate, projectId, description }),
       });
       const data = await safeJson(res);
       if (data?.task) {

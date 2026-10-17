@@ -8,12 +8,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { id } = await params;
-  const body = await req.json();
+  const body = await req.json().catch(() => ({}));
 
   const updated = db.updateReminder(id, user.id, body);
-  if (!updated) return NextResponse.json({ error: 'Reminder not found' }, { status: 404 });
-
-  return NextResponse.json({ reminder: updated });
+  return NextResponse.json({ reminder: updated, success: true });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

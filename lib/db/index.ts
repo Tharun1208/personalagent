@@ -726,9 +726,31 @@ export const db = {
     if (idx === -1) {
       idx = data.tasks.findIndex((t) => t.id === id);
     }
-    if (idx === -1) return null;
+    const now = new Date().toISOString();
+    if (idx === -1) {
+      const newTask: Task = {
+        id,
+        userId: userId || 'usr_primary_default',
+        title: patch.title || 'Task',
+        description: patch.description,
+        status: patch.status || 'todo',
+        priority: patch.priority || 'medium',
+        dueDate: patch.dueDate,
+        projectId: patch.projectId,
+        reminderId: patch.reminderId,
+        tags: patch.tags || [],
+        subtasks: patch.subtasks || [],
+        createdAt: patch.createdAt || now,
+        completedAt: patch.status === 'completed' ? (patch.completedAt || now) : undefined,
+        ...patch,
+      };
+      data.tasks.unshift(newTask);
+      persistDb();
+      persistDocs('tasks', newTask);
+      return newTask;
+    }
     if (patch.status === 'completed' && !patch.completedAt) {
-      patch.completedAt = new Date().toISOString();
+      patch.completedAt = now;
     }
     data.tasks[idx] = { ...data.tasks[idx], ...patch };
     persistDb();
@@ -911,6 +933,7 @@ export const db = {
 
   createNotification(notif: AppNotification): AppNotification {
     const data = ensureDbFile();
+    data.notifications = data.notifications || [];
     data.notifications.unshift(notif);
     persistDb();
     persistDocs('notifications', notif);
@@ -919,6 +942,7 @@ export const db = {
 
   markNotificationRead(id: string, userId: string): boolean {
     const data = ensureDbFile();
+    data.notifications = data.notifications || [];
     let notif = data.notifications.find((n) => n.id === id && (n.userId === userId || !n.userId || userId === 'usr_primary_default' || userId === 'guest_instant'));
     if (!notif) {
       notif = data.notifications.find((n) => n.id === id);
@@ -934,6 +958,7 @@ export const db = {
 
   markAllNotificationsRead(userId: string): boolean {
     const data = ensureDbFile();
+    data.notifications = data.notifications || [];
     const affected = data.notifications.filter((n) => n.userId === userId || !n.userId || userId === 'usr_primary_default' || userId === 'guest_instant');
     affected.forEach((n) => {
       n.read = true;
@@ -945,6 +970,7 @@ export const db = {
 
   deleteNotification(id: string, userId: string): boolean {
     const data = ensureDbFile();
+    data.notifications = data.notifications || [];
     const prevLen = data.notifications.length;
     data.notifications = data.notifications.filter((n) => n.id !== id);
     persistDb();
@@ -954,6 +980,7 @@ export const db = {
 
   clearAllNotifications(userId: string): boolean {
     const data = ensureDbFile();
+    data.notifications = data.notifications || [];
     const removed = data.notifications.filter((n) => n.userId === userId || !n.userId || userId === 'usr_primary_default' || userId === 'guest_instant');
     data.notifications = data.notifications.filter((n) => !(n.userId === userId || !n.userId || userId === 'usr_primary_default' || userId === 'guest_instant'));
     persistDb();
@@ -1101,6 +1128,14 @@ export const db = {
   createLedgerEntry(entry: LedgerEntry): LedgerEntry {
     const data = ensureDbFile();
     data.ledger = data.ledger || [];
+    const existingIdx = data.ledger.findIndex((l) => l.id === entry.id);
+    if (existingIdx !== -1) {
+      data.ledger[existingIdx] = { ...data.ledger[existingIdx], ...entry, updatedAt: new Date().toISOString() };
+      persistDb();
+      syncEntityToMongo('ledger', 'upsert', data.ledger[existingIdx]).catch(() => {});
+      persistDocs('ledger', data.ledger[existingIdx]);
+      return data.ledger[existingIdx];
+    }
     data.ledger.unshift(entry);
     persistDb();
     syncEntityToMongo('ledger', 'upsert', entry).catch(() => {});
@@ -1115,8 +1150,30 @@ export const db = {
     if (idx === -1) {
       idx = data.ledger.findIndex((l) => l.id === id);
     }
-    if (idx === -1) return null;
-    data.ledger[idx] = { ...data.ledger[idx], ...patch, updatedAt: new Date().toISOString() };
+    const now = new Date().toISOString();
+    if (idx === -1) {
+      const newEntry: LedgerEntry = {
+        id,
+        userId: userId || 'usr_alex_01',
+        personName: patch.personName || 'Unnamed',
+        amount: patch.amount || 0,
+        currency: patch.currency || '₹',
+        type: patch.type || 'give',
+        status: patch.status || 'pending',
+        description: patch.description,
+        dueDate: patch.dueDate,
+        category: patch.category || 'personal',
+        createdAt: patch.createdAt || now,
+        updatedAt: now,
+        ...patch,
+      };
+      data.ledger.unshift(newEntry);
+      persistDb();
+      syncEntityToMongo('ledger', 'upsert', newEntry).catch(() => {});
+      persistDocs('ledger', newEntry);
+      return newEntry;
+    }
+    data.ledger[idx] = { ...data.ledger[idx], ...patch, updatedAt: now };
     persistDb();
     syncEntityToMongo('ledger', 'upsert', data.ledger[idx]).catch(() => {});
     persistDocs('ledger', data.ledger[idx]);
@@ -1130,8 +1187,27 @@ export const db = {
     if (idx === -1) {
       idx = data.ledger.findIndex((l) => l.id === id);
     }
-    if (idx === -1) return null;
     const now = new Date().toISOString();
+    if (idx === -1) {
+      const newEntry: LedgerEntry = {
+        id,
+        userId: userId || 'usr_alex_01',
+        personName: 'Settled Entry',
+        amount: 0,
+        currency: '₹',
+        type: 'give',
+        status: 'settled',
+        paidAmount: 0,
+        settledAt: now,
+        createdAt: now,
+        updatedAt: now,
+      };
+      data.ledger.unshift(newEntry);
+      persistDb();
+      syncEntityToMongo('ledger', 'upsert', newEntry).catch(() => {});
+      persistDocs('ledger', newEntry);
+      return newEntry;
+    }
     data.ledger[idx].status = 'settled';
     data.ledger[idx].paidAmount = data.ledger[idx].amount;
     data.ledger[idx].settledAt = now;
@@ -1149,13 +1225,7 @@ export const db = {
     if (idx === -1) {
       idx = data.ledger.findIndex((l) => l.id === id);
     }
-    if (idx === -1) return null;
-
-    const entry = data.ledger[idx];
-    const currentPaid = entry.paidAmount || 0;
-    const newPaid = Math.min(entry.amount, currentPaid + Math.max(0, paymentAmount));
     const now = new Date().toISOString();
-
     const paymentRecord = {
       id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       amount: paymentAmount,
@@ -1163,6 +1233,31 @@ export const db = {
       note: note?.trim() || undefined,
     };
 
+    if (idx === -1) {
+      const newEntry: LedgerEntry = {
+        id,
+        userId: userId || 'usr_alex_01',
+        personName: 'Ledger Entry',
+        amount: paymentAmount,
+        currency: '₹',
+        type: 'give',
+        status: 'settled',
+        paidAmount: paymentAmount,
+        payments: [paymentRecord],
+        settledAt: now,
+        createdAt: now,
+        updatedAt: now,
+      };
+      data.ledger.unshift(newEntry);
+      persistDb();
+      syncEntityToMongo('ledger', 'upsert', newEntry).catch(() => {});
+      persistDocs('ledger', newEntry);
+      return newEntry;
+    }
+
+    const entry = data.ledger[idx];
+    const currentPaid = entry.paidAmount || 0;
+    const newPaid = Math.min(entry.amount, currentPaid + Math.max(0, paymentAmount));
     const isFullyPaid = newPaid >= entry.amount;
 
     data.ledger[idx] = {
@@ -1173,7 +1268,6 @@ export const db = {
       settledAt: isFullyPaid ? now : entry.settledAt,
       updatedAt: now,
     };
-
     persistDb();
     syncEntityToMongo('ledger', 'upsert', data.ledger[idx]).catch(() => {});
     persistDocs('ledger', data.ledger[idx]);

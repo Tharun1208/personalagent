@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack -H 0.0.0.0",
+    "dev": "next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
@@ -15,10 +15,13 @@
     "cap:sync:local": "node scripts/sync-local-ip.js && npx cap sync",
     "cap:sync:tunnel": "node scripts/sync-tunnel-url.js && npx cap sync",
     "cap:open:android": "npx cap open android",
-    "cap:add:android": "npx cap add android"
+    "cap:add:android": "npx cap add android",
+    "build:apk": "node scripts/build-apk.mjs",
+    "build:apk:debug": "node scripts/build-apk.mjs --debug"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.2",
     "@capacitor/cli": "^8.5.2",
     "@capacitor/core": "^8.5.2",
     "@capacitor/local-notifications": "^8.3.1",
