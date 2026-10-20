@@ -20,7 +20,7 @@ import {
   SpendingEntry,
 } from '@/types';
 import { syncInitialDataToMongo, syncEntityToMongo } from './mongoSync';
-import { isMongoConfigured } from './mongodb';
+import { isMongoConfigured, getMongoStatus } from './mongodb';
 import {
   hydrateStore,
   getMirror,
@@ -61,6 +61,33 @@ export async function ensureDbReady(): Promise<void> {
   if (!isMongoConfigured()) return;
   const store = await hydrateStore();
   if (!memoryDb) memoryDb = store as unknown as Schema;
+
+  // If Atlas is unreachable the mirror can come back empty. Never let that
+  // replace a recoverable local snapshot — otherwise the app would report
+  // zero tasks/reminders even though durable data exists on disk.
+  if (memoryDb && !memoryDb.users?.length) {
+    recoverLocalSnapshot(memoryDb);
+  }
+}
+
+/**
+ * Describes the storage backend actually serving requests. `degraded` means
+ * Atlas is configured but unreachable, so we are running on the volatile
+ * fallback store and writes may not persist.
+ */
+export function getStorageStatus() {
+  const configured = isMongoConfigured();
+  const mongo = getMongoStatus();
+  // If Atlas is configured but this process has no live connection, reads are
+  // served from the fallback store. That is inherently not trustworthy, so
+  // treat it as degraded even if the connection attempt is still in flight.
+  return {
+    driver: configured ? 'mongodb' : 'local-json',
+    configured,
+    connected: configured ? mongo.connected : true,
+    degraded: configured && !mongo.connected,
+    lastError: mongo.lastError,
+  };
 }
 
 /**
@@ -133,7 +160,14 @@ function recoverLocalSnapshot(target: Schema): boolean {
 }
 
 function ensureDbFile(): Schema {
-  if (memoryDb) return memoryDb;
+  if (memoryDb) {
+    // A previous hydrate may have installed an empty mirror before Atlas
+    // failed. Give durable local data a chance to fill it in.
+    if (isMongoConfigured() && !memoryDb.users?.length) {
+      recoverLocalSnapshot(memoryDb);
+    }
+    return memoryDb;
+  }
 
   // Mongo mirror is the primary store when configured
   if (isMongoConfigured()) {
@@ -153,22 +187,30 @@ function ensureDbFile(): Schema {
   }
 
   if (fs.existsSync(DB_FILE)) {
-    try {
-      const content = fs.readFileSync(DB_FILE, 'utf-8');
-      if (content && content.trim().length > 0) {
-        const parsed = normalizeSchema(JSON.parse(content));
-        memoryDb = parsed as Schema;
-        
-        // Sync to MongoDB in background once on startup if connection URI is provided
-        if (!hasSyncedToMongo) {
-          hasSyncedToMongo = true;
-          syncInitialDataToMongo(memoryDb).catch(() => {});
+    // Read + parse with a single short retry. Combined with the atomic
+    // temp-file rename in persistDb this makes torn/partial reads impossible;
+    // the retry only guards rare transient filesystem hiccups.
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const content = fs.readFileSync(DB_FILE, 'utf-8');
+        if (content && content.trim().length > 0) {
+          const parsed = normalizeSchema(JSON.parse(content));
+          memoryDb = parsed as Schema;
+
+          // Sync to MongoDB in background once on startup if connection URI is provided
+          if (!hasSyncedToMongo) {
+            hasSyncedToMongo = true;
+            syncInitialDataToMongo(memoryDb).catch(() => {});
+          }
+          return memoryDb;
         }
-        return memoryDb;
+        break;
+      } catch (err) {
+        if (attempt === 1) {
+          if (memoryDb) return memoryDb as Schema;
+          console.error('Error reading DB file, reinitializing', err);
+        }
       }
-    } catch (err) {
-      if (memoryDb) return memoryDb as Schema;
-      console.error('Error reading DB file, reinitializing', err);
     }
   }
 
@@ -471,11 +513,19 @@ function persistDb(): void {
   persistTimer = setTimeout(async () => {
     if (isWriting || !memoryDb) return;
     isWriting = true;
+    // Write to a temp file and atomically rename it into place. A plain
+    // writeFile can be observed mid-write by a concurrent read, producing
+    // "Unexpected end of JSON input" errors on the API routes.
+    const tmpFile = `${DB_FILE}.tmp`;
     try {
       const dataStr = JSON.stringify(memoryDb);
-      await fs.promises.writeFile(DB_FILE, dataStr, 'utf-8');
+      await fs.promises.writeFile(tmpFile, dataStr, 'utf-8');
+      await fs.promises.rename(tmpFile, DB_FILE);
     } catch (err) {
       console.error('Failed to persist database:', err);
+      try {
+        await fs.promises.rm(tmpFile, { force: true });
+      } catch {}
     } finally {
       isWriting = false;
     }

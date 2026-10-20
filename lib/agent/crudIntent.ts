@@ -1,4 +1,5 @@
 import { toolRegistry } from '@/lib/tools';
+import { getStorageStatus } from '@/lib/db';
 import type { ToolExecutionStep } from '@/types';
 
 /**
@@ -402,7 +403,13 @@ export async function handleCrudIntent({
           .join('\n');
         return { reply: `### Reminders\n\n${rows}`, toolSteps: steps };
       }
-      if (res) return { reply: res.message, toolSteps: steps };
+      if (res) {
+        const storage = getStorageStatus();
+        const warning = storage.degraded
+          ? `\n\n> ⚠️ **Storage is offline.** I could not load your saved reminders, so this is not proof that none exist. Fix the database connection (\`MONGODB_URI\`) and try again.`
+          : '';
+        return { reply: `${res.message}${warning}`, toolSteps: steps };
+      }
     }
   }
 
@@ -468,7 +475,13 @@ export async function handleCrudIntent({
           ? new Date().toISOString().slice(0, 10)
           : undefined;
       const res = await run('SpendingTool', 'getExpenses', date ? { date } : {}, userId, steps);
-      if (res) return { reply: res.message, toolSteps: steps };
+      if (res) {
+        const storage = getStorageStatus();
+        const warning = storage.degraded
+          ? `\n\n> ⚠️ **Storage is offline.** I could not load your saved expenses, so this is not proof that none exist. Fix the database connection (\`MONGODB_URI\`) and try again.`
+          : '';
+        return { reply: `${res.message}${warning}`, toolSteps: steps };
+      }
     }
 
     if (wantsCreate) {
