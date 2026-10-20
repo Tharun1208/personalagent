@@ -42,7 +42,6 @@ export interface UserPreferences {
   emailDigestEnabled?: boolean;
   githubToken?: string;
   autoExtractMemories?: boolean;
-  autoDropboxBackupEnabled?: boolean;
 }
 
 export interface SubTask {
@@ -89,15 +88,15 @@ export interface NoteFolder {
   createdAt: string;
 }
 
-export interface DropboxIntegration {
+export interface SpendingEntry {
   id: string;
   userId: string;
-  refreshToken: string;
-  email?: string;
-  scope?: string;
-  connectedAt: string;
-  lastBackupAt?: string;
-  lastBackupFileId?: string;
+  amount: number;
+  category: string;
+  note?: string;
+  date: string; // local YYYY-MM-DD
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export type LedgerType = 'give' | 'receive'; // 'give' (You owe/payable) | 'receive' (They owe you/receivable)

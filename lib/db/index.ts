@@ -17,7 +17,7 @@ import {
   LedgerEntry,
   Note,
   NoteFolder,
-  DropboxIntegration,
+  SpendingEntry,
 } from '@/types';
 import { syncInitialDataToMongo, syncEntityToMongo } from './mongoSync';
 import { isMongoConfigured } from './mongodb';
@@ -48,7 +48,7 @@ interface Schema {
   ledger: LedgerEntry[];
   notes: Note[];
   noteFolders: NoteFolder[];
-  dropboxIntegrations: DropboxIntegration[];
+  spending: SpendingEntry[];
 }
 
 const DB_DIR = path.join(process.cwd(), 'data');
@@ -94,8 +94,23 @@ function normalizeSchema(parsed: any): Schema {
   parsed.ledger = parsed.ledger || [];
   parsed.notes = parsed.notes || [];
   parsed.noteFolders = parsed.noteFolders || [];
-  parsed.dropboxIntegrations = parsed.dropboxIntegrations || [];
+  parsed.spending = parsed.spending || [];
+  parsed.tasks = dedupeById(parsed.tasks);
+  parsed.reminders = dedupeById(parsed.reminders);
+  parsed.ledger = dedupeById(parsed.ledger);
+  parsed.notes = dedupeById(parsed.notes);
+  parsed.spending = dedupeById(parsed.spending);
   return parsed as Schema;
+}
+
+/** Collapse duplicated records that share an id (last write wins). */
+function dedupeById<T extends { id: string }>(items: T[]): T[] {
+  if (!Array.isArray(items) || items.length < 2) return items || [];
+  const map = new Map<string, T>();
+  for (const item of items) {
+    if (item && item.id) map.set(item.id, item);
+  }
+  return map.size === items.length ? items : Array.from(map.values());
 }
 
 /**
@@ -431,7 +446,7 @@ How can I assist you today?`,
     ledger: [],
     notes: [],
     noteFolders: [],
-    dropboxIntegrations: [],
+    spending: [],
   };
 
   fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
@@ -1053,58 +1068,6 @@ export const db = {
     return conf;
   },
 
-  // --- INTEGRATIONS (Dropbox OAuth) ---
-  getDropboxIntegration(userId: string): DropboxIntegration | null {
-    const data = ensureDbFile();
-    data.dropboxIntegrations = data.dropboxIntegrations || [];
-    return data.dropboxIntegrations.find((i) => i && i.userId === userId) || null;
-  },
-
-  saveDropboxIntegration(integration: DropboxIntegration): DropboxIntegration {
-    const data = ensureDbFile();
-    data.dropboxIntegrations = data.dropboxIntegrations || [];
-    const idx = data.dropboxIntegrations.findIndex((i) => i.userId === integration.userId);
-    if (idx >= 0) {
-      data.dropboxIntegrations[idx] = { ...data.dropboxIntegrations[idx], ...integration };
-    } else {
-      data.dropboxIntegrations.push(integration);
-    }
-    persistDb();
-    const saved = data.dropboxIntegrations.find((i) => i.userId === integration.userId)!;
-    persistDocs('dropboxIntegrations', saved);
-    return saved;
-  },
-
-  updateDropboxIntegration(
-    userId: string,
-    patch: Partial<DropboxIntegration>,
-  ): DropboxIntegration | null {
-    const data = ensureDbFile();
-    data.dropboxIntegrations = data.dropboxIntegrations || [];
-    const idx = data.dropboxIntegrations.findIndex((i) => i.userId === userId);
-    if (idx === -1) return null;
-    data.dropboxIntegrations[idx] = {
-      ...data.dropboxIntegrations[idx],
-      ...patch,
-      id: data.dropboxIntegrations[idx].id,
-      userId,
-    };
-    persistDb();
-    persistDocs('dropboxIntegrations', data.dropboxIntegrations[idx]);
-    return data.dropboxIntegrations[idx];
-  },
-
-  deleteDropboxIntegration(userId: string): boolean {
-    const data = ensureDbFile();
-    data.dropboxIntegrations = data.dropboxIntegrations || [];
-    const existing = data.dropboxIntegrations.find((i) => i.userId === userId);
-    if (!existing) return false;
-    data.dropboxIntegrations = data.dropboxIntegrations.filter((i) => i.userId !== userId);
-    persistDb();
-    deleteFromStore('dropboxIntegrations', existing.id);
-    return true;
-  },
-
   // --- NOTES & NOTE FOLDERS ---
   getNotes(userId: string): Note[] {
     const data = ensureDbFile();
@@ -1482,6 +1445,51 @@ export const db = {
     return data.ledger.length < initialLen;
   },
 
+  // --- DAILY SPENDING ---
+  getSpendingEntries(userId: string): SpendingEntry[] {
+    const data = ensureDbFile();
+    data.spending = data.spending || [];
+    return data.spending
+      .filter((entry) => entry.userId === userId)
+      .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+  },
+
+  createSpendingEntry(entry: SpendingEntry): SpendingEntry {
+    const data = ensureDbFile();
+    data.spending = data.spending || [];
+    const existingIdx = data.spending.findIndex((item) => item.id === entry.id);
+    if (existingIdx >= 0) {
+      data.spending[existingIdx] = { ...data.spending[existingIdx], ...entry };
+    } else {
+      data.spending.push(entry);
+    }
+    persistDb();
+    persistDocs('spending', entry);
+    return entry;
+  },
+
+  updateSpendingEntry(id: string, userId: string, patch: Partial<SpendingEntry>): SpendingEntry | null {
+    const data = ensureDbFile();
+    data.spending = data.spending || [];
+    const idx = data.spending.findIndex((item) => item.id === id && item.userId === userId);
+    if (idx === -1) return null;
+    data.spending[idx] = { ...data.spending[idx], ...patch, id, userId };
+    persistDb();
+    persistDocs('spending', data.spending[idx]);
+    return data.spending[idx];
+  },
+
+  deleteSpendingEntry(id: string, userId: string): boolean {
+    const data = ensureDbFile();
+    data.spending = data.spending || [];
+    const initialLen = data.spending.length;
+    data.spending = data.spending.filter((item) => !(item.id === id && item.userId === userId));
+    if (data.spending.length === initialLen) return false;
+    persistDb();
+    deleteFromStore('spending', id);
+    return true;
+  },
+
   // --- DATA OWNERSHIP / EXPORT / IMPORT / WIPE ---
   exportUserData(userId: string): Record<string, any> {
     const data = ensureDbFile();
@@ -1499,6 +1507,7 @@ export const db = {
       ledger: (data.ledger || []).filter((l) => l.userId === userId),
       notes: (data.notes || []).filter((n) => n.userId === userId),
       noteFolders: (data.noteFolders || []).filter((f) => f.userId === userId),
+      spending: (data.spending || []).filter((s) => s.userId === userId),
       agentActions: data.agentActions.filter((a) => a.userId === userId),
     };
   },
@@ -1516,6 +1525,7 @@ export const db = {
       ledger: 0,
       notes: 0,
       noteFolders: 0,
+      spending: 0,
     };
 
     if (!backupData || typeof backupData !== 'object') {
@@ -1556,6 +1566,7 @@ export const db = {
     mergeCollection('ledger', 'ledger');
     mergeCollection('notes', 'notes');
     mergeCollection('noteFolders', 'noteFolders');
+    mergeCollection('spending', 'spending');
 
     persistDb();
     return { imported };
@@ -1573,9 +1584,9 @@ export const db = {
     const ldg = (data.ledger || []).filter((l) => l.userId === userId);
     const nts = (data.notes || []).filter((n) => n.userId === userId);
     const nflds = (data.noteFolders || []).filter((f) => f.userId === userId);
+    const spnd = (data.spending || []).filter((s) => s.userId === userId);
     const acts = data.agentActions.filter((a) => a.userId === userId);
     const nots = data.notifications.filter((n) => n.userId === userId);
-    const dbxi = (data.dropboxIntegrations || []).filter((i) => i.userId === userId);
     data.conversations = data.conversations.filter((c) => c.userId !== userId);
     data.messages = data.messages.filter((m) => m.userId !== userId);
     data.memories = data.memories.filter((m) => m.userId !== userId);
@@ -1586,9 +1597,9 @@ export const db = {
     data.ledger = (data.ledger || []).filter((l) => l.userId !== userId);
     data.notes = (data.notes || []).filter((n) => n.userId !== userId);
     data.noteFolders = (data.noteFolders || []).filter((f) => f.userId !== userId);
+    data.spending = (data.spending || []).filter((s) => s.userId !== userId);
     data.agentActions = data.agentActions.filter((a) => a.userId !== userId);
     data.notifications = data.notifications.filter((n) => n.userId !== userId);
-    data.dropboxIntegrations = (data.dropboxIntegrations || []).filter((i) => i.userId !== userId);
     persistDb();
     convs.forEach((d) => deleteFromStore('conversations', d.id));
     msgs.forEach((d) => deleteFromStore('messages', d.id));
@@ -1600,9 +1611,9 @@ export const db = {
     ldg.forEach((d) => deleteFromStore('ledger', d.id));
     nts.forEach((d) => deleteFromStore('notes', d.id));
     nflds.forEach((d) => deleteFromStore('noteFolders', d.id));
+    spnd.forEach((d) => deleteFromStore('spending', d.id));
     acts.forEach((d) => deleteFromStore('agentActions', d.id));
     nots.forEach((d) => deleteFromStore('notifications', d.id));
-    dbxi.forEach((d) => deleteFromStore('dropboxIntegrations', d.id));
     return true;
   },
 };

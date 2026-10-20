@@ -495,21 +495,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try { localStorage.setItem('recall_tasks', JSON.stringify(tasks)); } catch {}
   }, [tasks, isHydrated]);
 
-  // ── WhatsApp-style daily Dropbox backups ───────────────────────────────
-  useEffect(() => {
-    if (!isHydrated || !user?.id) return;
-    if (typeof window === 'undefined') return;
-    if (!user.preferences?.autoDropboxBackupEnabled) return;
-    if (sessionStorage.getItem('recall_auto_backup_attempted')) return;
-    sessionStorage.setItem('recall_auto_backup_attempted', '1');
-
-    apiFetch('/api/backup/dropbox', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ auto: true }),
-    }).catch(() => {});
-  }, [isHydrated, user?.id, user?.preferences?.autoDropboxBackupEnabled]);
-
   useEffect(() => {
     if (!isHydrated) return;
     try { localStorage.setItem('recall_reminders', JSON.stringify(reminders)); } catch {}
@@ -712,6 +697,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         apiFetch('/api/ledger').then(safeJson),
         apiFetch('/api/notes').then(safeJson),
       ]);
+
+      // Sync daily expenses so AI-logged expenses appear on the dashboard and ledger.
+      apiFetch('/api/spending')
+        .then(safeJson)
+        .then((spendingData) => {
+          if (!Array.isArray(spendingData?.spending) || typeof window === 'undefined') return;
+          const local: any[] = (() => {
+            try { return JSON.parse(localStorage.getItem('assistance_daily_spending') || '[]'); } catch { return []; }
+          })();
+          const serverIds = new Set(spendingData.spending.map((entry: any) => entry.id));
+          const merged = new Map<string, any>(spendingData.spending.map((entry: any) => [entry.id, entry]));
+          local.forEach((entry) => {
+            if (entry?.id && !merged.has(entry.id)) merged.set(entry.id, entry);
+          });
+          const all = Array.from(merged.values());
+          localStorage.setItem('assistance_daily_spending', JSON.stringify(all));
+          window.dispatchEvent(new CustomEvent('spending_updated', { detail: all }));
+
+          local
+            .filter((entry) => entry?.id && !serverIds.has(entry.id))
+            .forEach((entry) => {
+              apiFetch('/api/spending', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(entry),
+              }).catch(() => {});
+            });
+        })
+        .catch(() => {});
 
       // Smart non-destructive merge: preserve local data if server returns empty list (e.g. cold start)
       if (convResult.status === 'fulfilled' && Array.isArray(convResult.value?.conversations)) {

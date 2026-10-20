@@ -152,8 +152,9 @@ export async function handleCrudIntent({
   const lower = text.toLowerCase();
   const steps: ToolExecutionStep[] = [];
 
-  // Never hijack explanatory/how-to questions.
-  if (/^(how|why)\b/.test(lower)) return null;
+  // Never hijack explanatory/how-to questions. Keep "how much / how many / how is my ..." data queries.
+  if (/^why\b/.test(lower)) return null;
+  if (/^how\b/.test(lower) && !/^how\s+(?:much|many|is|are|was|were|long|far|often)\b/.test(lower)) return null;
 
   // ── NOTES ───────────────────────────────────────────────────
   if (/\bnotes?\b/.test(lower) || /\bfolders?\b/.test(lower)) {
@@ -448,6 +449,56 @@ export async function handleCrudIntent({
       }
       if (args) {
         const res = await run('TaskTool', 'updateTask', args, userId, steps);
+        if (res) return { reply: res.message, toolSteps: steps };
+      }
+    }
+  }
+
+  // ── DAILY SPENDING ─────────────────────────────────────────
+  const EXPENSE_WORD = /\b(?:expenses?|spending|spend|spent|purchase[ds]?|bought)\b/i;
+  const DEBT_WORD = /\b(?:owe|owed|debt|ledger|borrow|borrowed|lend|lent|receivable|payable)\b/i;
+  if (EXPENSE_WORD.test(lower) && !DEBT_WORD.test(lower)) {
+    const wantsList = /\b(?:show|list|view|what|which|how\s+much|total)\b/i.test(lower);
+    const wantsCreate = CREATE_VERB.test(lower) || /\b(?:spent|paid|bought)\b/i.test(lower);
+
+    if (wantsList && !wantsCreate) {
+      const date = /\byesterday\b/i.test(lower)
+        ? new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+        : /\btoday\b/i.test(lower)
+          ? new Date().toISOString().slice(0, 10)
+          : undefined;
+      const res = await run('SpendingTool', 'getExpenses', date ? { date } : {}, userId, steps);
+      if (res) return { reply: res.message, toolSteps: steps };
+    }
+
+    if (wantsCreate) {
+      const amountMatch =
+        text.match(/(?:₹|rs\.?|inr|\$|€|£)\s*(\d+(?:[.,]\d{1,2})?)/i) ||
+        text.match(/\b(?:expense|spent|spend|paid|purchase|bought|of|for)\s*(?:of\s*)?(?:₹|rs\.?|inr|\$|€|£)?\s*(\d+(?:[.,]\d{1,2})?)/i) ||
+        text.match(/\b(\d+(?:[.,]\d{1,2})?)\s*(?:rupees?|rs\.?|inr|dollars?|usd)\b/i);
+      if (amountMatch) {
+        const amount = parseFloat(amountMatch[1].replace(',', '.'));
+        const noteMatch = text.match(/(?:for|on)\s+(.+?)(?:\s+(?:today|yesterday|tomorrow|at\s+\d.*))?[.!?]*$/i);
+        const note = noteMatch ? stripFiller(noteMatch[1]) : undefined;
+        const haystack = `${note || ''} ${text}`.toLowerCase();
+        const category =
+          /\b(?:lunch|dinner|breakfast|food|restaurant|meal|snack)\b/.test(haystack) ? 'food' :
+          /\b(?:coffee|tea|cafe|starbucks)\b/.test(haystack) ? 'coffee' :
+          /\b(?:cab|uber|ola|auto|bus|train|metro|fuel|petrol|transport|travel)\b/.test(haystack) ? 'transport' :
+          /\b(?:shopping|clothes|amazon|flipkart|shoes)\b/.test(haystack) ? 'shopping' :
+          /\b(?:groceries|grocery|supermarket|vegetables)\b/.test(haystack) ? 'groceries' :
+          /\b(?:bill|electricity|water|gas|recharge)\b/.test(haystack) ? 'bills' :
+          /\b(?:rent|housing|maintenance)\b/.test(haystack) ? 'rent' :
+          /\b(?:health|medicine|doctor|pharmacy|hospital|gym)\b/.test(haystack) ? 'health' :
+          /\b(?:phone|internet|wifi|mobile)\b/.test(haystack) ? 'phone' :
+          'other';
+        const date = /\byesterday\b/i.test(lower)
+          ? new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)
+          : /\btomorrow\b/i.test(lower)
+            ? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+            : new Date().toISOString().slice(0, 10);
+
+        const res = await run('SpendingTool', 'addExpense', { amount, note, category, date }, userId, steps);
         if (res) return { reply: res.message, toolSteps: steps };
       }
     }
