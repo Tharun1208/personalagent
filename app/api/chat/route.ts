@@ -8,8 +8,13 @@ import { Conversation, Message, ToolExecutionStep } from '@/types';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-/** DB warm-up must never gate the model call. */
-const DB_READY_BUDGET_MS = 1500;
+/**
+ * DB warm-up must not gate the model call for long, but it must be long enough
+ * for a cold Atlas connection (TLS + auth) to finish. A shorter budget made
+ * the first chat after a cold start answer "storage is offline" even though
+ * the database was healthy.
+ */
+const DB_READY_BUDGET_MS = 8000;
 
 export async function POST(req: NextRequest) {
   // A slow/unreachable Atlas cluster should not delay the reply: hydrate with a

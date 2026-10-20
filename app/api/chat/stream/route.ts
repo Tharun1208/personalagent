@@ -8,7 +8,12 @@ import { Conversation, Message, ToolExecutionStep } from '@/types';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const DB_READY_BUDGET_MS = 1500;
+/**
+ * Long enough for a cold Atlas connection (TLS + auth) to finish, otherwise
+ * the first message after a cold start answers "storage is offline" even when
+ * the database is healthy.
+ */
+const DB_READY_BUDGET_MS = 8000;
 
 /**
  * Newline-delimited JSON stream of chat events:
