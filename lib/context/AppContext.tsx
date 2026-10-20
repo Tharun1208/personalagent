@@ -712,12 +712,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .then((spendingData) => {
           if (!online || !Array.isArray(spendingData?.spending) || typeof window === 'undefined') return;
           const serverSpending = filterDeleted('spending', spendingData.spending);
-          const previous: unknown[] = (() => {
+          const previous: any[] = (() => {
             try { return JSON.parse(localStorage.getItem('assistance_daily_spending') || '[]'); } catch { return []; }
           })();
           // A degraded backend can answer with an empty list; keep the cached
-          // expenses rather than blanking the ledger.
-          if (serverSpending.length === 0 && Array.isArray(previous) && previous.length > 0) return;
+          // expenses rather than blanking the ledger. Tombstoned ids are
+          // always dropped, so a cross-tab delete of the last row still sticks.
+          const keptLocal = filterDeleted('spending', previous);
+          if (serverSpending.length === 0 && keptLocal.length > 0) return;
           localStorage.setItem('assistance_daily_spending', JSON.stringify(serverSpending));
           window.dispatchEvent(new CustomEvent('spending_updated', { detail: serverSpending }));
         })
@@ -725,7 +727,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (online && convResult.status === 'fulfilled' && Array.isArray(convResult.value?.conversations)) {
         const serverConvs = filterDeleted<Conversation>('conversations', convResult.value.conversations);
-        setConversations((prev) => (serverConvs.length === 0 && prev.length > 0 ? prev : serverConvs));
+        setConversations((prev) => {
+          const keptLocal = filterDeleted<Conversation>('conversations', prev);
+          return serverConvs.length === 0 && keptLocal.length > 0 ? keptLocal : serverConvs;
+        });
         if (!initialLoadedRef.current) {
           initialLoadedRef.current = true;
         }
@@ -734,7 +739,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (online && memResult.status === 'fulfilled' && Array.isArray(memResult.value?.memories)) {
         const serverMems = filterDeleted<Memory>('memories', memResult.value.memories);
         setMemories((prev) => {
-          if (serverMems.length === 0 && prev.length > 0) return prev;
+          const keptLocal = filterDeleted<Memory>('memories', prev);
+          if (serverMems.length === 0 && keptLocal.length > 0) return keptLocal;
           try { localStorage.setItem('recall_memories', JSON.stringify(serverMems)); } catch {}
           return serverMems;
         });
@@ -743,7 +749,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (online && taskResult.status === 'fulfilled' && Array.isArray(taskResult.value?.tasks)) {
         const serverTasks = filterDeleted<Task>('tasks', taskResult.value.tasks);
         setTasks((prev) => {
-          if (serverTasks.length === 0 && prev.length > 0) return prev;
+          const keptLocal = filterDeleted<Task>('tasks', prev);
+          if (serverTasks.length === 0 && keptLocal.length > 0) return keptLocal;
           try { localStorage.setItem('recall_tasks', JSON.stringify(serverTasks)); } catch {}
           return serverTasks;
         });
@@ -752,7 +759,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (online && remResult.status === 'fulfilled' && Array.isArray(remResult.value?.reminders)) {
         const serverRems = filterDeleted<Reminder>('reminders', remResult.value.reminders);
         setReminders((prev) => {
-          if (serverRems.length === 0 && prev.length > 0) return prev;
+          const keptLocal = filterDeleted<Reminder>('reminders', prev);
+          if (serverRems.length === 0 && keptLocal.length > 0) return keptLocal;
           try { localStorage.setItem('recall_reminders', JSON.stringify(serverRems)); } catch {}
           return serverRems;
         });
@@ -761,7 +769,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (online && goalResult.status === 'fulfilled' && Array.isArray(goalResult.value?.goals)) {
         const serverGoals = filterDeleted<Goal>('goals', goalResult.value.goals);
         setGoals((prev) => {
-          if (serverGoals.length === 0 && prev.length > 0) return prev;
+          const keptLocal = filterDeleted<Goal>('goals', prev);
+          if (serverGoals.length === 0 && keptLocal.length > 0) return keptLocal;
           try { localStorage.setItem('recall_goals', JSON.stringify(serverGoals)); } catch {}
           return serverGoals;
         });
@@ -773,13 +782,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (online && notifResult.status === 'fulfilled' && notifResult.value?.notifications) {
         const serverNotifs = filterDeleted<AppNotification>('notifications', notifResult.value.notifications);
-        setNotifications((prev) => (serverNotifs.length === 0 && prev.length > 0 ? prev : serverNotifs));
+        setNotifications((prev) => {
+          const keptLocal = filterDeleted<AppNotification>('notifications', prev);
+          return serverNotifs.length === 0 && keptLocal.length > 0 ? keptLocal : serverNotifs;
+        });
       }
 
       if (online && ledgerResult.status === 'fulfilled' && Array.isArray(ledgerResult.value?.ledger)) {
         const serverLedger = filterDeleted<LedgerEntry>('ledger', ledgerResult.value.ledger);
         setLedgerEntries((prev) => {
-          if (serverLedger.length === 0 && prev.length > 0) return prev;
+          const keptLocal = filterDeleted<LedgerEntry>('ledger', prev);
+          if (serverLedger.length === 0 && keptLocal.length > 0) return keptLocal;
           try { localStorage.setItem('recall_ledger', JSON.stringify(serverLedger)); } catch {}
           return serverLedger;
         });
@@ -787,20 +800,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       if (online && notesResult.status === 'fulfilled' && Array.isArray(notesResult.value?.notes)) {
         const serverNotes = filterDeleted<Note>('notes', notesResult.value.notes);
-        setNotes((prev) =>
-          serverNotes.length === 0 && prev.length > 0
-            ? prev
-            : serverNotes.sort(
-                (a, b) =>
-                  new Date(b.updatedAt || b.createdAt).getTime() -
-                  new Date(a.updatedAt || a.createdAt).getTime(),
-              ),
-        );
+        setNotes((prev) => {
+          const keptLocal = filterDeleted<Note>('notes', prev);
+          if (serverNotes.length === 0 && keptLocal.length > 0) return keptLocal;
+          return serverNotes.sort(
+            (a, b) =>
+              new Date(b.updatedAt || b.createdAt).getTime() -
+              new Date(a.updatedAt || a.createdAt).getTime(),
+          );
+        });
       }
 
       if (online && notesResult.status === 'fulfilled' && Array.isArray(notesResult.value?.folders)) {
         const serverFolders = filterDeleted<NoteFolder>('noteFolders', notesResult.value.folders);
-        setNoteFolders((prev) => (serverFolders.length === 0 && prev.length > 0 ? prev : serverFolders));
+        setNoteFolders((prev) => {
+          const keptLocal = filterDeleted<NoteFolder>('noteFolders', prev);
+          return serverFolders.length === 0 && keptLocal.length > 0 ? keptLocal : serverFolders;
+        });
       }
 
     } catch (err) {
