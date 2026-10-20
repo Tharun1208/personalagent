@@ -130,6 +130,16 @@ export function getStorageStatus() {
 }
 
 /**
+ * True when the configured durable store is unreachable and mutations would
+ * only land in the volatile fallback. Routes that delete data use this to
+ * answer 503 so the client queues the mutation and retries, rather than
+ * reporting a success that disappears on the next refresh.
+ */
+export function isStorageDegraded(): boolean {
+  return getStorageStatus().degraded;
+}
+
+/**
  * Prime the store. On Vercel (MONGODB_URI set) the dataset is hydrated from
  * Atlas via mongoStore; locally the JSON file remains the seed source.
  * Hydration is async, so we kick it off eagerly and the mirror fills in —

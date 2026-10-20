@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady, flushDb } from '@/lib/db';
+import { db, ensureDbReady, flushDb, isStorageDegraded } from '@/lib/db';
 import { ConversationModel, MessageModel } from '@/lib/db/models';
 import { isMongoConfigured } from '@/lib/db/mongodb';
 
@@ -80,6 +80,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     id: 'usr_default_main',
     email: 'guest@assistance.ai',
   };
+  if (isStorageDegraded()) {
+    return NextResponse.json({ error: 'Storage temporarily unavailable', success: false }, { status: 503 });
+  }
 
   const { id } = await params;
   const ok = db.deleteConversation(id, user.id) || db.deleteConversation(id, 'usr_primary_default');

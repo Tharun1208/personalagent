@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady, flushDb } from '@/lib/db';
+import { db, ensureDbReady, flushDb, isStorageDegraded } from '@/lib/db';
 import { sendTelegramAlert } from '@/lib/notifications/telegram';
 
 export async function GET(req: NextRequest) {
@@ -136,6 +136,9 @@ export async function DELETE(req: NextRequest) {
     await ensureDbReady();
     const user = auth.getUserFromRequest(req);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (isStorageDegraded()) {
+      return NextResponse.json({ error: 'Storage temporarily unavailable', success: false }, { status: 503 });
+    }
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

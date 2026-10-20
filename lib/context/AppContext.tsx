@@ -32,6 +32,7 @@ import {
 } from '@/lib/notifications/scheduler';
 import { apiFetch, safeJson } from '@/lib/api';
 import { flushOfflineQueue } from '@/lib/offline/syncQueue';
+import { filterDeleted, markDeleted, pruneTombstones } from '@/lib/offline/tombstones';
 
 export type AppTab =
   | 'dashboard'
@@ -698,289 +699,110 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         apiFetch('/api/notes').then(safeJson),
       ]);
 
+      // The server is the source of truth whenever it answers successfully.
+      // Local state is only kept when the request fails or the browser is
+      // offline — see the `online` guard below. Merging stale local copies and
+      // re-uploading them used to resurrect deleted records on refresh.
+      const online = typeof navigator === 'undefined' || navigator.onLine !== false;
+      pruneTombstones();
+
       // Sync daily expenses so AI-logged expenses appear on the dashboard and ledger.
       apiFetch('/api/spending')
         .then(safeJson)
         .then((spendingData) => {
-          if (!Array.isArray(spendingData?.spending) || typeof window === 'undefined') return;
-          const local: any[] = (() => {
+          if (!online || !Array.isArray(spendingData?.spending) || typeof window === 'undefined') return;
+          const serverSpending = filterDeleted('spending', spendingData.spending);
+          const previous: unknown[] = (() => {
             try { return JSON.parse(localStorage.getItem('assistance_daily_spending') || '[]'); } catch { return []; }
           })();
-          const serverIds = new Set(spendingData.spending.map((entry: any) => entry.id));
-          const merged = new Map<string, any>(spendingData.spending.map((entry: any) => [entry.id, entry]));
-          local.forEach((entry) => {
-            if (entry?.id && !merged.has(entry.id)) merged.set(entry.id, entry);
-          });
-          const all = Array.from(merged.values());
-          localStorage.setItem('assistance_daily_spending', JSON.stringify(all));
-          window.dispatchEvent(new CustomEvent('spending_updated', { detail: all }));
-
-          local
-            .filter((entry) => entry?.id && !serverIds.has(entry.id))
-            .forEach((entry) => {
-              apiFetch('/api/spending', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(entry),
-              }).catch(() => {});
-            });
+          // A degraded backend can answer with an empty list; keep the cached
+          // expenses rather than blanking the ledger.
+          if (serverSpending.length === 0 && Array.isArray(previous) && previous.length > 0) return;
+          localStorage.setItem('assistance_daily_spending', JSON.stringify(serverSpending));
+          window.dispatchEvent(new CustomEvent('spending_updated', { detail: serverSpending }));
         })
         .catch(() => {});
 
-      // Smart non-destructive merge: preserve local data if server returns empty list (e.g. cold start)
-      if (convResult.status === 'fulfilled' && Array.isArray(convResult.value?.conversations)) {
-        const serverConvs: Conversation[] = convResult.value.conversations;
-        setConversations((prev) => {
-          if (serverConvs.length === 0 && prev.length > 0) return prev;
-          const map = new Map<string, Conversation>();
-          serverConvs.forEach((c) => map.set(c.id, c));
-          prev.forEach((c) => { if (!map.has(c.id)) map.set(c.id, c); });
-          return Array.from(map.values());
-        });
+      if (online && convResult.status === 'fulfilled' && Array.isArray(convResult.value?.conversations)) {
+        const serverConvs = filterDeleted<Conversation>('conversations', convResult.value.conversations);
+        setConversations((prev) => (serverConvs.length === 0 && prev.length > 0 ? prev : serverConvs));
         if (!initialLoadedRef.current) {
           initialLoadedRef.current = true;
         }
       }
 
-      if (memResult.status === 'fulfilled' && Array.isArray(memResult.value?.memories)) {
-        const serverMems: Memory[] = memResult.value.memories;
+      if (online && memResult.status === 'fulfilled' && Array.isArray(memResult.value?.memories)) {
+        const serverMems = filterDeleted<Memory>('memories', memResult.value.memories);
         setMemories((prev) => {
-          if (serverMems.length === 0 && prev.length > 0) {
-            prev.forEach((m) => {
-              apiFetch('/api/memories', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(m),
-              }).catch(() => {});
-            });
-            return prev;
-          }
-          const map = new Map<string, Memory>();
-          serverMems.forEach((m) => map.set(m.id, m));
-          prev.forEach((m) => {
-            if (!map.has(m.id)) {
-              map.set(m.id, m);
-              apiFetch('/api/memories', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(m),
-              }).catch(() => {});
-            }
-          });
-          return Array.from(map.values());
+          if (serverMems.length === 0 && prev.length > 0) return prev;
+          try { localStorage.setItem('recall_memories', JSON.stringify(serverMems)); } catch {}
+          return serverMems;
         });
       }
 
-      if (taskResult.status === 'fulfilled' && Array.isArray(taskResult.value?.tasks)) {
-        const serverTasks: Task[] = taskResult.value.tasks;
+      if (online && taskResult.status === 'fulfilled' && Array.isArray(taskResult.value?.tasks)) {
+        const serverTasks = filterDeleted<Task>('tasks', taskResult.value.tasks);
         setTasks((prev) => {
-          if (serverTasks.length === 0 && prev.length > 0) {
-            prev.forEach((t) => {
-              apiFetch('/api/tasks', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(t),
-              }).catch(() => {});
-            });
-            return prev;
-          }
-          const map = new Map<string, Task>();
-          serverTasks.forEach((t) => map.set(t.id, t));
-          prev.forEach((t) => {
-            if (!map.has(t.id)) {
-              map.set(t.id, t);
-              apiFetch('/api/tasks', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(t),
-              }).catch(() => {});
-            } else {
-              const serverT = map.get(t.id)!;
-              // If local task was completed and server is todo, preserve completed status and sync to server
-              if (t.status === 'completed' && serverT.status !== 'completed') {
-                const merged = { ...serverT, status: 'completed' as const, completedAt: t.completedAt || new Date().toISOString() };
-                map.set(t.id, merged);
-                apiFetch(`/api/tasks/${t.id}`, {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ status: 'completed' }),
-                }).catch(() => {});
-              }
-            }
-          });
-          const mergedList = Array.from(map.values());
-          try { localStorage.setItem('recall_tasks', JSON.stringify(mergedList)); } catch {}
-          return mergedList;
+          if (serverTasks.length === 0 && prev.length > 0) return prev;
+          try { localStorage.setItem('recall_tasks', JSON.stringify(serverTasks)); } catch {}
+          return serverTasks;
         });
       }
 
-      if (remResult.status === 'fulfilled' && Array.isArray(remResult.value?.reminders)) {
-        const serverRems: Reminder[] = remResult.value.reminders;
+      if (online && remResult.status === 'fulfilled' && Array.isArray(remResult.value?.reminders)) {
+        const serverRems = filterDeleted<Reminder>('reminders', remResult.value.reminders);
         setReminders((prev) => {
-          if (serverRems.length === 0 && prev.length > 0) {
-            prev.forEach((r) => {
-              apiFetch('/api/reminders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(r),
-              }).catch(() => {});
-            });
-            return prev;
-          }
-          const map = new Map<string, Reminder>();
-          serverRems.forEach((r) => map.set(r.id, r));
-          prev.forEach((r) => {
-            if (!map.has(r.id)) {
-              map.set(r.id, r);
-              apiFetch('/api/reminders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(r),
-              }).catch(() => {});
-            } else {
-              const serverR = map.get(r.id)!;
-              if (r.status === 'dismissed' && serverR.status !== 'dismissed') {
-                map.set(r.id, { ...serverR, status: 'dismissed' });
-              }
-            }
-          });
-          const mergedList = Array.from(map.values());
-          try { localStorage.setItem('recall_reminders', JSON.stringify(mergedList)); } catch {}
-          return mergedList;
+          if (serverRems.length === 0 && prev.length > 0) return prev;
+          try { localStorage.setItem('recall_reminders', JSON.stringify(serverRems)); } catch {}
+          return serverRems;
         });
       }
 
-      if (goalResult.status === 'fulfilled' && Array.isArray(goalResult.value?.goals)) {
-        const serverGoals: Goal[] = goalResult.value.goals;
+      if (online && goalResult.status === 'fulfilled' && Array.isArray(goalResult.value?.goals)) {
+        const serverGoals = filterDeleted<Goal>('goals', goalResult.value.goals);
         setGoals((prev) => {
-          if (serverGoals.length === 0 && prev.length > 0) {
-            prev.forEach((g) => {
-              apiFetch('/api/goals', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(g),
-              }).catch(() => {});
-            });
-            return prev;
-          }
-          const map = new Map<string, Goal>();
-          serverGoals.forEach((g) => map.set(g.id, g));
-          prev.forEach((g) => {
-            if (!map.has(g.id)) {
-              map.set(g.id, g);
-              apiFetch('/api/goals', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(g),
-              }).catch(() => {});
-            }
-          });
-          const mergedList = Array.from(map.values());
-          try { localStorage.setItem('recall_goals', JSON.stringify(mergedList)); } catch {}
-          return mergedList;
+          if (serverGoals.length === 0 && prev.length > 0) return prev;
+          try { localStorage.setItem('recall_goals', JSON.stringify(serverGoals)); } catch {}
+          return serverGoals;
         });
       }
 
-      if (actResult.status === 'fulfilled' && actResult.value?.actions) {
+      if (online && actResult.status === 'fulfilled' && actResult.value?.actions) {
         setAgentActions(actResult.value.actions);
       }
 
-      if (notifResult.status === 'fulfilled' && notifResult.value?.notifications) {
-        setNotifications((prev) => {
-          const serverN = notifResult.value.notifications;
-          if (serverN.length === 0 && prev.length > 0) return prev;
-          const map = new Map<string, AppNotification>();
-          serverN.forEach((n: AppNotification) => map.set(n.id, n));
-          prev.forEach((n) => { if (!map.has(n.id)) map.set(n.id, n); });
-          return Array.from(map.values());
-        });
+      if (online && notifResult.status === 'fulfilled' && notifResult.value?.notifications) {
+        const serverNotifs = filterDeleted<AppNotification>('notifications', notifResult.value.notifications);
+        setNotifications((prev) => (serverNotifs.length === 0 && prev.length > 0 ? prev : serverNotifs));
       }
 
-      if (ledgerResult.status === 'fulfilled' && Array.isArray(ledgerResult.value?.ledger)) {
-        const serverLedger: LedgerEntry[] = ledgerResult.value.ledger;
+      if (online && ledgerResult.status === 'fulfilled' && Array.isArray(ledgerResult.value?.ledger)) {
+        const serverLedger = filterDeleted<LedgerEntry>('ledger', ledgerResult.value.ledger);
         setLedgerEntries((prev) => {
-          if (serverLedger.length === 0 && prev.length > 0) {
-            prev.forEach((l) => {
-              apiFetch('/api/ledger', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(l),
-              }).catch(() => {});
-            });
-            return prev;
-          }
-          const map = new Map<string, LedgerEntry>();
-          serverLedger.forEach((l) => map.set(l.id, l));
-          prev.forEach((l) => {
-            if (!map.has(l.id)) {
-              map.set(l.id, l);
-              apiFetch('/api/ledger', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(l),
-              }).catch(() => {});
-            } else {
-              const serverL = map.get(l.id)!;
-              // If local entry was settled and server is pending, preserve settled status and sync to server
-              if (l.status === 'settled' && serverL.status !== 'settled') {
-                const merged = { ...serverL, status: 'settled' as const, settledAt: l.settledAt || new Date().toISOString() };
-                map.set(l.id, merged);
-                apiFetch('/api/ledger', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ id: l.id, action: 'settle' }),
-                }).catch(() => {});
-              }
-            }
-          });
-          const mergedList = Array.from(map.values());
-          try { localStorage.setItem('recall_ledger', JSON.stringify(mergedList)); } catch {}
-          return mergedList;
+          if (serverLedger.length === 0 && prev.length > 0) return prev;
+          try { localStorage.setItem('recall_ledger', JSON.stringify(serverLedger)); } catch {}
+          return serverLedger;
         });
       }
 
-      if (notesResult.status === 'fulfilled' && Array.isArray(notesResult.value?.notes)) {
-        const serverNotes: Note[] = notesResult.value.notes;
-        setNotes((prev) => {
-          if (serverNotes.length === 0 && prev.length > 0) {
-            // Migrate browser-only notes into the shared store on first run.
-            prev.forEach((n) => {
-              apiFetch('/api/notes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(n),
-              }).catch(() => {});
-            });
-            return prev;
-          }
-          const map = new Map<string, Note>();
-          serverNotes.forEach((n) => map.set(n.id, n));
-          prev.forEach((n) => { if (!map.has(n.id)) map.set(n.id, n); });
-          return Array.from(map.values()).sort(
-            (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime(),
-          );
-        });
+      if (online && notesResult.status === 'fulfilled' && Array.isArray(notesResult.value?.notes)) {
+        const serverNotes = filterDeleted<Note>('notes', notesResult.value.notes);
+        setNotes((prev) =>
+          serverNotes.length === 0 && prev.length > 0
+            ? prev
+            : serverNotes.sort(
+                (a, b) =>
+                  new Date(b.updatedAt || b.createdAt).getTime() -
+                  new Date(a.updatedAt || a.createdAt).getTime(),
+              ),
+        );
       }
 
-      if (notesResult.status === 'fulfilled' && Array.isArray(notesResult.value?.folders)) {
-        const serverFolders: NoteFolder[] = notesResult.value.folders;
-        setNoteFolders((prev) => {
-          if (serverFolders.length === 0 && prev.length > 0) {
-            prev.forEach((f) => {
-              apiFetch('/api/notes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...f, kind: 'folder' }),
-              }).catch(() => {});
-            });
-            return prev;
-          }
-          const map = new Map<string, NoteFolder>();
-          serverFolders.forEach((f) => map.set(f.id, f));
-          prev.forEach((f) => { if (!map.has(f.id)) map.set(f.id, f); });
-          return Array.from(map.values());
-        });
+      if (online && notesResult.status === 'fulfilled' && Array.isArray(notesResult.value?.folders)) {
+        const serverFolders = filterDeleted<NoteFolder>('noteFolders', notesResult.value.folders);
+        setNoteFolders((prev) => (serverFolders.length === 0 && prev.length > 0 ? prev : serverFolders));
       }
+
     } catch (err) {
       console.error('Failed to load initial application state', err);
     }
@@ -1469,6 +1291,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteNote = async (id: string): Promise<void> => {
+    markDeleted('notes', id);
     setNotes((prev) => prev.filter((n) => n.id !== id));
     try {
       await apiFetch(`/api/notes/${id}`, { method: 'DELETE' });
@@ -1532,6 +1355,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteNoteFolder = async (id: string): Promise<void> => {
+    markDeleted('noteFolders', id);
     setNoteFolders((prev) => prev.filter((f) => f.id !== id));
     setNotes((prev) => prev.map((n) => (n.folderId === id ? { ...n, folderId: undefined } : n)));
     try {
@@ -1542,6 +1366,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteConversation = async (id: string) => {
+    markDeleted('conversations', id);
     try {
       await apiFetch(`/api/conversations/${id}`, { method: 'DELETE' });
       setConversations((prev) => prev.filter((c) => c.id !== id));
@@ -1608,6 +1433,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteMemory = async (id: string) => {
+    markDeleted('memories', id);
     setMemories((prev) => {
       const updated = prev.filter((m) => m.id !== id);
       try { localStorage.setItem('recall_memories', JSON.stringify(updated)); } catch {}
@@ -1761,6 +1587,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteTask = async (id: string) => {
+    markDeleted('tasks', id);
     setTasks((prev) => {
       const updated = prev.filter((t) => t.id !== id);
       try { localStorage.setItem('recall_tasks', JSON.stringify(updated)); } catch {}
@@ -1839,6 +1666,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteReminder = async (id: string) => {
+    markDeleted('reminders', id);
     setReminders((prev) => {
       const updated = prev.filter((r) => r.id !== id);
       try { localStorage.setItem('recall_reminders', JSON.stringify(updated)); } catch {}
@@ -1965,6 +1793,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteGoal = async (id: string) => {
+    markDeleted('goals', id);
     setGoals((prev) => {
       const updated = prev.filter((g) => g.id !== id);
       try { localStorage.setItem('recall_goals', JSON.stringify(updated)); } catch {}
@@ -2154,6 +1983,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteLedgerEntry = async (id: string) => {
+    markDeleted('ledger', id);
     setLedgerEntries((prev) => {
       const updated = prev.filter((l) => l.id !== id);
       try { localStorage.setItem('recall_ledger', JSON.stringify(updated)); } catch {}
@@ -2205,6 +2035,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteNotification = async (id: string) => {
+    markDeleted('notifications', id);
     setNotifications((prev) => {
       const updated = prev.filter((n) => n.id !== id);
       try { localStorage.setItem('recall_notifications', JSON.stringify(updated)); } catch {}
@@ -2219,6 +2050,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clearAllNotifications = async () => {
+    notifications.forEach((notification) => markDeleted('notifications', notification.id));
     setNotifications([]);
     try { localStorage.setItem('recall_notifications', JSON.stringify([])); } catch {}
 
