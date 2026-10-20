@@ -199,7 +199,7 @@ export function persistDoc(collection: CollectionName, doc: any): Promise<any> {
       if (!conn) return;
       return await model.findOneAndUpdate({ [keyField]: payload[keyField] }, payload, {
         upsert: true,
-        new: true,
+        returnDocument: 'after',
         setDefaultsOnInsert: true,
       });
     } catch (err: any) {

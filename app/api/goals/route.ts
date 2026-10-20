@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady } from '@/lib/db';
+import { db, ensureDbReady, flushDb } from '@/lib/db';
 import { Goal } from '@/types';
 
 export async function GET(req: NextRequest) {
@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
   };
 
   db.createGoal(newGoal);
+  await flushDb();
   return NextResponse.json({ goal: newGoal }, { status: 201 });
 }
 
@@ -58,6 +59,7 @@ export async function PATCH(req: NextRequest) {
     if (!updated) {
       return NextResponse.json({ error: 'Goal or milestone not found' }, { status: 404 });
     }
+    await flushDb();
     return NextResponse.json({ goal: updated });
   }
 
@@ -66,6 +68,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
   }
 
+  await flushDb();
   return NextResponse.json({ goal: updated });
 }
 
@@ -80,5 +83,6 @@ export async function DELETE(req: NextRequest) {
   }
 
   const success = db.deleteGoal(id, user.id);
+  await flushDb();
   return NextResponse.json({ success });
 }

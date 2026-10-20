@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady } from '@/lib/db';
+import { db, ensureDbReady, flushDb } from '@/lib/db';
 import { sendTelegramAlert } from '@/lib/notifications/telegram';
 
 export async function GET(req: NextRequest) {
@@ -87,6 +87,7 @@ export async function PATCH(req: NextRequest) {
           }
         });
       } catch {}
+      await flushDb();
       return NextResponse.json({ success: true });
     }
 
@@ -119,6 +120,7 @@ export async function PATCH(req: NextRequest) {
         }
       } catch {}
 
+      await flushDb();
       return NextResponse.json({ success: true });
     }
 
@@ -144,6 +146,7 @@ export async function DELETE(req: NextRequest) {
       db.clearAllNotifications(user.id);
     }
 
+    await flushDb();
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Error in DELETE /api/notifications:', error);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady } from '@/lib/db';
+import { db, ensureDbReady, flushDb } from '@/lib/db';
 import { LedgerEntry } from '@/types';
 
 export async function GET(req: NextRequest) {
@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
     };
 
     const saved = db.createLedgerEntry(newEntry);
+    await flushDb();
     return NextResponse.json({ entry: saved, success: true }, { status: 201 });
   } catch (error: any) {
     console.error('Error in POST /api/ledger:', error);
@@ -71,6 +72,7 @@ export async function PATCH(req: NextRequest) {
 
     if (action === 'settle') {
       const settled = db.settleLedgerEntry(id, user.id);
+      await flushDb();
       return NextResponse.json({ entry: settled, success: true });
     }
 
@@ -81,10 +83,12 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid payment amount' }, { status: 400 });
       }
       const updated = db.recordPartialPayment(id, user.id, numPayment, note);
+      await flushDb();
       return NextResponse.json({ entry: updated, success: true });
     }
 
     const updated = db.updateLedgerEntry(id, user.id, updates);
+    await flushDb();
     return NextResponse.json({ entry: updated, success: true });
   } catch (error: any) {
     console.error('Error in PATCH /api/ledger:', error);
@@ -106,6 +110,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const success = db.deleteLedgerEntry(id, user.id);
+    await flushDb();
     return NextResponse.json({ success });
   } catch (error: any) {
     console.error('Error in DELETE /api/ledger:', error);

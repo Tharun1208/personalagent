@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady } from '@/lib/db';
+import { db, ensureDbReady, flushDb } from '@/lib/db';
 import { Memory } from '@/types';
 
 export async function GET(req: NextRequest) {
@@ -38,5 +38,6 @@ export async function POST(req: NextRequest) {
   };
 
   const saved = db.saveMemory(newMemory);
+  await flushDb();
   return NextResponse.json({ memory: saved }, { status: 201 });
 }

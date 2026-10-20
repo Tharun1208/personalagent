@@ -743,7 +743,10 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       const pendingTasks = allTasks.filter((t) => t.status !== 'completed' && t.status !== 'cancelled');
 
       const allReminders = db.getReminders(userId);
-      const pendingReminders = allReminders.filter((r) => r.status === 'pending');
+      // Reminders become "triggered" once their notification fires, so only
+      // "dismissed" means the user is done with them. Filtering on "pending"
+      // hid today's events from the agenda and briefing.
+      const pendingReminders = allReminders.filter((r) => r.status !== 'dismissed');
 
       const allGoals = db.getGoals(userId).filter((g) => g.status === 'active');
       const allHabits = db.getHabits(userId);
@@ -1108,7 +1111,39 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       };
 
       const reminders = res.data as any[];
-      const pendingReminders = reminders.filter((r) => r.status === 'pending');
+      let pendingReminders = reminders.filter((r) => r.status !== 'dismissed');
+
+      // "Today / tomorrow / this week" must scope the list, otherwise past and
+      // far-future reminders look like they are part of the requested window.
+      const reminderRange = /\b(?:today|tomorrow|this week|next week)\b/i.test(lower);
+      if (reminderRange) {
+        const remUser = db.getUserById(userId);
+        const remTz = timezone || (remUser?.preferences as any)?.timezone || 'Asia/Kolkata';
+        const keyOf = (value?: string) => {
+          const date = new Date(value as string);
+          return Number.isNaN(date.getTime())
+            ? ''
+            : new Intl.DateTimeFormat('en-CA', { timeZone: remTz }).format(date);
+        };
+        const now = new Date();
+        const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: remTz }).format(now);
+        const tomorrowKey = new Intl.DateTimeFormat('en-CA', { timeZone: remTz }).format(
+          new Date(now.getTime() + 86_400_000),
+        );
+        const weekEndKey = new Intl.DateTimeFormat('en-CA', { timeZone: remTz }).format(
+          new Date(now.getTime() + 7 * 86_400_000),
+        );
+        const wantsTomorrow = /\btomorrow\b/i.test(lower);
+        const wantsToday = /\btoday\b/i.test(lower) && !wantsTomorrow;
+
+        pendingReminders = pendingReminders.filter((r) => {
+          const key = keyOf(r.dueDateTime);
+          if (!key) return false;
+          if (wantsTomorrow) return key === tomorrowKey;
+          if (wantsToday) return key === todayKey;
+          return key >= todayKey && key <= weekEndKey;
+        });
+      }
 
       if (!reminders.length && storageUnavailable) {
         return { reply: `### Your Reminders\n\n${storageWarning}`, toolSteps };
@@ -1492,6 +1527,208 @@ Explain what you see clearly, extract any key text/details, and answer the user'
     }
 
     // ─────────────────────────────────────────────────────────────
+    // STEP 6.4: JSON DATA EXPORT
+    // ─────────────────────────────────────────────────────────────
+    const isExportQuery =
+      /\b(?:export|download)\b/i.test(lower) &&
+      /\b(?:data|json|backup|everything|all|records)\b/i.test(lower) &&
+      !/\b(?:restore|import)\b/i.test(lower);
+
+    if (isExportQuery) {
+      return {
+        reply:
+          `### Export your data\n\n` +
+          `Download a complete JSON snapshot of your tasks, reminders, memories, goals, habits, notes, ledger, spending and conversations.\n\n` +
+          `[**Download JSON backup**](/api/export)\n\n` +
+          `You can also open **Settings → Data & Backup → Export Data (.json)** or the backup page's **Download .JSON Backup** button. ` +
+          `The file can be imported again from Settings if you ever need to restore it.`,
+        toolSteps,
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // STEP 6.5: CALENDAR & SCHEDULE VIEW (deterministic)
+    // ─────────────────────────────────────────────────────────────
+    const isCalendarQuery =
+      /\b(?:calendar|schedule|agenda)\b/i.test(lower) &&
+      /\b(?:what|what's|show|list|tell|check|see|any|upcoming|pending|today|tomorrow|week|my|analyze)\b/i.test(lower) &&
+      !/\b(?:add|create|set|new|remind me|schedule a|schedule an|schedule the)\b/i.test(lower);
+
+    if (isCalendarQuery) {
+      const calUser = db.getUserById(userId);
+      const calTz = timezone || (calUser?.preferences as any)?.timezone || 'Asia/Kolkata';
+      const keyOf = (value?: string) => {
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        return new Intl.DateTimeFormat('en-CA', { timeZone: calTz }).format(date);
+      };
+      const labelOf = (value?: string) => {
+        const date = new Date(value as string);
+        if (Number.isNaN(date.getTime())) return 'No date';
+        return new Intl.DateTimeFormat('en-US', {
+          timeZone: calTz,
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        }).format(date);
+      };
+      const timeOf = (value?: string) => {
+        const date = new Date(value as string);
+        if (Number.isNaN(date.getTime())) return '';
+        return new Intl.DateTimeFormat('en-US', {
+          timeZone: calTz,
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        }).format(date);
+      };
+
+      const now = new Date();
+      const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: calTz }).format(now);
+      const tomorrowKey = new Intl.DateTimeFormat('en-CA', { timeZone: calTz }).format(
+        new Date(now.getTime() + 86_400_000),
+      );
+      const weekEndKey = new Intl.DateTimeFormat('en-CA', { timeZone: calTz }).format(
+        new Date(now.getTime() + 7 * 86_400_000),
+      );
+
+      const wantsToday =
+        /\btoday\b/i.test(lower) ||
+        lower === 'agenda' ||
+        (/\bmy schedule\b/i.test(lower) && !/\b(?:tomorrow|week|upcoming)\b/i.test(lower));
+      const wantsTomorrow = /\btomorrow\b/i.test(lower);
+
+      const inRange = (key: string) => {
+        if (!key) return false;
+        if (wantsTomorrow) return key === tomorrowKey;
+        if (wantsToday) return key === todayKey;
+        return key >= todayKey && key <= weekEndKey;
+      };
+
+      const events: Array<{
+        at: string;
+        key: string;
+        label: string;
+        title: string;
+        kind: string;
+        status: string;
+      }> = [];
+
+      for (const task of db.getTasks(userId)) {
+        if (task.status === 'completed' || task.status === 'cancelled') continue;
+        const key = keyOf(task.dueDate);
+        if (!inRange(key)) continue;
+        events.push({
+          at: task.dueDate as string,
+          key,
+          label: labelOf(task.dueDate),
+          title: task.title,
+          kind: `task · ${task.priority || 'normal'}`,
+          status: task.status,
+        });
+      }
+      for (const reminder of db.getReminders(userId)) {
+        const key = keyOf(reminder.dueDateTime);
+        if (!inRange(key)) continue;
+        events.push({
+          at: reminder.dueDateTime,
+          key,
+          label: labelOf(reminder.dueDateTime),
+          title: reminder.title,
+          kind: 'reminder',
+          status: reminder.status,
+        });
+      }
+
+      events.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+
+      const heading = wantsTomorrow ? 'Tomorrow' : wantsToday ? 'Today' : 'Next 7 days';
+      let reply = `## 📅 Calendar — ${heading}\n`;
+      if (!events.length) {
+        reply += storageUnavailable
+          ? `\n${storageWarning}\n`
+          : `\nNo tasks or reminders scheduled ${
+              wantsTomorrow ? 'tomorrow' : wantsToday ? 'today' : 'in the next 7 days'
+            }.\n`;
+      } else {
+        let currentKey = '';
+        for (const event of events) {
+          if (event.key !== currentKey) {
+            currentKey = event.key;
+            reply += `\n### ${event.label}\n`;
+          }
+          const state =
+            event.status === 'dismissed' || event.status === 'completed'
+              ? ' *(done)*'
+              : event.status === 'triggered'
+                ? ' *(passed)*'
+                : '';
+          reply += `* **${timeOf(event.at)}** — **${event.title}** (${event.kind})${state}\n`;
+        }
+      }
+      if (events.length) {
+        const nowMs = Date.now();
+        const upcoming = events.filter((event) => new Date(event.at).getTime() >= nowMs);
+        const nextEvent = upcoming[0];
+
+        const days = new Map<string, typeof events>();
+        for (const event of events) {
+          const list = days.get(event.key) || [];
+          list.push(event);
+          days.set(event.key, list);
+        }
+        const busiest = [...days.entries()].sort((a, b) => b[1].length - a[1].length)[0];
+
+        const conflicts: string[] = [];
+        for (const [, list] of days) {
+          const sorted = [...list].sort(
+            (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime(),
+          );
+          for (let i = 1; i < sorted.length; i += 1) {
+            const gap = new Date(sorted[i].at).getTime() - new Date(sorted[i - 1].at).getTime();
+            if (gap >= 0 && gap <= 15 * 60_000) {
+              conflicts.push(
+                `${sorted[i - 1].title} and ${sorted[i].title} (${sorted[i].label})`,
+              );
+            }
+          }
+        }
+
+        const overdue = db.getTasks(userId).filter((task) => {
+          if (task.status === 'completed' || task.status === 'cancelled' || !task.dueDate) {
+            return false;
+          }
+          const key = keyOf(task.dueDate);
+          return Boolean(key) && key < todayKey;
+        });
+
+        reply += `\n### Analysis\n`;
+        reply += `- **${events.length}** item${events.length === 1 ? '' : 's'} across **${days.size}** day${days.size === 1 ? '' : 's'}`;
+        if (busiest) {
+          reply += `; busiest is **${busiest[1][0].label}** with **${busiest[1].length}** item${busiest[1].length === 1 ? '' : 's'}`;
+        }
+        reply += `.\n`;
+        reply += nextEvent
+          ? `- Next up: **${nextEvent.title}** — ${nextEvent.label}, ${timeOf(nextEvent.at)}.\n`
+          : `- Everything in this window has already passed.\n`;
+        reply += conflicts.length
+          ? `- ⚠️ Tight or overlapping slots: ${conflicts.slice(0, 3).join('; ')}.\n`
+          : `- No overlapping time slots.\n`;
+        if (overdue.length) {
+          reply += `- ⚠️ **${overdue.length}** unfinished task${overdue.length === 1 ? '' : 's'} already overdue: ${overdue
+            .slice(0, 3)
+            .map((task) => task.title)
+            .join(', ')}${overdue.length > 3 ? '…' : ''}.\n`;
+        }
+      }
+
+      reply += `\n*Ask about a specific day if you want more detail.*`;
+
+      return { reply, toolSteps };
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // STEP 7: "What do I need to finish this week?" / Cross-domain overview
     // ─────────────────────────────────────────────────────────────
     if (
@@ -1501,7 +1738,26 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       lower.includes('what is due')
     ) {
       const tasks = db.getTasks(userId).filter((t) => t.status !== 'completed');
-      const reminders = db.getReminders(userId).filter((r) => r.status === 'pending');
+      const weekUser = db.getUserById(userId);
+      const weekTz = timezone || (weekUser?.preferences as any)?.timezone || 'Asia/Kolkata';
+      const weekKey = (value?: string) => {
+        const date = new Date(value as string);
+        return Number.isNaN(date.getTime())
+          ? ''
+          : new Intl.DateTimeFormat('en-CA', { timeZone: weekTz }).format(date);
+      };
+      const weekNow = new Date();
+      const weekStartKey = new Intl.DateTimeFormat('en-CA', { timeZone: weekTz }).format(weekNow);
+      const weekEndKey = new Intl.DateTimeFormat('en-CA', { timeZone: weekTz }).format(
+        new Date(weekNow.getTime() + 7 * 86_400_000),
+      );
+      const reminders = db
+        .getReminders(userId)
+        .filter((r) => r.status !== 'dismissed')
+        .filter((r) => {
+          const key = weekKey(r.dueDateTime);
+          return Boolean(key) && key >= weekStartKey && key <= weekEndKey;
+        });
       const memories = db.getMemories(userId).filter((m) => m.type === 'important_date');
 
       toolSteps.push({
@@ -1765,15 +2021,23 @@ Explain what you see clearly, extract any key text/details, and answer the user'
     // Call Multi-Provider LLM Router (Gemini / OpenAI / Anthropic / Groq / Ollama)
     const allMemories = db.getMemories(userId);
     const allTasks = db.getTasks(userId).filter((t) => t.status !== 'completed');
-    const allReminders = db.getReminders(userId).filter((r) => r.status === 'pending');
+    const allReminders = db.getReminders(userId);
+    const activeReminders = allReminders.filter((r) => r.status !== 'dismissed');
     const allGoals = db.getGoals(userId).filter((g) => g.status === 'active');
     const allLedgerEntries = db.getLedgerEntries(userId);
     const allLedger = allLedgerEntries.filter((l) => l.status === 'pending');
     const allSpending = db.getSpendingEntries(userId);
 
-    // Local calendar date (YYYY-MM-DD) in the user's timezone.
+    // Calendar date (YYYY-MM-DD) in the user's timezone. Comparing the raw
+    // ISO slice against an IST date was off by one near midnight.
     const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(now);
-    const isToday = (value?: string) => Boolean(value && String(value).slice(0, 10) === todayKey);
+    const dateKeyInTz = (value?: string) => {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(date);
+    };
+    const isToday = (value?: string) => Boolean(value) && dateKeyInTz(value) === todayKey;
 
     const agenda = [
       ...allTasks
@@ -1781,7 +2045,10 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         .map((t) => `- TASK: ${t.title} — due ${new Date(t.dueDate as string).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} [${t.priority}]`),
       ...allReminders
         .filter((r) => isToday(r.dueDateTime))
-        .map((r) => `- REMINDER: ${r.title} — due ${new Date(r.dueDateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`),
+        .map((r) => {
+          const state = r.status === 'dismissed' ? ' [done]' : r.status === 'triggered' ? ' [passed]' : '';
+          return `- REMINDER: ${r.title} — due ${new Date(r.dueDateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}${state}`;
+        }),
     ];
 
     const recentLedger = [...allLedgerEntries].slice(-10).reverse();
@@ -1792,7 +2059,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
 
     const emptyText = (offline: string, normal: string) => (storageUnavailable ? offline : normal);
     const taskLines = allTasks.map((t) => `- ${t.title} [Priority: ${t.priority.toUpperCase()}]${t.dueDate ? ` (Due: ${t.dueDate})` : ''}`);
-    const reminderLines = allReminders.map((r) => `- ${r.title} (Due: ${r.dueDateTime})`);
+    const reminderLines = activeReminders.map((r) => `- ${r.title} (Due: ${r.dueDateTime})`);
     const ledgerLines = allLedger.map(
       (l) => `- ${l.type === 'give' ? 'Payable (User owes)' : 'Receivable (Owed to user)'}: ${l.currency}${l.amount} with ${l.personName}`,
     );

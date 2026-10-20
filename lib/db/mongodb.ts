@@ -8,31 +8,6 @@ const FAILURE_COOLDOWN_MS = 5 * 60_000;
 /** Avoid flooding the terminal with one identical error per request. */
 const ERROR_LOG_INTERVAL_MS = 5 * 60_000;
 
-let resolversChecked = false;
-
-/**
- * Some environments (notably Windows dev setups) expose only a loopback
- * resolver that refuses SRV queries, which breaks `mongodb+srv://` URIs with
- * `querySrv ECONNREFUSED` even though the OS resolves fine. When that is the
- * case, fall back to public resolvers so Atlas connections can succeed.
- */
-function ensureUsableResolvers(): void {
-  if (resolversChecked) return;
-  resolversChecked = true;
-  try {
-    const servers = dns.getServers();
-    const onlyLocal =
-      servers.length === 0 ||
-      servers.every((s) => s === '127.0.0.1' || s === '::1' || s === 'localhost');
-    if (onlyLocal) {
-      dns.setServers(['8.8.8.8', '1.1.1.1']);
-      console.log('ℹ️ Using public DNS resolvers for MongoDB SRV lookups');
-    }
-  } catch {
-    /* non-fatal — keep default resolver behavior */
-  }
-}
-
 declare global {
   // eslint-disable-next-line no-var
   var mongooseConnection:
@@ -92,6 +67,78 @@ export function getMongoStatus() {
   };
 }
 
+/**
+ * Some Node runtimes ship with a resolver that fails SRV lookups even though
+ * plain lookups work. Rebuild the connection string from the resolved SRV/TXT
+ * records so the driver can connect without doing its own SRV query.
+ */
+function publicResolver(): dns.Resolver {
+  const resolver = new dns.Resolver();
+  resolver.setServers(['8.8.8.8', '1.1.1.1']);
+  return resolver;
+}
+
+async function resolveSrvWithFallback(
+  host: string,
+): Promise<Array<{ name: string; port: number }>> {
+  try {
+    return await dns.promises.resolveSrv(host);
+  } catch {
+    return new Promise((resolve, reject) => {
+      publicResolver().resolveSrv(host, (err, records) => (err ? reject(err) : resolve(records)));
+    });
+  }
+}
+
+async function resolveTxtWithFallback(host: string): Promise<string> {
+  try {
+    const txt = await dns.promises.resolveTxt(host);
+    return txt.map((chunks) => chunks.join('')).join('&');
+  } catch {
+    const txt = await new Promise<string[][]>((resolve, reject) => {
+      publicResolver().resolveTxt(host, (err, records) => (err ? reject(err) : resolve(records)));
+    });
+    return txt.map((chunks) => chunks.join('')).join('&');
+  }
+}
+
+async function resolveSrvToDirectUri(uri: string): Promise<string | null> {
+  try {
+    const rest = uri.slice('mongodb+srv://'.length);
+    const at = rest.lastIndexOf('@');
+    if (at === -1) return null;
+
+    const auth = rest.slice(0, at + 1);
+    const hostAndPath = rest.slice(at + 1);
+    const slash = hostAndPath.indexOf('/');
+    const host = slash === -1 ? hostAndPath : hostAndPath.slice(0, slash);
+    const pathAndQuery = slash === -1 ? '/' : hostAndPath.slice(slash);
+    const [path, existingQuery = ''] = pathAndQuery.split('?');
+
+    const records = await resolveSrvWithFallback(`_mongodb._tcp.${host}`);
+    if (!records.length) return null;
+
+    let txtOptions = '';
+    try {
+      txtOptions = await resolveTxtWithFallback(host);
+    } catch {
+      /* TXT is optional */
+    }
+
+    const params = new URLSearchParams(existingQuery);
+    for (const [key, value] of new URLSearchParams(txtOptions)) {
+      if (!params.has(key)) params.set(key, value);
+    }
+    if (!params.has('tls')) params.set('tls', 'true');
+
+    const seeds = records.map((record) => `${record.name}:${record.port}`).join(',');
+    return `mongodb://${auth}${seeds}${path || '/'}?${params.toString()}`;
+  } catch (err) {
+    console.warn('⚠️ SRV fallback resolution failed:', (err as Error)?.message || err);
+    return null;
+  }
+}
+
 export async function connectToDatabase(): Promise<typeof mongoose | null> {
   const uri = getUri().trim();
 
@@ -114,8 +161,6 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
   }
 
   if (!cached.promise) {
-    if (uri.startsWith('mongodb+srv://')) ensureUsableResolvers();
-
     const opts = {
       bufferCommands: false,
       maxPoolSize: 10,
@@ -126,8 +171,26 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
       maxIdleTimeMS: 60_000,
     };
 
-    cached.promise = mongoose
-      .connect(uri, opts)
+    const connectWithSrvFallback = async () => {
+      try {
+        return await mongoose.connect(uri, opts);
+      } catch (err) {
+        const message = String((err as Error)?.message || '');
+        if (
+          uri.startsWith('mongodb+srv://') &&
+          /querySrv|ENOTFOUND|ECONNREFUSED|ETIMEOUT/i.test(message)
+        ) {
+          const directUri = await resolveSrvToDirectUri(uri);
+          if (directUri) {
+            console.log('ℹ️ SRV lookup failed; retrying MongoDB with resolved hosts');
+            return mongoose.connect(directUri, opts);
+          }
+        }
+        throw err;
+      }
+    };
+
+    cached.promise = connectWithSrvFallback()
       .then((mongooseInstance) => {
         console.log('✅ Connected to MongoDB successfully');
         cached.lastFailureAt = 0;

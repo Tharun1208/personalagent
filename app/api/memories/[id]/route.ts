@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady } from '@/lib/db';
+import { db, ensureDbReady, flushDb } from '@/lib/db';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   await ensureDbReady();
@@ -25,6 +25,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const updated = db.updateMemory(id, user.id, body);
   if (!updated) return NextResponse.json({ error: 'Memory not found' }, { status: 404 });
 
+  await flushDb();
   return NextResponse.json({ memory: updated });
 }
 
@@ -35,5 +36,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { id } = await params;
   const ok = db.deleteMemory(id, user.id);
+  await flushDb();
   return NextResponse.json({ success: ok });
 }

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { after } from 'next/server';
 import bcrypt from 'bcryptjs';
 import {
   User,
@@ -66,8 +67,46 @@ export async function ensureDbReady(): Promise<void> {
   // replace a recoverable local snapshot — otherwise the app would report
   // zero tasks/reminders even though durable data exists on disk.
   if (memoryDb && !memoryDb.users?.length) {
-    recoverLocalSnapshot(memoryDb);
+    if (recoverLocalSnapshot(memoryDb) && getMongoStatus().connected) {
+      // Atlas is reachable but empty (first connection to a fresh database).
+      // Seed it with the durable local snapshot so other hosts (Vercel) see
+      // the same data instead of an empty store.
+      migrateSnapshotToMongo(memoryDb).catch(() => {});
+    }
   }
+}
+
+/**
+ * Push a full local snapshot into Atlas. Used once when a fresh database is
+ * connected; upserts make it safe to call again.
+ */
+async function migrateSnapshotToMongo(snapshot: Schema): Promise<void> {
+  if (!isMongoConfigured()) return;
+  const collections: Array<[CollectionName, unknown[]]> = [
+    ['users', snapshot.users],
+    ['userCredentials', snapshot.userCredentials],
+    ['conversations', snapshot.conversations],
+    ['messages', snapshot.messages],
+    ['memories', snapshot.memories],
+    ['tasks', snapshot.tasks],
+    ['reminders', snapshot.reminders],
+    ['goals', snapshot.goals],
+    ['habits', snapshot.habits],
+    ['agentActions', snapshot.agentActions],
+    ['notifications', snapshot.notifications],
+    ['confirmations', snapshot.confirmations],
+    ['ledger', snapshot.ledger],
+    ['notes', snapshot.notes],
+    ['noteFolders', snapshot.noteFolders],
+    ['spending', snapshot.spending],
+  ];
+
+  for (const [collection, docs] of collections) {
+    if (!Array.isArray(docs) || docs.length === 0) continue;
+    for (const doc of docs) persistDoc(collection, doc);
+  }
+  await flushDb();
+  console.log('✅ Local snapshot migrated to MongoDB');
 }
 
 /**
@@ -540,11 +579,35 @@ function persistDocs(collection: CollectionName, docs: any | any[]): void {
   if (!isMongoConfigured()) return;
   const arr = Array.isArray(docs) ? docs : [docs];
   arr.forEach((d) => persistDoc(collection, d));
+  scheduleFlush();
 }
 
 function deleteFromStore(collection: CollectionName, key: string | number): void {
   if (!isMongoConfigured()) return;
   deleteDoc(collection, key);
+  scheduleFlush();
+}
+
+let flushScheduled = false;
+
+/**
+ * Serverless runtimes freeze the function as soon as the response is sent, so
+ * fire-and-forget writes can be lost (deletes then "come back" on refresh).
+ * Register the flush with Next's `after()` so it completes before the runtime
+ * is frozen. Falls back to a plain flush outside a request context.
+ */
+function scheduleFlush(): void {
+  if (flushScheduled) return;
+  flushScheduled = true;
+  try {
+    after(() => {
+      flushScheduled = false;
+      return flushDb();
+    });
+  } catch {
+    flushScheduled = false;
+    flushDb().catch(() => {});
+  }
 }
 
 export const db = {
@@ -1543,22 +1606,31 @@ export const db = {
   // --- DATA OWNERSHIP / EXPORT / IMPORT / WIPE ---
   exportUserData(userId: string): Record<string, any> {
     const data = ensureDbFile();
+
+    // Mirror the read helpers: legacy rows without an owner, plus every row
+    // when the permanent primary profile is requesting the export. Otherwise
+    // the downloaded file would miss items the UI is showing.
+    const owned = <T extends { userId?: string }>(items: T[] | undefined): T[] =>
+      (items || []).filter(
+        (item) => item && (item.userId === userId || !item.userId || userId === 'usr_primary_default'),
+      );
+
     return {
       version: '1.0.0',
       exportedAt: new Date().toISOString(),
       user: data.users.find((u) => u.id === userId),
-      conversations: data.conversations.filter((c) => c.userId === userId),
-      messages: data.messages.filter((m) => m.userId === userId),
-      memories: data.memories.filter((m) => m.userId === userId),
-      tasks: data.tasks.filter((t) => t.userId === userId),
-      reminders: data.reminders.filter((r) => r.userId === userId),
-      goals: (data.goals || []).filter((g) => g.userId === userId),
-      habits: (data.habits || []).filter((h) => h.userId === userId),
-      ledger: (data.ledger || []).filter((l) => l.userId === userId),
-      notes: (data.notes || []).filter((n) => n.userId === userId),
-      noteFolders: (data.noteFolders || []).filter((f) => f.userId === userId),
-      spending: (data.spending || []).filter((s) => s.userId === userId),
-      agentActions: data.agentActions.filter((a) => a.userId === userId),
+      conversations: owned(data.conversations),
+      messages: owned(data.messages),
+      memories: owned(data.memories),
+      tasks: owned(data.tasks),
+      reminders: owned(data.reminders),
+      goals: owned(data.goals),
+      habits: owned(data.habits),
+      ledger: owned(data.ledger),
+      notes: owned(data.notes),
+      noteFolders: owned(data.noteFolders),
+      spending: owned(data.spending),
+      agentActions: owned(data.agentActions),
     };
   },
 

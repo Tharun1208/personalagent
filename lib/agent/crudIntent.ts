@@ -1,5 +1,5 @@
 import { toolRegistry } from '@/lib/tools';
-import { getStorageStatus } from '@/lib/db';
+import { db, getStorageStatus } from '@/lib/db';
 import type { ToolExecutionStep } from '@/types';
 
 /**
@@ -397,10 +397,64 @@ export async function handleCrudIntent({
     if (LIST_VERB.test(lower)) {
       const res = await run('ReminderTool', 'getReminders', {}, userId, steps);
       if (res?.data?.length) {
-        const rows = res.data
+        const tz =
+          (db.getUserById(userId)?.preferences as any)?.timezone || 'Asia/Kolkata';
+        const keyOf = (value?: string) => {
+          const date = new Date(value as string);
+          return Number.isNaN(date.getTime())
+            ? ''
+            : new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(date);
+        };
+
+        let reminders: any[] = res.data.filter((r: any) => r.status !== 'dismissed');
+        const scoped = /\b(?:today|tomorrow|this week|next week)\b/i.test(lower);
+        if (scoped) {
+          const now = new Date();
+          const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(now);
+          const tomorrowKey = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(
+            new Date(now.getTime() + 86_400_000),
+          );
+          const weekEndKey = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(
+            new Date(now.getTime() + 7 * 86_400_000),
+          );
+          const wantsTomorrow = /\btomorrow\b/i.test(lower);
+          const wantsToday = /\btoday\b/i.test(lower) && !wantsTomorrow;
+          reminders = reminders.filter((r: any) => {
+            const key = keyOf(r.dueDateTime);
+            if (!key) return false;
+            if (wantsTomorrow) return key === tomorrowKey;
+            if (wantsToday) return key === todayKey;
+            return key >= todayKey && key <= weekEndKey;
+          });
+        }
+
+        reminders.sort(
+          (a: any, b: any) =>
+            new Date(a.dueDateTime).getTime() - new Date(b.dueDateTime).getTime(),
+        );
+
+        const rows = reminders
           .slice(0, 20)
-          .map((r: any) => `• **${r.title}** — ${new Date(r.dueDateTime).toLocaleString()}`)
+          .map(
+            (r: any) =>
+              `• **${r.title}** — ${new Date(r.dueDateTime).toLocaleString([], {
+                timeZone: tz,
+                dateStyle: 'medium',
+                timeStyle: 'short',
+              })}`,
+          )
           .join('\n');
+
+        if (!rows) {
+          return {
+            reply: `### Reminders\n\nNo reminders scheduled for that period.${
+              getStorageStatus().degraded
+                ? '\n\n> ⚠️ **Storage is offline.** Saved reminders could not be loaded.'
+                : ''
+            }`,
+            toolSteps: steps,
+          };
+        }
         return { reply: `### Reminders\n\n${rows}`, toolSteps: steps };
       }
       if (res) {
