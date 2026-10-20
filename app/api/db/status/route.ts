@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase, isMongoConfigured } from '@/lib/db/mongodb';
+import { connectToDatabase, isMongoConfigured, getMongoStatus } from '@/lib/db/mongodb';
 import { UserModel, TaskModel, MemoryModel, ReminderModel, ConversationModel } from '@/lib/db/models';
 
 export async function GET() {
@@ -19,8 +19,10 @@ export async function GET() {
       return NextResponse.json({
         connected: false,
         driver: 'MongoDB',
+        coolingDown: getMongoStatus().coolingDown,
+        lastError: getMongoStatus().lastError,
         error: 'Unable to establish connection with provided MONGODB_URI.',
-      }, { status: 500 });
+      });
     }
 
     const [users, tasks, memories, reminders, conversations] = await Promise.all([
@@ -48,6 +50,6 @@ export async function GET() {
       connected: false,
       driver: 'MongoDB',
       error: err?.message || 'Connection failed',
-    }, { status: 500 });
+    });
   }
 }

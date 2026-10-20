@@ -5,6 +5,8 @@ export interface CallAnthropicParams {
   messages: { role: 'user' | 'assistant' | 'system'; content: string }[];
 }
 
+const REQUEST_TIMEOUT_MS = 30_000;
+
 export async function callAnthropic({
   apiKey,
   model = 'claude-3-5-sonnet-20241022',
@@ -44,15 +46,18 @@ export async function callAnthropic({
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      return { success: false, error: `Anthropic Error (${response.status}): ${err}` };
+      const err = await response.text().catch(() => '');
+      return { success: false, error: `Anthropic Error (${response.status}): ${err.slice(0, 200)}` };
     }
 
     const data = await response.json();
-    const content = data.content?.[0]?.text;
+    const content = (data.content || [])
+      .map((part: any) => (part?.type === 'text' ? part.text : ''))
+      .join('');
 
     if (!content) {
       return { success: false, error: 'Empty response from Anthropic' };
@@ -60,6 +65,12 @@ export async function callAnthropic({
 
     return { success: true, content };
   } catch (err: any) {
-    return { success: false, error: err.message || 'Failed to call Anthropic' };
+    return {
+      success: false,
+      error:
+        err?.name === 'TimeoutError'
+          ? 'Anthropic request timed out'
+          : err.message || 'Failed to call Anthropic',
+    };
   }
 }

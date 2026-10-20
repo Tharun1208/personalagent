@@ -1080,57 +1080,142 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const clientTimezone = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
-      const res = await apiFetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversationId: activeConversationId,
-          message: effectiveContent,
-          attachments,
-          timezone: clientTimezone,
-        }),
-      });
+      const payload = {
+        conversationId: activeConversationId,
+        message: effectiveContent,
+        attachments,
+        timezone: clientTimezone,
+      };
 
-      const data = await safeJson(res);
+      let handled = false;
+      let draftId: string | null = null;
 
-      if (data?.success) {
-        if (data.conversationId) {
-          skipNextLoadRef.current = data.conversationId;
-          if (!activeConversationId || activeConversationId !== data.conversationId) {
-            setActiveConversationId(data.conversationId);
-            const newConv: Conversation = {
-              id: data.conversationId,
-              userId: user?.id || 'usr_default_main',
-              title: effectiveContent.slice(0, 36) + (effectiveContent.length > 36 ? '...' : ''),
-              pinned: false,
-              model: user?.preferences?.model || 'Recall Core Ultra',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            setConversations((prev) => [newConv, ...prev.filter((c) => c.id !== data.conversationId)]);
+      const attachConversation = (conversationId: string) => {
+        skipNextLoadRef.current = conversationId;
+        if (!activeConversationId || activeConversationId !== conversationId) {
+          setActiveConversationId(conversationId);
+          const newConv: Conversation = {
+            id: conversationId,
+            userId: user?.id || 'usr_default_main',
+            title: effectiveContent.slice(0, 36) + (effectiveContent.length > 36 ? '...' : ''),
+            pinned: false,
+            model: user?.preferences?.model || 'Recall Core Ultra',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          setConversations((prev) => [newConv, ...prev.filter((c) => c.id !== conversationId)]);
+        }
+      };
+
+      // ── Streaming path: first tokens paint in well under a second ──
+      try {
+        const streamRes = await apiFetch('/api/chat/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (streamRes.ok && streamRes.body) {
+          const reader = streamRes.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let finished = false;
+
+          const handleEvent = (evt: any) => {
+            if (!evt || typeof evt !== 'object') return;
+
+            if (evt.type === 'start') {
+              attachConversation(evt.conversationId);
+              draftId = `draft_${Date.now()}`;
+              const draft: Message = {
+                id: draftId,
+                conversationId: evt.conversationId,
+                userId: 'assistant',
+                role: 'assistant',
+                content: '',
+                createdAt: new Date().toISOString(),
+              };
+              setMessages((prev) => [
+                ...prev.filter((m) => m.id !== tempUserMsg.id),
+                evt.userMessage,
+                draft,
+              ]);
+            } else if (evt.type === 'delta' && draftId) {
+              const text = typeof evt.text === 'string' ? evt.text : '';
+              if (!text) return;
+              setMessages((prev) =>
+                prev.map((m) => (m.id === draftId ? { ...m, content: `${m.content || ''}${text}` } : m)),
+              );
+            } else if (evt.type === 'done') {
+              finished = true;
+              if (evt.assistantMessage) {
+                const finalMessage = evt.assistantMessage as Message;
+                setMessages((prev) => prev.map((m) => (m.id === draftId ? finalMessage : m)));
+              }
+            }
+          };
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            let newlineIndex: number;
+            while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+              const line = buffer.slice(0, newlineIndex).trim();
+              buffer = buffer.slice(newlineIndex + 1);
+              if (!line) continue;
+              try {
+                handleEvent(JSON.parse(line));
+              } catch {
+                // Ignore incomplete frames split across chunks.
+              }
+            }
+          }
+
+          if (finished) {
+            handled = true;
+            refreshAll();
           }
         }
+      } catch (streamErr) {
+        console.warn('Streaming unavailable, falling back to JSON response:', streamErr);
+      }
 
-        // Replace temp message with server message and append assistant reply
-        setMessages((prev) => [
-          ...prev.filter((m) => m.id !== tempUserMsg.id),
-          data.userMessage,
-          data.assistantMessage,
-        ]);
+      // ── Fallback path (older deployments / streaming blocked by a proxy) ──
+      if (!handled) {
+        const res = await apiFetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
 
-        // Refresh auxiliary data if memory, task, or reminder was updated
-        refreshAll();
-      } else {
-        const errorContent = data?.error || 'Unable to process your request with AI assistant. Please try again.';
-        const errorMsg: Message = {
-          id: `err_${Date.now()}`,
-          conversationId: activeConversationId || 'error',
-          userId: 'system',
-          role: 'assistant',
-          content: errorContent,
-          createdAt: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, errorMsg]);
+        const data = await safeJson(res);
+
+        if (data?.success) {
+          if (data.conversationId) attachConversation(data.conversationId);
+
+          // Replace temp message with server message and append assistant reply
+          setMessages((prev) => [
+            ...prev.filter((m) => m.id !== tempUserMsg.id && m.id !== draftId),
+            data.userMessage,
+            data.assistantMessage,
+          ]);
+
+          // Refresh auxiliary data if memory, task, or reminder was updated
+          refreshAll();
+        } else {
+          const errorContent = data?.error || 'Unable to process your request with AI assistant. Please try again.';
+          const errorMsg: Message = {
+            id: `err_${Date.now()}`,
+            conversationId: activeConversationId || 'error',
+            userId: 'system',
+            role: 'assistant',
+            content: errorContent,
+            createdAt: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+        }
       }
     } catch (err: any) {
       console.warn('Send message notice:', err);

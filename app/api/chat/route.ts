@@ -1,13 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { auth } from '@/lib/auth';
 import { db, ensureDbReady, flushDb } from '@/lib/db';
+import { withTimeout } from '@/lib/server/timeout';
 import { AgentOrchestrator } from '@/lib/agent/orchestrator';
 import { Conversation, Message, ToolExecutionStep } from '@/types';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
+/** DB warm-up must never gate the model call. */
+const DB_READY_BUDGET_MS = 1500;
 
 export async function POST(req: NextRequest) {
-  await ensureDbReady();
+  // A slow/unreachable Atlas cluster should not delay the reply: hydrate with a
+  // small budget and continue with whatever is already in the local mirror.
+  await withTimeout(ensureDbReady().catch(() => undefined), DB_READY_BUDGET_MS);
+
   const user = auth.getUserFromRequest(req) || {
     id: 'usr_default_main',
     email: 'guest@assistance.ai',
@@ -64,7 +72,8 @@ export async function POST(req: NextRequest) {
     createdAt: new Date().toISOString(),
   };
   db.createMessage(userMessage);
-  await flushDb();
+  // Writes are queued in the background — do NOT block inference on Mongo.
+  after(() => flushDb().catch(() => undefined));
 
   let reply = '';
   let toolSteps: ToolExecutionStep[] = [];
@@ -110,7 +119,7 @@ export async function POST(req: NextRequest) {
     createdAt: new Date().toISOString(),
   };
   db.createMessage(assistantMessage);
-  await flushDb();
+  after(() => flushDb().catch(() => undefined));
 
   return NextResponse.json({
     success: true,

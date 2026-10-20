@@ -14,6 +14,8 @@ export interface AgentRunParams {
   model?: string;
   attachments?: any[];
   timezone?: string;
+  /** Receives streamed token deltas for progressive rendering. */
+  onToken?: (chunk: string) => void;
 }
 
 export interface AgentRunResult {
@@ -443,6 +445,7 @@ export class AgentOrchestrator {
     model = 'Recall Core Ultra',
     attachments = [],
     timezone = 'Asia/Kolkata',
+    onToken,
   }: AgentRunParams): Promise<AgentRunResult> {
     const trimmed = userPrompt.trim();
     const lower = trimmed.toLowerCase();
@@ -482,6 +485,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
           systemInstruction: multimodalSystemPrompt,
           fallbackContent: `I've received and processed your attachment(s): **${fileNames}**.`,
           attachments: processedAttachments,
+          onToken,
         });
 
         const executionTimeMs = Date.now() - startTime;
@@ -1825,6 +1829,7 @@ CORE GUIDELINES:
       systemInstruction: systemPrompt,
       fallbackContent: fallbackText,
       attachments: processedAttachments,
+      onToken,
     });
 
     return {
