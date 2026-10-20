@@ -31,7 +31,6 @@ const QUEUEABLE_PREFIXES = [
 const NEVER_QUEUE_PREFIXES = [
   '/api/chat',
   '/api/auth',
-  '/api/google',
   '/api/backup',
   '/api/settings',
   '/api/tools',

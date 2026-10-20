@@ -21,7 +21,6 @@ import {
   LedgerModel,
   NoteModel,
   NoteFolderModel,
-  IntegrationModel,
   DropboxIntegrationModel,
 } from './models';
 
@@ -56,7 +55,6 @@ export interface DbSchema {
   ledger: any[];
   notes: any[];
   noteFolders: any[];
-  integrations: any[];
   dropboxIntegrations: any[];
 }
 
@@ -76,7 +74,6 @@ const COLLECTION_MAP = {
   ledger: LedgerModel,
   notes: NoteModel,
   noteFolders: NoteFolderModel,
-  integrations: IntegrationModel,
   dropboxIntegrations: DropboxIntegrationModel,
 } as const;
 
@@ -102,7 +99,6 @@ function emptySchema(): DbSchema {
     ledger: [],
     notes: [],
     noteFolders: [],
-    integrations: [],
     dropboxIntegrations: [],
   };
 }

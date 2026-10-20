@@ -5,7 +5,7 @@
  * `Apps/<app-name>` directory, never the rest of the user's Dropbox.
  */
 
-import { sanitizeBackupPayload } from '@/lib/google/drive';
+import { sanitizeBackupPayload } from '@/lib/backup/sanitize';
 
 const DROPBOX_AUTH_URL = 'https://www.dropbox.com/oauth2/authorize';
 const DROPBOX_TOKEN_URL = 'https://api.dropboxapi.com/oauth2/token';

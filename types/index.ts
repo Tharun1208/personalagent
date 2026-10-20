@@ -42,7 +42,6 @@ export interface UserPreferences {
   emailDigestEnabled?: boolean;
   githubToken?: string;
   autoExtractMemories?: boolean;
-  autoBackupEnabled?: boolean;
   autoDropboxBackupEnabled?: boolean;
 }
 
@@ -88,17 +87,6 @@ export interface NoteFolder {
   badge?: string;
   themeColor: 'amber' | 'peach' | 'slate' | 'mint' | 'lavender';
   createdAt: string;
-}
-
-export interface GoogleDriveIntegration {
-  id: string;
-  userId: string;
-  refreshToken: string;
-  email?: string;
-  scope?: string;
-  connectedAt: string;
-  lastBackupAt?: string;
-  lastBackupFileId?: string;
 }
 
 export interface DropboxIntegration {

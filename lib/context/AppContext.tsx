@@ -481,31 +481,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try { localStorage.setItem('recall_tasks', JSON.stringify(tasks)); } catch {}
   }, [tasks, isHydrated]);
 
-  // ── WhatsApp-style daily cloud backups (Google Drive / Dropbox) ──────────
+  // ── WhatsApp-style daily Dropbox backups ───────────────────────────────
   useEffect(() => {
     if (!isHydrated || !user?.id) return;
     if (typeof window === 'undefined') return;
-
-    const googleAuto = Boolean(user.preferences?.autoBackupEnabled);
-    const dropboxAuto = Boolean(user.preferences?.autoDropboxBackupEnabled);
-    if (!googleAuto && !dropboxAuto) return;
+    if (!user.preferences?.autoDropboxBackupEnabled) return;
     if (sessionStorage.getItem('recall_auto_backup_attempted')) return;
     sessionStorage.setItem('recall_auto_backup_attempted', '1');
 
-    const options = {
+    apiFetch('/api/backup/dropbox', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ auto: true }),
-    };
-
-    if (googleAuto) apiFetch('/api/backup/drive', options).catch(() => {});
-    if (dropboxAuto) apiFetch('/api/backup/dropbox', options).catch(() => {});
-  }, [
-    isHydrated,
-    user?.id,
-    user?.preferences?.autoBackupEnabled,
-    user?.preferences?.autoDropboxBackupEnabled,
-  ]);
+    }).catch(() => {});
+  }, [isHydrated, user?.id, user?.preferences?.autoDropboxBackupEnabled]);
 
   useEffect(() => {
     if (!isHydrated) return;

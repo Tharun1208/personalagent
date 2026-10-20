@@ -14,7 +14,6 @@ import {
   LedgerEntry,
   Note,
   NoteFolder,
-  GoogleDriveIntegration,
   DropboxIntegration,
 } from '@/types';
 
@@ -289,22 +288,7 @@ const NoteFolderSchema = new Schema<NoteFolder>(
   { timestamps: true }
 );
 
-// 16. Google Drive Integration Schema
-const IntegrationSchema = new Schema<GoogleDriveIntegration>(
-  {
-    id: { type: String, required: true, unique: true, index: true },
-    userId: { type: String, required: true, unique: true, index: true },
-    refreshToken: { type: String, required: true },
-    email: { type: String },
-    scope: { type: String },
-    connectedAt: { type: String, required: true },
-    lastBackupAt: { type: String },
-    lastBackupFileId: { type: String },
-  },
-  { timestamps: true }
-);
-
-// 17. Dropbox Integration Schema
+// 16. Dropbox Integration Schema
 const DropboxIntegrationSchema = new Schema<DropboxIntegration>(
   {
     id: { type: String, required: true, unique: true, index: true },
@@ -335,5 +319,4 @@ export const ConfirmationModel: Model<ConfirmationRequest> = mongoose.models.Con
 export const LedgerModel: Model<LedgerEntry> = mongoose.models.LedgerEntry || mongoose.model<LedgerEntry>('LedgerEntry', LedgerEntrySchema);
 export const NoteModel: Model<Note> = mongoose.models.Note || mongoose.model<Note>('Note', NoteSchema);
 export const NoteFolderModel: Model<NoteFolder> = mongoose.models.NoteFolder || mongoose.model<NoteFolder>('NoteFolder', NoteFolderSchema);
-export const IntegrationModel: Model<GoogleDriveIntegration> = mongoose.models.Integration || mongoose.model<GoogleDriveIntegration>('Integration', IntegrationSchema);
 export const DropboxIntegrationModel: Model<DropboxIntegration> = mongoose.models.DropboxIntegration || mongoose.model<DropboxIntegration>('DropboxIntegration', DropboxIntegrationSchema);
