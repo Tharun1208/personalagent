@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { exchangeCode, getDriveEmail, getRedirectUri } from '@/lib/google/drive';
+import { getRequestOrigin } from '@/lib/oauth/origin';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
-  const origin = url.origin;
+  const origin = getRequestOrigin(req);
 
   const error = url.searchParams.get('error');
   if (error) {

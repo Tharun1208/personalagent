@@ -5,6 +5,7 @@ import {
   getDropboxRedirectUri,
   isDropboxConfigured,
 } from '@/lib/dropbox/backup';
+import { getRequestOrigin } from '@/lib/oauth/origin';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const origin = new URL(req.url).origin;
+  const origin = getRequestOrigin(req);
   const state = auth.signToken({ userId: user.id, email: user.email });
   return NextResponse.redirect(buildDropboxAuthUrl(state, getDropboxRedirectUri(origin)));
 }

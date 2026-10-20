@@ -6,12 +6,13 @@ import {
   getDropboxEmail,
   getDropboxRedirectUri,
 } from '@/lib/dropbox/backup';
+import { getRequestOrigin } from '@/lib/oauth/origin';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
-  const origin = url.origin;
+  const origin = getRequestOrigin(req);
 
   const error = url.searchParams.get('error');
   if (error) {
