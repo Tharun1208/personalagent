@@ -66,8 +66,46 @@ export async function ensureDbReady(): Promise<void> {
   // replace a recoverable local snapshot — otherwise the app would report
   // zero tasks/reminders even though durable data exists on disk.
   if (memoryDb && !memoryDb.users?.length) {
-    recoverLocalSnapshot(memoryDb);
+    if (recoverLocalSnapshot(memoryDb) && getMongoStatus().connected) {
+      // Atlas is reachable but empty (first connection to a fresh database).
+      // Seed it with the durable local snapshot so other hosts (Vercel) see
+      // the same data instead of an empty store.
+      migrateSnapshotToMongo(memoryDb).catch(() => {});
+    }
   }
+}
+
+/**
+ * Push a full local snapshot into Atlas. Used once when a fresh database is
+ * connected; upserts make it safe to call again.
+ */
+async function migrateSnapshotToMongo(snapshot: Schema): Promise<void> {
+  if (!isMongoConfigured()) return;
+  const collections: Array<[CollectionName, unknown[]]> = [
+    ['users', snapshot.users],
+    ['userCredentials', snapshot.userCredentials],
+    ['conversations', snapshot.conversations],
+    ['messages', snapshot.messages],
+    ['memories', snapshot.memories],
+    ['tasks', snapshot.tasks],
+    ['reminders', snapshot.reminders],
+    ['goals', snapshot.goals],
+    ['habits', snapshot.habits],
+    ['agentActions', snapshot.agentActions],
+    ['notifications', snapshot.notifications],
+    ['confirmations', snapshot.confirmations],
+    ['ledger', snapshot.ledger],
+    ['notes', snapshot.notes],
+    ['noteFolders', snapshot.noteFolders],
+    ['spending', snapshot.spending],
+  ];
+
+  for (const [collection, docs] of collections) {
+    if (!Array.isArray(docs) || docs.length === 0) continue;
+    for (const doc of docs) persistDoc(collection, doc);
+  }
+  await flushDb();
+  console.log('✅ Local snapshot migrated to MongoDB');
 }
 
 /**
