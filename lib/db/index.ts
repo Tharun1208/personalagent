@@ -78,12 +78,58 @@ if (isMongoConfigured()) {
     .catch(() => {});
 }
 
+function normalizeSchema(parsed: any): Schema {
+  parsed.users = parsed.users || [];
+  parsed.userCredentials = parsed.userCredentials || [];
+  parsed.conversations = parsed.conversations || [];
+  parsed.messages = parsed.messages || [];
+  parsed.memories = parsed.memories || [];
+  parsed.tasks = parsed.tasks || [];
+  parsed.reminders = parsed.reminders || [];
+  parsed.goals = parsed.goals || [];
+  parsed.habits = parsed.habits || [];
+  parsed.agentActions = parsed.agentActions || [];
+  parsed.notifications = parsed.notifications || [];
+  parsed.confirmations = parsed.confirmations || [];
+  parsed.ledger = parsed.ledger || [];
+  parsed.notes = parsed.notes || [];
+  parsed.noteFolders = parsed.noteFolders || [];
+  parsed.dropboxIntegrations = parsed.dropboxIntegrations || [];
+  return parsed as Schema;
+}
+
+/**
+ * Copies the durable JSON snapshot into a target store. Used when Atlas is
+ * configured but unreachable, so a transient outage does not leave the app
+ * running on an empty, volatile in-memory store.
+ */
+function recoverLocalSnapshot(target: Schema): boolean {
+  try {
+    if (!fs.existsSync(DB_FILE)) return false;
+    const content = fs.readFileSync(DB_FILE, 'utf-8');
+    if (!content || !content.trim()) return false;
+    const parsed = normalizeSchema(JSON.parse(content));
+    if (!parsed.users.length) return false;
+    Object.assign(target, parsed);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function ensureDbFile(): Schema {
   if (memoryDb) return memoryDb;
 
   // Mongo mirror is the primary store when configured
   if (isMongoConfigured()) {
-    memoryDb = getMirror() as unknown as Schema;
+    const mirror = getMirror() as unknown as Schema;
+    memoryDb = mirror;
+
+    // Atlas unreachable on cold start leaves the mirror empty — recover the
+    // last durable local snapshot rather than silently losing data.
+    if (!mirror.users?.length) {
+      recoverLocalSnapshot(mirror);
+    }
     return memoryDb;
   }
 
@@ -95,23 +141,7 @@ function ensureDbFile(): Schema {
     try {
       const content = fs.readFileSync(DB_FILE, 'utf-8');
       if (content && content.trim().length > 0) {
-        const parsed = JSON.parse(content);
-        parsed.users = parsed.users || [];
-        parsed.userCredentials = parsed.userCredentials || [];
-        parsed.conversations = parsed.conversations || [];
-        parsed.messages = parsed.messages || [];
-        parsed.memories = parsed.memories || [];
-        parsed.tasks = parsed.tasks || [];
-        parsed.reminders = parsed.reminders || [];
-        parsed.goals = parsed.goals || [];
-        parsed.habits = parsed.habits || [];
-        parsed.agentActions = parsed.agentActions || [];
-        parsed.notifications = parsed.notifications || [];
-        parsed.confirmations = parsed.confirmations || [];
-        parsed.ledger = parsed.ledger || [];
-        parsed.notes = parsed.notes || [];
-        parsed.noteFolders = parsed.noteFolders || [];
-        parsed.dropboxIntegrations = parsed.dropboxIntegrations || [];
+        const parsed = normalizeSchema(JSON.parse(content));
         memoryDb = parsed as Schema;
         
         // Sync to MongoDB in background once on startup if connection URI is provided
@@ -413,15 +443,14 @@ let persistTimer: NodeJS.Timeout | null = null;
 let isWriting = false;
 
 /**
- * Persist the last-mutated documents.
- *  - Mongo mode: individual docs are persisted via persistDoc() at each call
- *    site (see persistDocs below); persistDb only flushes the local JSON as a
- *    best-effort debug artifact.
- *  - Local mode: debounced full-file write (original behavior).
+ * Persist the in-memory store to the local JSON snapshot (debounced).
+ *  - Mongo mode: per-document write-through is handled by persistDocs, but we
+ *    still keep the JSON snapshot current so data survives an Atlas outage,
+ *    a server restart, or a hot-reload reset of module state.
+ *  - Local mode: this is the primary store.
  */
 function persistDb(): void {
   if (!memoryDb) return;
-  if (isMongoConfigured()) return; // write-through handled per-document
   if (persistTimer) clearTimeout(persistTimer);
 
   persistTimer = setTimeout(async () => {
