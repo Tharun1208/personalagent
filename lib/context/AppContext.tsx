@@ -441,10 +441,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Register Service Worker for Background Push Notifications & Alarms
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').then((reg) => {
-        console.log('Recall AI Service Worker registered:', reg.scope);
-      }).catch((err) => {
-        console.warn('Service Worker registration skipped:', err);
+      navigator.serviceWorker
+        .register('/sw.js', { updateViaCache: 'none' })
+        .then((reg) => {
+          console.log('Recall AI Service Worker registered:', reg.scope);
+          // Pick up new deploys promptly instead of serving a stale shell.
+          reg.update().catch(() => undefined);
+        })
+        .catch((err) => {
+          console.warn('Service Worker registration skipped:', err);
+        });
+
+      // When an updated worker takes control, reload once so the UI never keeps
+      // rendering stale components (e.g. removed backup cards).
+      let reloadedForUpdate = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (reloadedForUpdate) return;
+        reloadedForUpdate = true;
+        window.location.reload();
       });
 
       // Listen for Background Alarm actions from Service Worker

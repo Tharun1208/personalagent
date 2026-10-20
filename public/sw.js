@@ -3,7 +3,7 @@
 // Offline app shell + push notifications + background sync
 // ==========================================
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const SHELL_CACHE = `assistance-shell-${CACHE_VERSION}`;
 const STATIC_CACHE = `assistance-static-${CACHE_VERSION}`;
 const PRECACHE_URLS = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png', '/logo.svg'];

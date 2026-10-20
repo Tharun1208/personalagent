@@ -129,7 +129,7 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
         const lastLogged = globalThis.__mongoErrorLoggedAt || 0;
         if (Date.now() - lastLogged > ERROR_LOG_INTERVAL_MS) {
           globalThis.__mongoErrorLoggedAt = Date.now();
-          const hint = /bad auth|authentication failed/i.test(cached.lastError)
+          const hint = /bad auth|authentication failed/i.test(cached.lastError || '')
             ? ' The Atlas user/password in MONGODB_URI was rejected — reset it under Atlas → Database Access.'
             : '';
           console.warn(
