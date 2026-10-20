@@ -7,17 +7,11 @@ import {
   FileText,
   Wallet,
   Calendar,
-  Bell,
+  Bot,
   Settings,
   X,
   ChevronLeft,
   ChevronRight,
-  Database,
-  Shield,
-  Activity,
-  Layers,
-  Sparkles,
-  Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
@@ -33,7 +27,7 @@ interface NavItem {
   title: string;
   subtitle: string;
   icon: LucideIcon;
-  badgeType?: 'tasks' | 'ledger' | 'notifications';
+  badgeType?: 'tasks' | 'ledger';
 }
 
 // ── Asklepios v3 Modern Navigation Modules ──
@@ -71,11 +65,10 @@ const MAIN_NAV_ITEMS: NavItem[] = [
     icon: Calendar,
   },
   {
-    key: 'notifications',
-    title: 'Notifications',
-    subtitle: 'Alerts & updates',
-    icon: Bell,
-    badgeType: 'notifications',
+    key: 'chat',
+    title: 'AI Assistant',
+    subtitle: 'Ask & automate anything',
+    icon: Bot,
   },
 ];
 
@@ -85,17 +78,15 @@ export default function Sidebar({ onClose, isCollapsed = false, onToggleCollapse
     setActiveTab,
     tasks,
     ledgerEntries,
-    unreadNotificationCount,
     user,
   } = useApp();
 
   const pendingTaskCount = tasks.filter((t) => t.status !== 'completed').length;
   const pendingLedgerCount = (ledgerEntries || []).filter((l) => l.status === 'pending').length;
 
-  const getBadge = (badgeType?: 'tasks' | 'ledger' | 'notifications') => {
+  const getBadge = (badgeType?: 'tasks' | 'ledger') => {
     if (badgeType === 'tasks') return pendingTaskCount;
     if (badgeType === 'ledger') return pendingLedgerCount;
-    if (badgeType === 'notifications') return unreadNotificationCount;
     return 0;
   };
 
@@ -248,28 +239,6 @@ export default function Sidebar({ onClose, isCollapsed = false, onToggleCollapse
           );
         })}
       </div>
-
-      {/* ── System Status Widget (Asklepios Soft Health & Sync Card) ── */}
-      {!isCollapsed && (
-        <div className="p-3 mx-3 mb-3 rounded-2xl bg-slate-50/80 border border-slate-100 text-slate-600 space-y-2">
-          <div className="flex items-center justify-between text-[11px] font-semibold">
-            <span className="flex items-center gap-1.5 text-slate-700">
-              <Database size={13} className="text-indigo-500" />
-              Local Storage
-            </span>
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-100 text-[10px] font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Ready
-            </span>
-          </div>
-          <div className="w-full bg-slate-200/80 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-indigo-600 h-full rounded-full w-[100%]" />
-          </div>
-          <p className="text-[10px] text-slate-400 font-medium">
-            100% offline-ready & private
-          </p>
-        </div>
-      )}
 
       {/* ── Footer Profile & Settings ── */}
       <div className="shrink-0 p-3 border-t border-slate-100 bg-white">
