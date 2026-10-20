@@ -1,8 +1,11 @@
+import { enqueueMutation, isQueueableRequest } from './offline/queueStore';
+
 /**
  * Universal Authenticated API Fetcher
  * Automatically resolves remote URLs when running inside Android Capacitor / offline APK,
  * attaches stored JWT token as Authorization Bearer header,
  * and gracefully falls back on offline errors without crashing the application.
+ * Mutating requests made offline are queued and replayed with conflict handling.
  */
 
 export const REMOTE_API_URL = 'https://personalagent-one.vercel.app';
@@ -42,6 +45,34 @@ export function resolveApiUrl(url: string | URL): string {
   return url;
 }
 
+function registerBackgroundSync(): void {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    navigator.serviceWorker.ready
+      .then((registration: any) => registration.sync?.register('assistance-sync'))
+      .catch(() => {});
+  } catch {
+    /* background sync unsupported */
+  }
+}
+
+function queuedResponse(url: string): Response {
+  return new Response(
+    JSON.stringify({
+      success: true,
+      queued: true,
+      offline: true,
+      url,
+      message: 'Saved offline — will sync when you are back online.',
+    }),
+    {
+      status: 202,
+      statusText: 'Accepted (offline queue)',
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
+}
+
 export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   if (typeof window !== 'undefined') {
@@ -56,6 +87,26 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
     targetUrl = resolveApiUrl(input);
   }
 
+  const method = (init.method || 'GET').toUpperCase();
+  const relativeUrl = typeof input === 'string' ? input : '';
+  const canQueue =
+    typeof window !== 'undefined' &&
+    relativeUrl.length > 0 &&
+    isQueueableRequest(relativeUrl, method) &&
+    (typeof init.body === 'string' || method === 'DELETE');
+
+  // Offline: persist the mutation instead of failing.
+  if (
+    canQueue &&
+    typeof navigator !== 'undefined' &&
+    navigator.onLine === false
+  ) {
+    const contentType = headers.get('Content-Type') || undefined;
+    enqueueMutation(method, relativeUrl, init.body as string, contentType);
+    registerBackgroundSync();
+    return queuedResponse(relativeUrl);
+  }
+
   try {
     const isRemote =
       typeof targetUrl === 'string'
@@ -63,14 +114,30 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
         : targetUrl instanceof URL
         ? targetUrl.protocol.startsWith('http')
         : false;
-    return await fetch(targetUrl, {
+    const res = await fetch(targetUrl, {
       ...init,
       headers,
       credentials: isRemote ? 'omit' : 'same-origin',
     });
+
+    // Server unreachable / gateway failure: keep the mutation for later.
+    if (canQueue && [502, 503, 504].includes(res.status)) {
+      const contentType = headers.get('Content-Type') || undefined;
+      enqueueMutation(method, relativeUrl, init.body as string, contentType);
+      registerBackgroundSync();
+      return queuedResponse(relativeUrl);
+    }
+
+    return res;
   } catch (err: any) {
+    if (canQueue) {
+      const contentType = headers.get('Content-Type') || undefined;
+      enqueueMutation(method, relativeUrl, init.body as string, contentType);
+      registerBackgroundSync();
+      return queuedResponse(relativeUrl);
+    }
     // Only return fallback response if the network request actually threw an error
-    return new Response(JSON.stringify({ error: err?.message || 'Network request failed', offline: false, success: false }), {
+    return new Response(JSON.stringify({ error: err?.message || 'Network request failed', offline: true, success: false }), {
       status: 503,
       statusText: 'Service Unavailable',
       headers: { 'Content-Type': 'application/json' },

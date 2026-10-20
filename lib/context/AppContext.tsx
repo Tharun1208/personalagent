@@ -31,6 +31,7 @@ import {
   ScheduledItem,
 } from '@/lib/notifications/scheduler';
 import { apiFetch, safeJson } from '@/lib/api';
+import { flushOfflineQueue } from '@/lib/offline/syncQueue';
 
 export type AppTab =
   | 'dashboard'
@@ -479,6 +480,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!isHydrated) return;
     try { localStorage.setItem('recall_tasks', JSON.stringify(tasks)); } catch {}
   }, [tasks, isHydrated]);
+
+  // ── WhatsApp-style daily Google Drive backup (once per browser session) ──
+  useEffect(() => {
+    if (!isHydrated || !user?.id) return;
+    if (!user.preferences?.autoBackupEnabled) return;
+    if (typeof window === 'undefined') return;
+    if (sessionStorage.getItem('recall_auto_backup_attempted')) return;
+    sessionStorage.setItem('recall_auto_backup_attempted', '1');
+    apiFetch('/api/backup/drive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auto: true }),
+    }).catch(() => {});
+  }, [isHydrated, user?.id, user?.preferences?.autoBackupEnabled]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -945,6 +960,59 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     refreshAll();
   }, [refreshAll]);
+
+  // ── Offline queue: replay local edits on reconnect + report conflicts ─────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const runFlush = () => {
+      flushOfflineQueue().catch(() => {});
+    };
+
+    const onOnline = () => runFlush();
+
+    const onServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'FLUSH_OFFLINE_QUEUE') runFlush();
+    };
+
+    const onSynced = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {};
+      const synced = Number(detail.synced) || 0;
+      const conflicts = Array.isArray(detail.conflicts) ? detail.conflicts.length : 0;
+
+      if (synced > 0) {
+        showToast(`${synced} offline change${synced === 1 ? '' : 's'} synced`, 'success');
+      }
+      if (conflicts > 0) {
+        showToast(
+          `${conflicts} conflict${conflicts === 1 ? '' : 's'} resolved — the newer server version was kept`,
+          'warning',
+          5000,
+        );
+      }
+      if (synced > 0 || conflicts > 0) refreshAll().catch(() => {});
+    };
+
+    window.addEventListener('online', onOnline);
+    window.addEventListener('assistance:offline-synced', onSynced as EventListener);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', onServiceWorkerMessage);
+    }
+
+    // Attempt a silent flush shortly after load (nothing queued = no-op).
+    const timer = setTimeout(() => {
+      if (navigator.onLine) runFlush();
+    }, 4000);
+
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('assistance:offline-synced', onSynced as EventListener);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', onServiceWorkerMessage);
+      }
+      clearTimeout(timer);
+    };
+  }, [showToast, refreshAll]);
 
   // ── OS push notifications ────────────────────────────────────────────────
   // Keeps the OS-level alarm schedule in sync with the user's reminders and

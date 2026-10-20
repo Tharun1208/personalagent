@@ -17,6 +17,7 @@ import {
   LedgerEntry,
   Note,
   NoteFolder,
+  GoogleDriveIntegration,
 } from '@/types';
 import { syncInitialDataToMongo, syncEntityToMongo } from './mongoSync';
 import { isMongoConfigured } from './mongodb';
@@ -47,6 +48,7 @@ interface Schema {
   ledger: LedgerEntry[];
   notes: Note[];
   noteFolders: NoteFolder[];
+  integrations: GoogleDriveIntegration[];
 }
 
 const DB_DIR = path.join(process.cwd(), 'data');
@@ -109,6 +111,7 @@ function ensureDbFile(): Schema {
         parsed.ledger = parsed.ledger || [];
         parsed.notes = parsed.notes || [];
         parsed.noteFolders = parsed.noteFolders || [];
+        parsed.integrations = parsed.integrations || [];
         memoryDb = parsed as Schema;
         
         // Sync to MongoDB in background once on startup if connection URI is provided
@@ -398,6 +401,7 @@ How can I assist you today?`,
     ledger: [],
     notes: [],
     noteFolders: [],
+    integrations: [],
   };
 
   fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
@@ -1020,6 +1024,49 @@ export const db = {
     return conf;
   },
 
+  // --- INTEGRATIONS (Google Drive OAuth) ---
+  getIntegration(userId: string): GoogleDriveIntegration | null {
+    const data = ensureDbFile();
+    data.integrations = data.integrations || [];
+    return data.integrations.find((i) => i && i.userId === userId) || null;
+  },
+
+  saveIntegration(integration: GoogleDriveIntegration): GoogleDriveIntegration {
+    const data = ensureDbFile();
+    data.integrations = data.integrations || [];
+    const idx = data.integrations.findIndex((i) => i.userId === integration.userId);
+    if (idx >= 0) {
+      data.integrations[idx] = { ...data.integrations[idx], ...integration };
+    } else {
+      data.integrations.push(integration);
+    }
+    persistDb();
+    persistDocs('integrations', data.integrations.find((i) => i.userId === integration.userId)!);
+    return data.integrations.find((i) => i.userId === integration.userId)!;
+  },
+
+  updateIntegration(userId: string, patch: Partial<GoogleDriveIntegration>): GoogleDriveIntegration | null {
+    const data = ensureDbFile();
+    data.integrations = data.integrations || [];
+    const idx = data.integrations.findIndex((i) => i.userId === userId);
+    if (idx === -1) return null;
+    data.integrations[idx] = { ...data.integrations[idx], ...patch, id: data.integrations[idx].id, userId };
+    persistDb();
+    persistDocs('integrations', data.integrations[idx]);
+    return data.integrations[idx];
+  },
+
+  deleteIntegration(userId: string): boolean {
+    const data = ensureDbFile();
+    data.integrations = data.integrations || [];
+    const existing = data.integrations.find((i) => i.userId === userId);
+    if (!existing) return false;
+    data.integrations = data.integrations.filter((i) => i.userId !== userId);
+    persistDb();
+    deleteFromStore('integrations', existing.id);
+    return true;
+  },
+
   // --- NOTES & NOTE FOLDERS ---
   getNotes(userId: string): Note[] {
     const data = ensureDbFile();
@@ -1490,6 +1537,7 @@ export const db = {
     const nflds = (data.noteFolders || []).filter((f) => f.userId === userId);
     const acts = data.agentActions.filter((a) => a.userId === userId);
     const nots = data.notifications.filter((n) => n.userId === userId);
+    const intg = (data.integrations || []).filter((i) => i.userId === userId);
     data.conversations = data.conversations.filter((c) => c.userId !== userId);
     data.messages = data.messages.filter((m) => m.userId !== userId);
     data.memories = data.memories.filter((m) => m.userId !== userId);
@@ -1502,6 +1550,7 @@ export const db = {
     data.noteFolders = (data.noteFolders || []).filter((f) => f.userId !== userId);
     data.agentActions = data.agentActions.filter((a) => a.userId !== userId);
     data.notifications = data.notifications.filter((n) => n.userId !== userId);
+    data.integrations = (data.integrations || []).filter((i) => i.userId !== userId);
     persistDb();
     convs.forEach((d) => deleteFromStore('conversations', d.id));
     msgs.forEach((d) => deleteFromStore('messages', d.id));
@@ -1515,6 +1564,7 @@ export const db = {
     nflds.forEach((d) => deleteFromStore('noteFolders', d.id));
     acts.forEach((d) => deleteFromStore('agentActions', d.id));
     nots.forEach((d) => deleteFromStore('notifications', d.id));
+    intg.forEach((d) => deleteFromStore('integrations', d.id));
     return true;
   },
 };

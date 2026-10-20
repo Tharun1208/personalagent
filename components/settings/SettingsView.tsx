@@ -14,6 +14,14 @@ import {
   Sparkles,
   Smartphone,
   ShieldCheck,
+  Cloud,
+  CloudUpload,
+  CloudDownload,
+  Unplug,
+  Link2,
+  CircleCheck,
+  LoaderCircle,
+  TriangleAlert,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { apiFetch } from '@/lib/api';
@@ -54,6 +62,21 @@ export default function SettingsView() {
   const [backupStatusText, setBackupStatusText] = useState<string>('');
   const [isRestoring, setIsRestoring] = useState<boolean>(false);
 
+  // Google Drive backup states
+  type DriveStatus = {
+    configured: boolean;
+    connected: boolean;
+    email: string | null;
+    connectedAt: string | null;
+    lastBackupAt: string | null;
+    autoBackupEnabled: boolean;
+  };
+  const [driveStatus, setDriveStatus] = useState<DriveStatus | null>(null);
+  const [driveBusy, setDriveBusy] = useState(false);
+  const [driveRestoring, setDriveRestoring] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<Array<{ id: string; name: string; createdAt?: string; size?: number }>>([]);
+  const [driveFilesLoading, setDriveFilesLoading] = useState(false);
+
   useEffect(() => {
     if (user) {
       if (user.name) setProfileName(user.name);
@@ -69,6 +92,154 @@ export default function SettingsView() {
       if (storedSize) setBackupSize(storedSize);
     }
   }, []);
+
+  // ── Google Drive status ──────────────────────────────────────
+  const refreshDriveStatus = async () => {
+    try {
+      const res = await apiFetch('/api/google/status');
+      const data = await res.json();
+      if (!data?.error) {
+        setDriveStatus(data);
+        if (data.connected) loadDriveFiles();
+      }
+    } catch {
+      /* ignore — banner shows disconnected state */
+    }
+  };
+
+  useEffect(() => {
+    refreshDriveStatus();
+    // Notify about the OAuth redirect result and clean the URL.
+    if (typeof window !== 'undefined' && window.location.hash.includes('drive=')) {
+      const hash = window.location.hash;
+      if (hash.includes('drive=connected')) showToast('Google Drive connected', 'success');
+      else if (hash.includes('drive=denied')) showToast('Google Drive connection cancelled', 'info');
+      else if (hash.includes('drive=error')) showToast('Could not connect Google Drive', 'error');
+      window.history.replaceState(null, '', '/#settings');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleConnectDrive = () => {
+    window.location.href = '/api/google/connect';
+  };
+
+  const handleDriveBackupNow = async () => {
+    setDriveBusy(true);
+    setBackupStatusText('Uploading snapshot to Google Drive...');
+    try {
+      const res = await apiFetch('/api/backup/drive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.error) {
+        showToast(data?.error || 'Google Drive backup failed', 'error');
+        return;
+      }
+      showToast('Backup uploaded to Google Drive', 'success');
+      await refreshDriveStatus();
+      await loadDriveFiles();
+    } catch (err) {
+      console.error('Drive backup failed', err);
+      showToast('Google Drive backup failed', 'error');
+    } finally {
+      setDriveBusy(false);
+      setBackupStatusText('');
+    }
+  };
+
+  const loadDriveFiles = async () => {
+    setDriveFilesLoading(true);
+    try {
+      const res = await apiFetch('/api/backup/drive');
+      const data = await res.json();
+      if (Array.isArray(data?.files)) setDriveFiles(data.files);
+    } catch {
+      /* silent */
+    } finally {
+      setDriveFilesLoading(false);
+    }
+  };
+
+  const handleDriveRestore = async () => {
+    if (driveFiles.length === 0) {
+      await loadDriveFiles();
+      showToast('Select a backup below to restore', 'info');
+      return;
+    }
+    const latest = driveFiles[0];
+    const when = latest.createdAt
+      ? new Date(latest.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+      : 'latest snapshot';
+
+    showConfirm({
+      title: 'Restore from Google Drive',
+      message: `Restore the backup from ${when}? Your current items with the same IDs will be overwritten; everything else is kept.`,
+      confirmText: 'Restore',
+      type: 'warning',
+      onConfirm: async () => {
+        setDriveRestoring(true);
+        try {
+          const res = await apiFetch('/api/backup/drive/restore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileId: latest.id }),
+          });
+          const data = await res.json();
+          if (!res.ok || data?.error) {
+            showToast(data?.error || 'Restore failed', 'error');
+            return;
+          }
+          showToast('Backup restored from Google Drive', 'success');
+          await refreshAll();
+          await refreshDriveStatus();
+          setCurrentView('main');
+        } catch (err) {
+          console.error('Drive restore failed', err);
+          showToast('Restore from Google Drive failed', 'error');
+        } finally {
+          setDriveRestoring(false);
+        }
+      },
+    });
+  };
+
+  const handleDisconnectDrive = () => {
+    showConfirm({
+      title: 'Disconnect Google Drive?',
+      message: 'Existing backups stay in your Drive, but automatic and manual backups will stop until you reconnect.',
+      confirmText: 'Disconnect',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await apiFetch('/api/google/status', { method: 'DELETE' });
+          setDriveFiles([]);
+          await refreshDriveStatus();
+          showToast('Google Drive disconnected', 'info');
+        } catch {
+          showToast('Could not disconnect Google Drive', 'error');
+        }
+      },
+    });
+  };
+
+  const handleToggleAutoBackup = async () => {
+    const next = !driveStatus?.autoBackupEnabled;
+    setDriveStatus((prev) => (prev ? { ...prev, autoBackupEnabled: next } : prev));
+    try {
+      await apiFetch('/api/google/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autoBackupEnabled: next }),
+      });
+      showToast(next ? 'Daily auto-backup enabled' : 'Daily auto-backup disabled', 'success');
+      await refreshAll();
+    } catch {
+      showToast('Could not update auto-backup setting', 'error');
+    }
+  };
 
   // ── Profile handler ──────────────────────────────────────────
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -540,13 +711,140 @@ export default function SettingsView() {
             </h1>
           </div>
 
+          {/* Google Drive Backup Card */}
+          <div className="bg-white rounded-[26px] p-5 sm:p-7 shadow-2xs border border-slate-100 max-w-lg space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Cloud size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-sm font-bold text-slate-900">Google Drive Backup</h2>
+                <p className="text-[11px] text-slate-500">Automatic cloud backup, like WhatsApp.</p>
+              </div>
+              {driveStatus?.connected && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-bold">
+                  <CircleCheck size={11} /> Connected
+                </span>
+              )}
+            </div>
+
+            {driveStatus && !driveStatus.configured ? (
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] leading-relaxed flex gap-2">
+                <TriangleAlert size={15} className="shrink-0 mt-0.5" />
+                <div>
+                  Google Drive is not configured on the server. Add
+                  <code className="mx-1 font-mono text-[10px] bg-white/70 px-1 py-0.5 rounded">GOOGLE_CLIENT_ID</code>
+                  and
+                  <code className="mx-1 font-mono text-[10px] bg-white/70 px-1 py-0.5 rounded">GOOGLE_CLIENT_SECRET</code>
+                  to your environment, then reload.
+                </div>
+              </div>
+            ) : !driveStatus?.connected ? (
+              <>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Connect your Google account to store encrypted-at-rest snapshots in a private
+                  “Assistance Backups” folder. The app can only see files it creates.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleConnectDrive}
+                  disabled={!driveStatus?.configured}
+                  className="w-full py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  <Link2 size={15} /> Connect Google Drive
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+                  <div className="flex justify-between items-center gap-3">
+                    <span className="text-slate-500 font-medium">Account:</span>
+                    <span className="font-bold text-slate-800 truncate">{driveStatus.email || 'Google Drive'}</span>
+                  </div>
+                  <div className="flex justify-between items-center gap-3">
+                    <span className="text-slate-500 font-medium">Last cloud backup:</span>
+                    <span className="font-bold text-slate-800">
+                      {driveStatus.lastBackupAt
+                        ? new Date(driveStatus.lastBackupAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+                        : 'Never'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center gap-3">
+                    <span className="text-slate-500 font-medium">Daily auto-backup:</span>
+                    <button
+                      type="button"
+                      onClick={handleToggleAutoBackup}
+                      className={`relative w-10 h-5.5 rounded-full transition-colors cursor-pointer ${
+                        driveStatus.autoBackupEnabled ? 'bg-emerald-500' : 'bg-slate-300'
+                      }`}
+                      title="Toggle daily auto-backup"
+                    >
+                      <span
+                        className={`absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white shadow transition-all ${
+                          driveStatus.autoBackupEnabled ? 'left-5' : 'left-0.5'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDriveBackupNow}
+                    disabled={driveBusy}
+                    className="py-3 px-4 rounded-xl bg-gradient-to-r from-[#14B8A6] to-[#0EA5E9] text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
+                  >
+                    {driveBusy ? <LoaderCircle size={15} className="animate-spin" /> : <CloudUpload size={15} />}
+                    <span>{driveBusy ? 'Uploading...' : 'Back Up Now'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDriveRestore}
+                    disabled={driveRestoring}
+                    className="py-3 px-4 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    {driveRestoring ? <LoaderCircle size={15} className="animate-spin" /> : <CloudDownload size={15} />}
+                    <span>Restore from Drive</span>
+                  </button>
+                </div>
+
+                {driveFiles.length > 0 && (
+                  <p className="text-[10.5px] text-slate-400 text-center">
+                    {driveFiles.length} backup{driveFiles.length === 1 ? '' : 's'} found
+                    {driveFiles[0]?.createdAt
+                      ? ` · newest ${new Date(driveFiles[0].createdAt).toLocaleDateString()}`
+                      : ''}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={loadDriveFiles}
+                    className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw size={11} className={driveFilesLoading ? 'animate-spin' : ''} /> Refresh backups
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDisconnectDrive}
+                    className="text-[11px] font-semibold text-rose-500 hover:text-rose-700 inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Unplug size={11} /> Disconnect
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Backup Vault Card */}
           <div className="bg-white rounded-[26px] p-5 sm:p-7 shadow-2xs border border-slate-100 max-w-lg space-y-4">
             
             {/* Metrics */}
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5 text-xs">
               <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-medium">Last Snapshot:</span>
+                <span className="text-slate-500 font-medium">Last device snapshot:</span>
                 <span className="font-bold text-slate-800">{lastLocalBackup}</span>
               </div>
               <div className="flex justify-between items-center">
@@ -570,7 +868,7 @@ export default function SettingsView() {
               ) : (
                 <>
                   <Sparkles size={16} />
-                  <span>CREATE BACKUP SNAPSHOT</span>
+                  <span>SAVE DEVICE SNAPSHOT</span>
                 </>
               )}
             </button>
@@ -583,7 +881,7 @@ export default function SettingsView() {
               className="w-full py-3 px-4 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
             >
               {isRestoring ? <RefreshCw size={15} className="animate-spin" /> : <RefreshCw size={15} />}
-              <span>Restore from Latest Snapshot</span>
+              <span>Restore from Device Snapshot</span>
             </button>
 
             {/* Import .JSON file */}
