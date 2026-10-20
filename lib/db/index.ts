@@ -1606,22 +1606,31 @@ export const db = {
   // --- DATA OWNERSHIP / EXPORT / IMPORT / WIPE ---
   exportUserData(userId: string): Record<string, any> {
     const data = ensureDbFile();
+
+    // Mirror the read helpers: legacy rows without an owner, plus every row
+    // when the permanent primary profile is requesting the export. Otherwise
+    // the downloaded file would miss items the UI is showing.
+    const owned = <T extends { userId?: string }>(items: T[] | undefined): T[] =>
+      (items || []).filter(
+        (item) => item && (item.userId === userId || !item.userId || userId === 'usr_primary_default'),
+      );
+
     return {
       version: '1.0.0',
       exportedAt: new Date().toISOString(),
       user: data.users.find((u) => u.id === userId),
-      conversations: data.conversations.filter((c) => c.userId === userId),
-      messages: data.messages.filter((m) => m.userId === userId),
-      memories: data.memories.filter((m) => m.userId === userId),
-      tasks: data.tasks.filter((t) => t.userId === userId),
-      reminders: data.reminders.filter((r) => r.userId === userId),
-      goals: (data.goals || []).filter((g) => g.userId === userId),
-      habits: (data.habits || []).filter((h) => h.userId === userId),
-      ledger: (data.ledger || []).filter((l) => l.userId === userId),
-      notes: (data.notes || []).filter((n) => n.userId === userId),
-      noteFolders: (data.noteFolders || []).filter((f) => f.userId === userId),
-      spending: (data.spending || []).filter((s) => s.userId === userId),
-      agentActions: data.agentActions.filter((a) => a.userId === userId),
+      conversations: owned(data.conversations),
+      messages: owned(data.messages),
+      memories: owned(data.memories),
+      tasks: owned(data.tasks),
+      reminders: owned(data.reminders),
+      goals: owned(data.goals),
+      habits: owned(data.habits),
+      ledger: owned(data.ledger),
+      notes: owned(data.notes),
+      noteFolders: owned(data.noteFolders),
+      spending: owned(data.spending),
+      agentActions: owned(data.agentActions),
     };
   },
 

@@ -256,20 +256,31 @@ export default function SettingsView() {
 
   const handleExportData = async () => {
     try {
-      const res = await apiFetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'export' }),
-      });
+      const res = await apiFetch('/api/export');
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+
       const data = await res.json();
-      const blob = new Blob([JSON.stringify(data.export, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `personal_assistant_backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `assistance-backup_${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast('Backup file downloaded (.json)', 'success');
+
+      const total = [
+        'tasks',
+        'reminders',
+        'memories',
+        'goals',
+        'habits',
+        'notes',
+        'ledger',
+        'spending',
+        'conversations',
+      ].reduce((sum, key) => sum + (Array.isArray(data[key]) ? data[key].length : 0), 0);
+
+      showToast(`Exported ${total} records (.json)`, 'success');
     } catch (err) {
       console.error('Export failed', err);
       showToast('Failed to export data', 'error');
@@ -584,6 +595,16 @@ export default function SettingsView() {
             >
               {isRestoring ? <RefreshCw size={15} className="animate-spin" /> : <RefreshCw size={15} />}
               <span>Restore from Device Snapshot</span>
+            </button>
+
+            {/* Download a complete JSON backup */}
+            <button
+              type="button"
+              onClick={handleExportData}
+              className="w-full py-3 px-4 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
+            >
+              <Download size={15} />
+              <span>Download .JSON Backup</span>
             </button>
 
             {/* Import .JSON file */}
