@@ -6,6 +6,7 @@ import { processAllAttachments } from './fileAnalyzer';
 import { Message, ToolExecutionStep, Memory, AgentAction } from '@/types';
 import { FuzzyMatcher } from '@/lib/dsa/FuzzyMatcher';
 import { getHolidayForDate, getUpcomingHolidays, getHolidaysForYear, isGovernmentHoliday } from '@/lib/calendar/holidays';
+import { handleCrudIntent } from './crudIntent';
 
 export interface AgentRunParams {
   userId: string;
@@ -14,6 +15,8 @@ export interface AgentRunParams {
   model?: string;
   attachments?: any[];
   timezone?: string;
+  /** Receives streamed token deltas for progressive rendering. */
+  onToken?: (chunk: string) => void;
 }
 
 export interface AgentRunResult {
@@ -314,6 +317,8 @@ export function parseTaskIntent(text: string): {
     .replace(/^(?:task is to|task is|my task is|task:|todo:|todo)\s+/i, '')
     .replace(/(?:due\s+is|due\s*:|priority\s+is|priority\s*:|and\s+remind.*|and\s+remembe.*).*/i, '')
     .replace(/(?:\s+with\s+(?:urgent|high|medium|low)\s+priority|\s+as\s+(?:urgent|high|medium|low)\s+priority)/i, '')
+    .replace(/\s+(?:at|by|before)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)\b.*$/i, '')
+    .replace(/\s+(?:tomorrow|today|tonight)\b(?:\s+(?:at|by)?\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?.*$/i, '')
     .replace(/[.,!?]+$/, '')
     .trim();
 
@@ -443,6 +448,7 @@ export class AgentOrchestrator {
     model = 'Recall Core Ultra',
     attachments = [],
     timezone = 'Asia/Kolkata',
+    onToken,
   }: AgentRunParams): Promise<AgentRunResult> {
     const trimmed = userPrompt.trim();
     const lower = trimmed.toLowerCase();
@@ -482,6 +488,7 @@ Explain what you see clearly, extract any key text/details, and answer the user'
           systemInstruction: multimodalSystemPrompt,
           fallbackContent: `I've received and processed your attachment(s): **${fileNames}**.`,
           attachments: processedAttachments,
+          onToken,
         });
 
         const executionTimeMs = Date.now() - startTime;
@@ -675,6 +682,22 @@ Explain what you see clearly, extract any key text/details, and answer the user'
     }
 
     // ─────────────────────────────────────────────────────────────
+    // STEP 2.2: UNIVERSAL CRUD INTENT ROUTER
+    // Handles create/read/update/delete for notes, habits, goals,
+    // reminders, tasks, ledger, settings, notifications & projects.
+    // ─────────────────────────────────────────────────────────────
+    const crudIntent = await handleCrudIntent({ userPrompt: trimmed, userId, conversationId });
+    if (crudIntent) {
+      toolSteps.push(...crudIntent.toolSteps);
+      return {
+        reply: crudIntent.reply,
+        toolSteps,
+        requiresConfirmation: crudIntent.requiresConfirmation,
+        confirmationPayload: crudIntent.confirmationPayload,
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // STEP 2.5: COMPREHENSIVE DAILY BRIEFING & UPDATES
     // ─────────────────────────────────────────────────────────────
     const isDailyBriefingQuery =
@@ -797,90 +820,52 @@ Explain what you see clearly, extract any key text/details, and answer the user'
     // ─────────────────────────────────────────────────────────────
     const taskIntent = parseTaskIntent(trimmed);
     if (taskIntent && taskIntent.isTask) {
+      const reminderAt =
+        taskIntent.hasReminder && taskIntent.reminderTime
+          ? taskIntent.reminderTime.toISOString()
+          : undefined;
+
+      // Do NOT create the task yet — surface an editable confirmation card
+      // first so the user can adjust title / priority / due date.
+      const draftPayload = {
+        toolName: 'TaskTool',
+        action: 'createTask',
+        title: taskIntent.title,
+        priority: taskIntent.priority,
+        dueDate: taskIntent.dueDate || '',
+        reminderAt: reminderAt || '',
+      };
+
       toolSteps.push({
         toolName: 'TaskTool',
         action: 'createTask',
         input: { title: taskIntent.title, priority: taskIntent.priority, dueDate: taskIntent.dueDate },
-        status: 'executing',
+        status: 'requires_confirmation',
+        confirmationMessage: 'Review the task details, edit anything you need, then confirm to add it.',
       });
-
-      const res = await toolRegistry.TaskTool.execute(
-        'createTask',
-        {
-          title: taskIntent.title,
-          priority: taskIntent.priority,
-          dueDate: taskIntent.dueDate,
-        },
-        userId
-      );
-
-      toolSteps[toolSteps.length - 1] = {
-        toolName: 'TaskTool',
-        action: 'createTask',
-        input: { title: taskIntent.title },
-        output: res.data,
-        status: 'success',
-      };
-
-      db.logAgentAction({
-        id: `act_${Date.now()}`,
-        userId,
-        conversationId,
-        toolName: 'TaskTool',
-        action: 'createTask',
-        summary: res.message,
-        status: 'success',
-        permissionLevel: 'WRITE',
-        createdAt: new Date().toISOString(),
-      });
-
-      let reminderMessage = '';
-      if (taskIntent.hasReminder && taskIntent.reminderTime) {
-        toolSteps.push({
-          toolName: 'ReminderTool',
-          action: 'createReminder',
-          input: { title: taskIntent.title, targetTime: taskIntent.reminderTime.toISOString() },
-          status: 'executing',
-        });
-
-        const remRes = await toolRegistry.ReminderTool.execute(
-          'createReminder',
-          {
-            title: taskIntent.title,
-            dueDateTime: taskIntent.reminderTime.toISOString(),
-            priority: taskIntent.priority,
-          },
-          userId
-        );
-
-        toolSteps[toolSteps.length - 1] = {
-          toolName: 'ReminderTool',
-          action: 'createReminder',
-          input: { title: taskIntent.title },
-          output: remRes.data,
-          status: 'success',
-        };
-
-        const remFormatted = taskIntent.reminderTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-        reminderMessage = `\n\n **Reminder Scheduled:** I will alert you at **${remFormatted}** when this task is due.`;
-      }
 
       const dueFormatted = taskIntent.dueDate
         ? new Date(taskIntent.dueDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
-        : 'No specific due date';
+        : 'Not set';
+      const reminderFormatted = reminderAt
+        ? new Date(reminderAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+        : 'None';
 
-      let reply = `###  Task Created Successfully\n\n`;
+      let reply = `###  Review your task\n\n`;
       reply += `| Field | Details |\n`;
       reply += `| :--- | :--- |\n`;
       reply += `| **Title** | ${taskIntent.title} |\n`;
       reply += `| **Priority** | ${taskIntent.priority.toUpperCase()} |\n`;
       reply += `| **Due** | ${dueFormatted} |\n`;
-      reply += `| **Status** | Todo (Pending) |\n`;
-      reply += reminderMessage;
+      reply += `| **Reminder** | ${reminderFormatted} |\n`;
+      reply += `| **Status** | Not added yet |\n\n`;
+      reply += `> ✏️ **Edit any field below, then tap “Add Task” to save it.** Nothing has been created yet.`;
 
       return {
         reply,
         toolSteps,
+        requiresConfirmation: true,
+        confirmationPayload: draftPayload,
       };
     }
 
@@ -1825,6 +1810,7 @@ CORE GUIDELINES:
       systemInstruction: systemPrompt,
       fallbackContent: fallbackText,
       attachments: processedAttachments,
+      onToken,
     });
 
     return {

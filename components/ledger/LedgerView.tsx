@@ -306,6 +306,18 @@ export default function LedgerView() {
     };
   }, [monthlyBudget, spendingEntries]);
 
+  // Only today's logged expenses (for the "Today's Expenses" card)
+  const todaysExpenseList = useMemo(() => {
+    const t = todayStr();
+    return spendingEntries
+      .filter((e) => (e.date || (e.createdAt ? e.createdAt.split('T')[0] : '')) === t)
+      .sort((a, b) => {
+        const aKey = a.createdAt || a.date || '';
+        const bKey = b.createdAt || b.date || '';
+        return bKey.localeCompare(aKey);
+      });
+  }, [spendingEntries]);
+
   // Derived Calculator Results
   const dayCalculatorResult = useMemo(() => {
     const list = spendingEntries.filter(
@@ -1324,15 +1336,19 @@ export default function LedgerView() {
               )}
             </div>
 
-            {/* ── Today's & Recent Daily Spending List ── */}
+            {/* ── Today's Daily Spending List ── */}
             <div className="rounded-[32px] bg-white border border-slate-200/80 p-6 sm:p-7 shadow-xs space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-black text-[#1C1C1E] tracking-tight">
-                    Recent Daily Expenses
+                    Today&apos;s Expenses
                   </h3>
                   <p className="text-xs text-slate-400 font-medium mt-0.5">
-                    {spendingEntries.length > 0 ? `${spendingEntries.length} recorded items` : 'No expenses recorded yet'}
+                    {todaysExpenseList.length > 0
+                      ? `${todaysExpenseList.length} logged today · ₹${todaysExpenseList
+                          .reduce((s, e) => s + (Number(e.amount) || 0), 0)
+                          .toLocaleString()}`
+                      : 'No expenses logged today'}
                   </p>
                 </div>
 
@@ -1356,9 +1372,9 @@ export default function LedgerView() {
               </div>
 
               {/* Items List */}
-              {spendingEntries.length > 0 ? (
+              {todaysExpenseList.length > 0 ? (
                 <div className="space-y-2.5 pt-1">
-                  {spendingEntries.slice(0, 6).map((item) => {
+                  {todaysExpenseList.slice(0, 6).map((item) => {
                     const meta = getCatMeta(item.category);
                     const Icon = meta.icon;
                     return (
@@ -1414,8 +1430,8 @@ export default function LedgerView() {
                 </div>
               ) : (
                 <div className="py-10 rounded-2xl bg-slate-50/50 border border-dashed border-slate-200 text-center space-y-2">
-                  <p className="text-sm font-bold text-slate-700">No daily expenses logged yet</p>
-                  <p className="text-xs text-slate-400">Log your daily coffee, food, or shopping spending.</p>
+                  <p className="text-sm font-bold text-slate-700">No expenses logged today</p>
+                  <p className="text-xs text-slate-400">Log today&apos;s coffee, food, or shopping spending.</p>
                   <button
                     type="button"
                     onClick={handleOpenAddExpense}

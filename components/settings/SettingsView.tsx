@@ -14,6 +14,14 @@ import {
   Sparkles,
   Smartphone,
   ShieldCheck,
+  CloudUpload,
+  CloudDownload,
+  Unplug,
+  Link2,
+  CircleCheck,
+  LoaderCircle,
+  TriangleAlert,
+  Box,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
 import { apiFetch } from '@/lib/api';
@@ -54,6 +62,21 @@ export default function SettingsView() {
   const [backupStatusText, setBackupStatusText] = useState<string>('');
   const [isRestoring, setIsRestoring] = useState<boolean>(false);
 
+  // Dropbox backup states
+  type CloudBackupStatus = {
+    configured: boolean;
+    connected: boolean;
+    email: string | null;
+    connectedAt: string | null;
+    lastBackupAt: string | null;
+    autoBackupEnabled: boolean;
+  };
+  const [dropboxStatus, setDropboxStatus] = useState<CloudBackupStatus | null>(null);
+  const [dropboxBusy, setDropboxBusy] = useState(false);
+  const [dropboxRestoring, setDropboxRestoring] = useState(false);
+  const [dropboxFiles, setDropboxFiles] = useState<Array<{ id: string; name: string; createdAt?: string; size?: number }>>([]);
+  const [dropboxFilesLoading, setDropboxFilesLoading] = useState(false);
+
   useEffect(() => {
     if (user) {
       if (user.name) setProfileName(user.name);
@@ -69,6 +92,156 @@ export default function SettingsView() {
       if (storedSize) setBackupSize(storedSize);
     }
   }, []);
+
+  // ── Dropbox status ───────────────────────────────────────────
+  const refreshDropboxStatus = async () => {
+    try {
+      const res = await apiFetch('/api/dropbox/status');
+      const data = await res.json();
+      if (!data?.error) {
+        setDropboxStatus(data);
+        if (data.connected) loadDropboxFiles();
+      }
+    } catch {
+      /* ignore — banner shows disconnected state */
+    }
+  };
+
+  useEffect(() => {
+    refreshDropboxStatus();
+    // Notify about the OAuth redirect result and clean the URL.
+    if (typeof window !== 'undefined' && window.location.hash.includes('dropbox=')) {
+      const hash = window.location.hash;
+      if (hash.includes('dropbox=connected')) showToast('Dropbox connected', 'success');
+      else if (hash.includes('dropbox=denied')) showToast('Dropbox connection cancelled', 'info');
+      else if (hash.includes('dropbox=error')) showToast('Could not connect Dropbox', 'error');
+      else if (hash.includes('dropbox=no_refresh_token')) showToast('Dropbox did not grant offline access — please try again', 'error');
+      window.history.replaceState(null, '', '/#settings');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Dropbox handlers ─────────────────────────────────────────
+  const handleConnectDropbox = () => {
+    window.location.href = '/api/dropbox/connect';
+  };
+
+  const loadDropboxFiles = async () => {
+    setDropboxFilesLoading(true);
+    try {
+      const res = await apiFetch('/api/backup/dropbox');
+      const data = await res.json();
+      if (Array.isArray(data?.files)) setDropboxFiles(data.files);
+    } catch {
+      /* silent */
+    } finally {
+      setDropboxFilesLoading(false);
+    }
+  };
+
+  const handleDropboxBackupNow = async () => {
+    setDropboxBusy(true);
+    setBackupStatusText('Uploading snapshot to Dropbox...');
+    try {
+      const res = await apiFetch('/api/backup/dropbox', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.error) {
+        showToast(data?.error || 'Dropbox backup failed', 'error');
+        return;
+      }
+      showToast('Backup uploaded to Dropbox', 'success');
+      await refreshDropboxStatus();
+      await loadDropboxFiles();
+    } catch (err) {
+      console.error('Dropbox backup failed', err);
+      showToast('Dropbox backup failed', 'error');
+    } finally {
+      setDropboxBusy(false);
+      setBackupStatusText('');
+    }
+  };
+
+  const handleDropboxRestore = async () => {
+    if (dropboxFiles.length === 0) {
+      await loadDropboxFiles();
+      showToast('Select a backup below to restore', 'info');
+      return;
+    }
+    const latest = dropboxFiles[0];
+    const when = latest.createdAt
+      ? new Date(latest.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+      : 'latest snapshot';
+
+    showConfirm({
+      title: 'Restore from Dropbox',
+      message: `Restore the backup from ${when}? Your current items with the same IDs will be overwritten; everything else is kept.`,
+      confirmText: 'Restore',
+      type: 'warning',
+      onConfirm: async () => {
+        setDropboxRestoring(true);
+        try {
+          const res = await apiFetch('/api/backup/dropbox/restore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileId: latest.id }),
+          });
+          const data = await res.json();
+          if (!res.ok || data?.error) {
+            showToast(data?.error || 'Restore failed', 'error');
+            return;
+          }
+          showToast('Backup restored from Dropbox', 'success');
+          await refreshAll();
+          await refreshDropboxStatus();
+          setCurrentView('main');
+        } catch (err) {
+          console.error('Dropbox restore failed', err);
+          showToast('Restore from Dropbox failed', 'error');
+        } finally {
+          setDropboxRestoring(false);
+        }
+      },
+    });
+  };
+
+  const handleDisconnectDropbox = () => {
+    showConfirm({
+      title: 'Disconnect Dropbox?',
+      message: 'Existing backups stay in your Dropbox, but automatic and manual backups will stop until you reconnect.',
+      confirmText: 'Disconnect',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await apiFetch('/api/dropbox/status', { method: 'DELETE' });
+          setDropboxFiles([]);
+          await refreshDropboxStatus();
+          showToast('Dropbox disconnected', 'info');
+        } catch {
+          showToast('Could not disconnect Dropbox', 'error');
+        }
+      },
+    });
+  };
+
+  const handleToggleDropboxAutoBackup = async () => {
+    const next = !dropboxStatus?.autoBackupEnabled;
+    setDropboxStatus((prev) => (prev ? { ...prev, autoBackupEnabled: next } : prev));
+    try {
+      await apiFetch('/api/dropbox/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autoBackupEnabled: next }),
+      });
+      showToast(next ? 'Daily Dropbox auto-backup enabled' : 'Daily Dropbox auto-backup disabled', 'success');
+      await refreshAll();
+    } catch {
+      showToast('Could not update Dropbox auto-backup setting', 'error');
+    }
+  };
 
   // ── Profile handler ──────────────────────────────────────────
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -540,13 +713,140 @@ export default function SettingsView() {
             </h1>
           </div>
 
+          {/* Dropbox Backup Card */}
+          <div className="bg-white rounded-[26px] p-5 sm:p-7 shadow-2xs border border-slate-100 max-w-lg space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#0061FF]/10 text-[#0061FF] flex items-center justify-center">
+                <Box size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-sm font-bold text-slate-900">Dropbox Backup</h2>
+                <p className="text-[11px] text-slate-500">Backups in your private app folder.</p>
+              </div>
+              {dropboxStatus?.connected && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-bold">
+                  <CircleCheck size={11} /> Connected
+                </span>
+              )}
+            </div>
+
+            {dropboxStatus && !dropboxStatus.configured ? (
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] leading-relaxed flex gap-2">
+                <TriangleAlert size={15} className="shrink-0 mt-0.5" />
+                <div>
+                  Dropbox is not configured on the server. Add
+                  <code className="mx-1 font-mono text-[10px] bg-white/70 px-1 py-0.5 rounded">DROPBOX_APP_KEY</code>
+                  and
+                  <code className="mx-1 font-mono text-[10px] bg-white/70 px-1 py-0.5 rounded">DROPBOX_APP_SECRET</code>
+                  to your environment, then reload.
+                </div>
+              </div>
+            ) : !dropboxStatus?.connected ? (
+              <>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Connect Dropbox to store snapshots in <span className="font-semibold">Apps/Assistance</span>.
+                  The app can only see files inside that folder.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleConnectDropbox}
+                  disabled={!dropboxStatus?.configured}
+                  className="w-full py-3 px-4 rounded-2xl bg-[#0061FF] hover:bg-[#004ECC] text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  <Link2 size={15} /> Connect Dropbox
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+                  <div className="flex justify-between items-center gap-3">
+                    <span className="text-slate-500 font-medium">Account:</span>
+                    <span className="font-bold text-slate-800 truncate">{dropboxStatus.email || 'Dropbox'}</span>
+                  </div>
+                  <div className="flex justify-between items-center gap-3">
+                    <span className="text-slate-500 font-medium">Last cloud backup:</span>
+                    <span className="font-bold text-slate-800">
+                      {dropboxStatus.lastBackupAt
+                        ? new Date(dropboxStatus.lastBackupAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+                        : 'Never'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center gap-3">
+                    <span className="text-slate-500 font-medium">Daily auto-backup:</span>
+                    <button
+                      type="button"
+                      onClick={handleToggleDropboxAutoBackup}
+                      className={`relative w-10 h-5.5 rounded-full transition-colors cursor-pointer ${
+                        dropboxStatus.autoBackupEnabled ? 'bg-emerald-500' : 'bg-slate-300'
+                      }`}
+                      title="Toggle daily Dropbox auto-backup"
+                    >
+                      <span
+                        className={`absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white shadow transition-all ${
+                          dropboxStatus.autoBackupEnabled ? 'left-5' : 'left-0.5'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDropboxBackupNow}
+                    disabled={dropboxBusy}
+                    className="py-3 px-4 rounded-xl bg-[#0061FF] hover:bg-[#004ECC] text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
+                  >
+                    {dropboxBusy ? <LoaderCircle size={15} className="animate-spin" /> : <CloudUpload size={15} />}
+                    <span>{dropboxBusy ? 'Uploading...' : 'Back Up Now'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDropboxRestore}
+                    disabled={dropboxRestoring}
+                    className="py-3 px-4 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
+                  >
+                    {dropboxRestoring ? <LoaderCircle size={15} className="animate-spin" /> : <CloudDownload size={15} />}
+                    <span>Restore from Dropbox</span>
+                  </button>
+                </div>
+
+                {dropboxFiles.length > 0 && (
+                  <p className="text-[10.5px] text-slate-400 text-center">
+                    {dropboxFiles.length} backup{dropboxFiles.length === 1 ? '' : 's'} found
+                    {dropboxFiles[0]?.createdAt
+                      ? ` · newest ${new Date(dropboxFiles[0].createdAt).toLocaleDateString()}`
+                      : ''}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    type="button"
+                    onClick={loadDropboxFiles}
+                    className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw size={11} className={dropboxFilesLoading ? 'animate-spin' : ''} /> Refresh backups
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDisconnectDropbox}
+                    className="text-[11px] font-semibold text-rose-500 hover:text-rose-700 inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Unplug size={11} /> Disconnect
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Backup Vault Card */}
           <div className="bg-white rounded-[26px] p-5 sm:p-7 shadow-2xs border border-slate-100 max-w-lg space-y-4">
             
             {/* Metrics */}
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5 text-xs">
               <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-medium">Last Snapshot:</span>
+                <span className="text-slate-500 font-medium">Last device snapshot:</span>
                 <span className="font-bold text-slate-800">{lastLocalBackup}</span>
               </div>
               <div className="flex justify-between items-center">
@@ -570,7 +870,7 @@ export default function SettingsView() {
               ) : (
                 <>
                   <Sparkles size={16} />
-                  <span>CREATE BACKUP SNAPSHOT</span>
+                  <span>SAVE DEVICE SNAPSHOT</span>
                 </>
               )}
             </button>
@@ -583,7 +883,7 @@ export default function SettingsView() {
               className="w-full py-3 px-4 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors"
             >
               {isRestoring ? <RefreshCw size={15} className="animate-spin" /> : <RefreshCw size={15} />}
-              <span>Restore from Latest Snapshot</span>
+              <span>Restore from Device Snapshot</span>
             </button>
 
             {/* Import .JSON file */}

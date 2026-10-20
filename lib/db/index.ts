@@ -15,6 +15,9 @@ import {
   Habit,
   SubTask,
   LedgerEntry,
+  Note,
+  NoteFolder,
+  DropboxIntegration,
 } from '@/types';
 import { syncInitialDataToMongo, syncEntityToMongo } from './mongoSync';
 import { isMongoConfigured } from './mongodb';
@@ -43,6 +46,9 @@ interface Schema {
   notifications: AppNotification[];
   confirmations: ConfirmationRequest[];
   ledger: LedgerEntry[];
+  notes: Note[];
+  noteFolders: NoteFolder[];
+  dropboxIntegrations: DropboxIntegration[];
 }
 
 const DB_DIR = path.join(process.cwd(), 'data');
@@ -72,12 +78,58 @@ if (isMongoConfigured()) {
     .catch(() => {});
 }
 
+function normalizeSchema(parsed: any): Schema {
+  parsed.users = parsed.users || [];
+  parsed.userCredentials = parsed.userCredentials || [];
+  parsed.conversations = parsed.conversations || [];
+  parsed.messages = parsed.messages || [];
+  parsed.memories = parsed.memories || [];
+  parsed.tasks = parsed.tasks || [];
+  parsed.reminders = parsed.reminders || [];
+  parsed.goals = parsed.goals || [];
+  parsed.habits = parsed.habits || [];
+  parsed.agentActions = parsed.agentActions || [];
+  parsed.notifications = parsed.notifications || [];
+  parsed.confirmations = parsed.confirmations || [];
+  parsed.ledger = parsed.ledger || [];
+  parsed.notes = parsed.notes || [];
+  parsed.noteFolders = parsed.noteFolders || [];
+  parsed.dropboxIntegrations = parsed.dropboxIntegrations || [];
+  return parsed as Schema;
+}
+
+/**
+ * Copies the durable JSON snapshot into a target store. Used when Atlas is
+ * configured but unreachable, so a transient outage does not leave the app
+ * running on an empty, volatile in-memory store.
+ */
+function recoverLocalSnapshot(target: Schema): boolean {
+  try {
+    if (!fs.existsSync(DB_FILE)) return false;
+    const content = fs.readFileSync(DB_FILE, 'utf-8');
+    if (!content || !content.trim()) return false;
+    const parsed = normalizeSchema(JSON.parse(content));
+    if (!parsed.users.length) return false;
+    Object.assign(target, parsed);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function ensureDbFile(): Schema {
   if (memoryDb) return memoryDb;
 
   // Mongo mirror is the primary store when configured
   if (isMongoConfigured()) {
-    memoryDb = getMirror() as unknown as Schema;
+    const mirror = getMirror() as unknown as Schema;
+    memoryDb = mirror;
+
+    // Atlas unreachable on cold start leaves the mirror empty — recover the
+    // last durable local snapshot rather than silently losing data.
+    if (!mirror.users?.length) {
+      recoverLocalSnapshot(mirror);
+    }
     return memoryDb;
   }
 
@@ -89,20 +141,7 @@ function ensureDbFile(): Schema {
     try {
       const content = fs.readFileSync(DB_FILE, 'utf-8');
       if (content && content.trim().length > 0) {
-        const parsed = JSON.parse(content);
-        parsed.users = parsed.users || [];
-        parsed.userCredentials = parsed.userCredentials || [];
-        parsed.conversations = parsed.conversations || [];
-        parsed.messages = parsed.messages || [];
-        parsed.memories = parsed.memories || [];
-        parsed.tasks = parsed.tasks || [];
-        parsed.reminders = parsed.reminders || [];
-        parsed.goals = parsed.goals || [];
-        parsed.habits = parsed.habits || [];
-        parsed.agentActions = parsed.agentActions || [];
-        parsed.notifications = parsed.notifications || [];
-        parsed.confirmations = parsed.confirmations || [];
-        parsed.ledger = parsed.ledger || [];
+        const parsed = normalizeSchema(JSON.parse(content));
         memoryDb = parsed as Schema;
         
         // Sync to MongoDB in background once on startup if connection URI is provided
@@ -390,6 +429,9 @@ How can I assist you today?`,
     confirmations: [],
     habits: [],
     ledger: [],
+    notes: [],
+    noteFolders: [],
+    dropboxIntegrations: [],
   };
 
   fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
@@ -401,15 +443,14 @@ let persistTimer: NodeJS.Timeout | null = null;
 let isWriting = false;
 
 /**
- * Persist the last-mutated documents.
- *  - Mongo mode: individual docs are persisted via persistDoc() at each call
- *    site (see persistDocs below); persistDb only flushes the local JSON as a
- *    best-effort debug artifact.
- *  - Local mode: debounced full-file write (original behavior).
+ * Persist the in-memory store to the local JSON snapshot (debounced).
+ *  - Mongo mode: per-document write-through is handled by persistDocs, but we
+ *    still keep the JSON snapshot current so data survives an Atlas outage,
+ *    a server restart, or a hot-reload reset of module state.
+ *  - Local mode: this is the primary store.
  */
 function persistDb(): void {
   if (!memoryDb) return;
-  if (isMongoConfigured()) return; // write-through handled per-document
   if (persistTimer) clearTimeout(persistTimer);
 
   persistTimer = setTimeout(async () => {
@@ -1012,6 +1053,162 @@ export const db = {
     return conf;
   },
 
+  // --- INTEGRATIONS (Dropbox OAuth) ---
+  getDropboxIntegration(userId: string): DropboxIntegration | null {
+    const data = ensureDbFile();
+    data.dropboxIntegrations = data.dropboxIntegrations || [];
+    return data.dropboxIntegrations.find((i) => i && i.userId === userId) || null;
+  },
+
+  saveDropboxIntegration(integration: DropboxIntegration): DropboxIntegration {
+    const data = ensureDbFile();
+    data.dropboxIntegrations = data.dropboxIntegrations || [];
+    const idx = data.dropboxIntegrations.findIndex((i) => i.userId === integration.userId);
+    if (idx >= 0) {
+      data.dropboxIntegrations[idx] = { ...data.dropboxIntegrations[idx], ...integration };
+    } else {
+      data.dropboxIntegrations.push(integration);
+    }
+    persistDb();
+    const saved = data.dropboxIntegrations.find((i) => i.userId === integration.userId)!;
+    persistDocs('dropboxIntegrations', saved);
+    return saved;
+  },
+
+  updateDropboxIntegration(
+    userId: string,
+    patch: Partial<DropboxIntegration>,
+  ): DropboxIntegration | null {
+    const data = ensureDbFile();
+    data.dropboxIntegrations = data.dropboxIntegrations || [];
+    const idx = data.dropboxIntegrations.findIndex((i) => i.userId === userId);
+    if (idx === -1) return null;
+    data.dropboxIntegrations[idx] = {
+      ...data.dropboxIntegrations[idx],
+      ...patch,
+      id: data.dropboxIntegrations[idx].id,
+      userId,
+    };
+    persistDb();
+    persistDocs('dropboxIntegrations', data.dropboxIntegrations[idx]);
+    return data.dropboxIntegrations[idx];
+  },
+
+  deleteDropboxIntegration(userId: string): boolean {
+    const data = ensureDbFile();
+    data.dropboxIntegrations = data.dropboxIntegrations || [];
+    const existing = data.dropboxIntegrations.find((i) => i.userId === userId);
+    if (!existing) return false;
+    data.dropboxIntegrations = data.dropboxIntegrations.filter((i) => i.userId !== userId);
+    persistDb();
+    deleteFromStore('dropboxIntegrations', existing.id);
+    return true;
+  },
+
+  // --- NOTES & NOTE FOLDERS ---
+  getNotes(userId: string): Note[] {
+    const data = ensureDbFile();
+    data.notes = data.notes || [];
+    return data.notes
+      .filter((n) => n && (n.userId === userId || !n.userId))
+      .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
+  },
+
+  getNoteById(id: string, userId: string): Note | null {
+    const data = ensureDbFile();
+    data.notes = data.notes || [];
+    return data.notes.find((n) => n.id === id && (n.userId === userId || !n.userId)) || null;
+  },
+
+  createNote(note: Note): Note {
+    const data = ensureDbFile();
+    data.notes = data.notes || [];
+    data.notes.unshift(note);
+    persistDb();
+    persistDocs('notes', note);
+    return note;
+  },
+
+  updateNote(id: string, userId: string, patch: Partial<Note>): Note | null {
+    const data = ensureDbFile();
+    data.notes = data.notes || [];
+    let idx = data.notes.findIndex((n) => n.id === id && (n.userId === userId || !n.userId));
+    if (idx === -1) idx = data.notes.findIndex((n) => n.id === id);
+    if (idx === -1) return null;
+    data.notes[idx] = {
+      ...data.notes[idx],
+      ...patch,
+      id: data.notes[idx].id,
+      userId: data.notes[idx].userId || userId,
+      updatedAt: new Date().toISOString(),
+    };
+    persistDb();
+    persistDocs('notes', data.notes[idx]);
+    return data.notes[idx];
+  },
+
+  deleteNote(id: string, userId: string): boolean {
+    const data = ensureDbFile();
+    data.notes = data.notes || [];
+    const initialLen = data.notes.length;
+    data.notes = data.notes.filter((n) => !(n.id === id && (n.userId === userId || !n.userId)));
+    persistDb();
+    deleteFromStore('notes', id);
+    return data.notes.length < initialLen;
+  },
+
+  getNoteFolders(userId: string): NoteFolder[] {
+    const data = ensureDbFile();
+    data.noteFolders = data.noteFolders || [];
+    return data.noteFolders.filter((f) => f && (f.userId === userId || !f.userId));
+  },
+
+  createNoteFolder(folder: NoteFolder): NoteFolder {
+    const data = ensureDbFile();
+    data.noteFolders = data.noteFolders || [];
+    data.noteFolders.push(folder);
+    persistDb();
+    persistDocs('noteFolders', folder);
+    return folder;
+  },
+
+  updateNoteFolder(id: string, userId: string, patch: Partial<NoteFolder>): NoteFolder | null {
+    const data = ensureDbFile();
+    data.noteFolders = data.noteFolders || [];
+    let idx = data.noteFolders.findIndex((f) => f.id === id && (f.userId === userId || !f.userId));
+    if (idx === -1) idx = data.noteFolders.findIndex((f) => f.id === id);
+    if (idx === -1) return null;
+    data.noteFolders[idx] = {
+      ...data.noteFolders[idx],
+      ...patch,
+      id: data.noteFolders[idx].id,
+      userId: data.noteFolders[idx].userId || userId,
+    };
+    persistDb();
+    persistDocs('noteFolders', data.noteFolders[idx]);
+    return data.noteFolders[idx];
+  },
+
+  deleteNoteFolder(id: string, userId: string): { deleted: boolean; unassignedNotes: number } {
+    const data = ensureDbFile();
+    data.noteFolders = data.noteFolders || [];
+    data.notes = data.notes || [];
+    const initialLen = data.noteFolders.length;
+    data.noteFolders = data.noteFolders.filter((f) => !(f.id === id && (f.userId === userId || !f.userId)));
+    const touched: Note[] = [];
+    data.notes.forEach((n) => {
+      if (n.folderId === id) {
+        n.folderId = undefined;
+        n.updatedAt = new Date().toISOString();
+        touched.push(n);
+      }
+    });
+    persistDb();
+    deleteFromStore('noteFolders', id);
+    touched.forEach((n) => persistDocs('notes', n));
+    return { deleted: data.noteFolders.length < initialLen, unassignedNotes: touched.length };
+  },
+
   // --- HABITS ---
   getHabits(userId: string): Habit[] {
     const data = ensureDbFile();
@@ -1300,6 +1497,8 @@ export const db = {
       goals: (data.goals || []).filter((g) => g.userId === userId),
       habits: (data.habits || []).filter((h) => h.userId === userId),
       ledger: (data.ledger || []).filter((l) => l.userId === userId),
+      notes: (data.notes || []).filter((n) => n.userId === userId),
+      noteFolders: (data.noteFolders || []).filter((f) => f.userId === userId),
       agentActions: data.agentActions.filter((a) => a.userId === userId),
     };
   },
@@ -1315,6 +1514,8 @@ export const db = {
       goals: 0,
       habits: 0,
       ledger: 0,
+      notes: 0,
+      noteFolders: 0,
     };
 
     if (!backupData || typeof backupData !== 'object') {
@@ -1353,6 +1554,8 @@ export const db = {
     mergeCollection('goals', 'goals');
     mergeCollection('habits', 'habits');
     mergeCollection('ledger', 'ledger');
+    mergeCollection('notes', 'notes');
+    mergeCollection('noteFolders', 'noteFolders');
 
     persistDb();
     return { imported };
@@ -1368,8 +1571,11 @@ export const db = {
     const gls = (data.goals || []).filter((g) => g.userId === userId);
     const hbts = (data.habits || []).filter((h) => h.userId === userId);
     const ldg = (data.ledger || []).filter((l) => l.userId === userId);
+    const nts = (data.notes || []).filter((n) => n.userId === userId);
+    const nflds = (data.noteFolders || []).filter((f) => f.userId === userId);
     const acts = data.agentActions.filter((a) => a.userId === userId);
     const nots = data.notifications.filter((n) => n.userId === userId);
+    const dbxi = (data.dropboxIntegrations || []).filter((i) => i.userId === userId);
     data.conversations = data.conversations.filter((c) => c.userId !== userId);
     data.messages = data.messages.filter((m) => m.userId !== userId);
     data.memories = data.memories.filter((m) => m.userId !== userId);
@@ -1378,8 +1584,11 @@ export const db = {
     data.goals = (data.goals || []).filter((g) => g.userId !== userId);
     data.habits = (data.habits || []).filter((h) => h.userId !== userId);
     data.ledger = (data.ledger || []).filter((l) => l.userId !== userId);
+    data.notes = (data.notes || []).filter((n) => n.userId !== userId);
+    data.noteFolders = (data.noteFolders || []).filter((f) => f.userId !== userId);
     data.agentActions = data.agentActions.filter((a) => a.userId !== userId);
     data.notifications = data.notifications.filter((n) => n.userId !== userId);
+    data.dropboxIntegrations = (data.dropboxIntegrations || []).filter((i) => i.userId !== userId);
     persistDb();
     convs.forEach((d) => deleteFromStore('conversations', d.id));
     msgs.forEach((d) => deleteFromStore('messages', d.id));
@@ -1389,8 +1598,11 @@ export const db = {
     gls.forEach((d) => deleteFromStore('goals', d.id));
     hbts.forEach((d) => deleteFromStore('habits', d.id));
     ldg.forEach((d) => deleteFromStore('ledger', d.id));
+    nts.forEach((d) => deleteFromStore('notes', d.id));
+    nflds.forEach((d) => deleteFromStore('noteFolders', d.id));
     acts.forEach((d) => deleteFromStore('agentActions', d.id));
     nots.forEach((d) => deleteFromStore('notifications', d.id));
+    dbxi.forEach((d) => deleteFromStore('dropboxIntegrations', d.id));
     return true;
   },
 };

@@ -26,18 +26,50 @@ export function parseDataUri(uri: string): { mimeType: string; base64: string } 
 }
 
 /**
- * Safe text extractor from PDF buffer using pdf-parse or fallback
+ * Safe text extractor from a PDF buffer.
+ * Supports both pdf-parse v1 (callable export) and v2+ (`PDFParse` class).
  */
 async function parsePdfBuffer(buffer: Buffer): Promise<string> {
   try {
     // Dynamic require to prevent ESM bundler export resolution issues
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdf = require('pdf-parse');
-    const parserFn = typeof pdf === 'function' ? pdf : pdf.default || pdf.pdfParse;
+    const pdf: any = require('pdf-parse');
+
+    // pdf-parse v2+ API: const { PDFParse } = require('pdf-parse')
+    const PDFParseCtor = pdf?.PDFParse;
+    if (typeof PDFParseCtor === 'function') {
+      const parser = new PDFParseCtor({ data: new Uint8Array(buffer) });
+      try {
+        const result = await parser.getText();
+        const text = typeof result?.text === 'string' ? result.text.trim() : '';
+        if (text) return text;
+
+        // Fallback: stitch per-page text when the aggregate is empty.
+        if (Array.isArray(result?.pages)) {
+          return result.pages
+            .map((page: any) => (typeof page?.text === 'string' ? page.text : ''))
+            .join('\n')
+            .trim();
+        }
+        return '';
+      } finally {
+        try {
+          await parser.destroy?.();
+        } catch {
+          /* ignore cleanup errors */
+        }
+      }
+    }
+
+    // pdf-parse v1 API: module itself is a function
+    const parserFn =
+      typeof pdf === 'function' ? pdf : pdf?.default || pdf?.pdfParse;
     if (typeof parserFn === 'function') {
       const res = await parserFn(buffer);
       return res?.text?.trim() || '';
     }
+
+    console.warn('[FileAnalyzer] Unsupported pdf-parse module shape:', Object.keys(pdf || {}));
     return '';
   } catch (err) {
     console.warn('[FileAnalyzer] Failed to parse PDF text:', err);

@@ -19,6 +19,9 @@ import {
   NotificationModel,
   ConfirmationModel,
   LedgerModel,
+  NoteModel,
+  NoteFolderModel,
+  DropboxIntegrationModel,
 } from './models';
 
 /**
@@ -50,6 +53,9 @@ export interface DbSchema {
   notifications: any[];
   confirmations: any[];
   ledger: any[];
+  notes: any[];
+  noteFolders: any[];
+  dropboxIntegrations: any[];
 }
 
 const COLLECTION_MAP = {
@@ -66,6 +72,9 @@ const COLLECTION_MAP = {
   notifications: NotificationModel,
   confirmations: ConfirmationModel,
   ledger: LedgerModel,
+  notes: NoteModel,
+  noteFolders: NoteFolderModel,
+  dropboxIntegrations: DropboxIntegrationModel,
 } as const;
 
 export type CollectionName = keyof typeof COLLECTION_MAP;
@@ -88,6 +97,9 @@ function emptySchema(): DbSchema {
     notifications: [],
     confirmations: [],
     ledger: [],
+    notes: [],
+    noteFolders: [],
+    dropboxIntegrations: [],
   };
 }
 
@@ -120,6 +132,8 @@ export async function hydrateStore(): Promise<DbSchema> {
     const data = getMirror();
     const conn = await connectToDatabase();
     if (!conn) {
+      // Allow a later request to retry once the driver's cooldown expires.
+      hydrationPromise = null;
       return data;
     }
 
@@ -127,7 +141,13 @@ export async function hydrateStore(): Promise<DbSchema> {
       Object.keys(COLLECTION_MAP) as CollectionName[]
     ).map(async (name) => {
       try {
-        const docs = await (COLLECTION_MAP[name] as any).find({}).lean();
+        let query = (COLLECTION_MAP[name] as any).find({});
+        // Messages grow without bound — only the newest slice is needed for
+        // chat history, so keep the cold-start hydration payload small.
+        if (name === 'messages') {
+          query = query.sort({ createdAt: -1 }).limit(1000);
+        }
+        const docs = await query.lean();
         (data as any)[name] = docs.map(lean);
       } catch (err) {
         console.error(`⚠️ hydrate ${name} failed:`, err);

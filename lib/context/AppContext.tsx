@@ -12,6 +12,8 @@ import {
   AgentAction,
   AppNotification,
   LedgerEntry,
+  Note,
+  NoteFolder,
 } from '@/types';
 import {
   isGuestEmail,
@@ -29,6 +31,7 @@ import {
   ScheduledItem,
 } from '@/lib/notifications/scheduler';
 import { apiFetch, safeJson } from '@/lib/api';
+import { flushOfflineQueue } from '@/lib/offline/syncQueue';
 
 export type AppTab =
   | 'dashboard'
@@ -83,6 +86,14 @@ interface AppContextType {
   reminders: Reminder[];
   goals: Goal[];
   ledgerEntries: LedgerEntry[];
+  notes: Note[];
+  noteFolders: NoteFolder[];
+  createNote: (input: Partial<Note> & { title: string }) => Promise<Note | null>;
+  updateNote: (id: string, patch: Partial<Note>) => Promise<Note | null>;
+  deleteNote: (id: string) => Promise<void>;
+  createNoteFolder: (input: Partial<NoteFolder> & { name: string }) => Promise<NoteFolder | null>;
+  updateNoteFolder: (id: string, patch: Partial<NoteFolder>) => Promise<NoteFolder | null>;
+  deleteNoteFolder: (id: string) => Promise<void>;
   agentActions: AgentAction[];
   notifications: AppNotification[];
   unreadNotificationCount: number;
@@ -247,6 +258,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [reminders, setReminders] = useState<Reminder[]>(() => getInitialList<Reminder>('recall_reminders'));
   const [goals, setGoals] = useState<Goal[]>(() => getInitialList<Goal>('recall_goals'));
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>(() => getInitialList<LedgerEntry>('recall_ledger'));
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [noteFolders, setNoteFolders] = useState<NoteFolder[]>([]);
   const [agentActions, setAgentActions] = useState<AgentAction[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>(() => getInitialList<AppNotification>('recall_notifications'));
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -468,6 +481,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try { localStorage.setItem('recall_tasks', JSON.stringify(tasks)); } catch {}
   }, [tasks, isHydrated]);
 
+  // ── WhatsApp-style daily Dropbox backups ───────────────────────────────
+  useEffect(() => {
+    if (!isHydrated || !user?.id) return;
+    if (typeof window === 'undefined') return;
+    if (!user.preferences?.autoDropboxBackupEnabled) return;
+    if (sessionStorage.getItem('recall_auto_backup_attempted')) return;
+    sessionStorage.setItem('recall_auto_backup_attempted', '1');
+
+    apiFetch('/api/backup/dropbox', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auto: true }),
+    }).catch(() => {});
+  }, [isHydrated, user?.id, user?.preferences?.autoDropboxBackupEnabled]);
+
   useEffect(() => {
     if (!isHydrated) return;
     try { localStorage.setItem('recall_reminders', JSON.stringify(reminders)); } catch {}
@@ -658,6 +686,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         actResult,
         notifResult,
         ledgerResult,
+        notesResult,
       ] = await Promise.allSettled([
         apiFetch('/api/conversations').then(safeJson),
         apiFetch('/api/memories').then(safeJson),
@@ -667,6 +696,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         apiFetch('/api/actions').then(safeJson),
         apiFetch('/api/notifications').then(safeJson),
         apiFetch('/api/ledger').then(safeJson),
+        apiFetch('/api/notes').then(safeJson),
       ]);
 
       // Smart non-destructive merge: preserve local data if server returns empty list (e.g. cold start)
@@ -880,6 +910,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return mergedList;
         });
       }
+
+      if (notesResult.status === 'fulfilled' && Array.isArray(notesResult.value?.notes)) {
+        const serverNotes: Note[] = notesResult.value.notes;
+        setNotes((prev) => {
+          if (serverNotes.length === 0 && prev.length > 0) {
+            // Migrate browser-only notes into the shared store on first run.
+            prev.forEach((n) => {
+              apiFetch('/api/notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(n),
+              }).catch(() => {});
+            });
+            return prev;
+          }
+          const map = new Map<string, Note>();
+          serverNotes.forEach((n) => map.set(n.id, n));
+          prev.forEach((n) => { if (!map.has(n.id)) map.set(n.id, n); });
+          return Array.from(map.values()).sort(
+            (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime(),
+          );
+        });
+      }
+
+      if (notesResult.status === 'fulfilled' && Array.isArray(notesResult.value?.folders)) {
+        const serverFolders: NoteFolder[] = notesResult.value.folders;
+        setNoteFolders((prev) => {
+          if (serverFolders.length === 0 && prev.length > 0) {
+            prev.forEach((f) => {
+              apiFetch('/api/notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...f, kind: 'folder' }),
+              }).catch(() => {});
+            });
+            return prev;
+          }
+          const map = new Map<string, NoteFolder>();
+          serverFolders.forEach((f) => map.set(f.id, f));
+          prev.forEach((f) => { if (!map.has(f.id)) map.set(f.id, f); });
+          return Array.from(map.values());
+        });
+      }
     } catch (err) {
       console.error('Failed to load initial application state', err);
     }
@@ -888,6 +961,59 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     refreshAll();
   }, [refreshAll]);
+
+  // ── Offline queue: replay local edits on reconnect + report conflicts ─────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const runFlush = () => {
+      flushOfflineQueue().catch(() => {});
+    };
+
+    const onOnline = () => runFlush();
+
+    const onServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'FLUSH_OFFLINE_QUEUE') runFlush();
+    };
+
+    const onSynced = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {};
+      const synced = Number(detail.synced) || 0;
+      const conflicts = Array.isArray(detail.conflicts) ? detail.conflicts.length : 0;
+
+      if (synced > 0) {
+        showToast(`${synced} offline change${synced === 1 ? '' : 's'} synced`, 'success');
+      }
+      if (conflicts > 0) {
+        showToast(
+          `${conflicts} conflict${conflicts === 1 ? '' : 's'} resolved — the newer server version was kept`,
+          'warning',
+          5000,
+        );
+      }
+      if (synced > 0 || conflicts > 0) refreshAll().catch(() => {});
+    };
+
+    window.addEventListener('online', onOnline);
+    window.addEventListener('assistance:offline-synced', onSynced as EventListener);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', onServiceWorkerMessage);
+    }
+
+    // Attempt a silent flush shortly after load (nothing queued = no-op).
+    const timer = setTimeout(() => {
+      if (navigator.onLine) runFlush();
+    }, 4000);
+
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('assistance:offline-synced', onSynced as EventListener);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', onServiceWorkerMessage);
+      }
+      clearTimeout(timer);
+    };
+  }, [showToast, refreshAll]);
 
   // ── OS push notifications ────────────────────────────────────────────────
   // Keeps the OS-level alarm schedule in sync with the user's reminders and
@@ -1080,57 +1206,159 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const clientTimezone = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Kolkata';
-      const res = await apiFetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversationId: activeConversationId,
-          message: effectiveContent,
-          attachments,
-          timezone: clientTimezone,
-        }),
-      });
+      const payload = {
+        conversationId: activeConversationId,
+        message: effectiveContent,
+        attachments,
+        timezone: clientTimezone,
+      };
 
-      const data = await safeJson(res);
+      let handled = false;
+      let draftId: string | null = null;
 
-      if (data?.success) {
-        if (data.conversationId) {
-          skipNextLoadRef.current = data.conversationId;
-          if (!activeConversationId || activeConversationId !== data.conversationId) {
-            setActiveConversationId(data.conversationId);
-            const newConv: Conversation = {
-              id: data.conversationId,
-              userId: user?.id || 'usr_default_main',
-              title: effectiveContent.slice(0, 36) + (effectiveContent.length > 36 ? '...' : ''),
-              pinned: false,
-              model: user?.preferences?.model || 'Recall Core Ultra',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            setConversations((prev) => [newConv, ...prev.filter((c) => c.id !== data.conversationId)]);
+      const attachConversation = (conversationId: string) => {
+        skipNextLoadRef.current = conversationId;
+        if (!activeConversationId || activeConversationId !== conversationId) {
+          setActiveConversationId(conversationId);
+          const newConv: Conversation = {
+            id: conversationId,
+            userId: user?.id || 'usr_default_main',
+            title: effectiveContent.slice(0, 36) + (effectiveContent.length > 36 ? '...' : ''),
+            pinned: false,
+            model: user?.preferences?.model || 'Recall Core Ultra',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          setConversations((prev) => [newConv, ...prev.filter((c) => c.id !== conversationId)]);
+        }
+      };
+
+      // ── Streaming path: first tokens paint in well under a second ──
+      try {
+        const streamRes = await apiFetch('/api/chat/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (streamRes.ok && streamRes.body) {
+          const reader = streamRes.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let finished = false;
+
+          const handleEvent = (evt: any) => {
+            if (!evt || typeof evt !== 'object') return;
+
+            if (evt.type === 'start') {
+              attachConversation(evt.conversationId);
+              draftId = `draft_${Date.now()}`;
+              const draft: Message = {
+                id: draftId,
+                conversationId: evt.conversationId,
+                userId: 'assistant',
+                role: 'assistant',
+                content: '',
+                createdAt: new Date().toISOString(),
+              };
+              setMessages((prev) => [
+                ...prev.filter((m) => m.id !== tempUserMsg.id),
+                evt.userMessage,
+                draft,
+              ]);
+            } else if (evt.type === 'delta' && draftId) {
+              const text = typeof evt.text === 'string' ? evt.text : '';
+              if (!text) return;
+              setMessages((prev) =>
+                prev.map((m) => (m.id === draftId ? { ...m, content: `${m.content || ''}${text}` } : m)),
+              );
+            } else if (evt.type === 'done') {
+              finished = true;
+              if (evt.assistantMessage) {
+                const finalMessage = evt.assistantMessage as Message;
+                if (evt.requiresConfirmation && evt.confirmationPayload) {
+                  finalMessage.confirmation = {
+                    toolName: evt.confirmationPayload.toolName || 'TaskTool',
+                    action: evt.confirmationPayload.action || 'createTask',
+                    payload: evt.confirmationPayload,
+                    message: 'Review and confirm to save.',
+                  };
+                }
+                setMessages((prev) => prev.map((m) => (m.id === draftId ? finalMessage : m)));
+              }
+            }
+          };
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            let newlineIndex: number;
+            while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+              const line = buffer.slice(0, newlineIndex).trim();
+              buffer = buffer.slice(newlineIndex + 1);
+              if (!line) continue;
+              try {
+                handleEvent(JSON.parse(line));
+              } catch {
+                // Ignore incomplete frames split across chunks.
+              }
+            }
+          }
+
+          if (finished) {
+            handled = true;
+            refreshAll();
           }
         }
+      } catch (streamErr) {
+        console.warn('Streaming unavailable, falling back to JSON response:', streamErr);
+      }
 
-        // Replace temp message with server message and append assistant reply
-        setMessages((prev) => [
-          ...prev.filter((m) => m.id !== tempUserMsg.id),
-          data.userMessage,
-          data.assistantMessage,
-        ]);
+      // ── Fallback path (older deployments / streaming blocked by a proxy) ──
+      if (!handled) {
+        const res = await apiFetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
 
-        // Refresh auxiliary data if memory, task, or reminder was updated
-        refreshAll();
-      } else {
-        const errorContent = data?.error || 'Unable to process your request with AI assistant. Please try again.';
-        const errorMsg: Message = {
-          id: `err_${Date.now()}`,
-          conversationId: activeConversationId || 'error',
-          userId: 'system',
-          role: 'assistant',
-          content: errorContent,
-          createdAt: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, errorMsg]);
+        const data = await safeJson(res);
+
+        if (data?.success) {
+          if (data.conversationId) attachConversation(data.conversationId);
+
+          if (data.requiresConfirmation && data.confirmationPayload && data.assistantMessage) {
+            data.assistantMessage.confirmation = {
+              toolName: data.confirmationPayload.toolName || 'TaskTool',
+              action: data.confirmationPayload.action || 'createTask',
+              payload: data.confirmationPayload,
+              message: 'Review and confirm to save.',
+            };
+          }
+
+          // Replace temp message with server message and append assistant reply
+          setMessages((prev) => [
+            ...prev.filter((m) => m.id !== tempUserMsg.id && m.id !== draftId),
+            data.userMessage,
+            data.assistantMessage,
+          ]);
+
+          // Refresh auxiliary data if memory, task, or reminder was updated
+          refreshAll();
+        } else {
+          const errorContent = data?.error || 'Unable to process your request with AI assistant. Please try again.';
+          const errorMsg: Message = {
+            id: `err_${Date.now()}`,
+            conversationId: activeConversationId || 'error',
+            userId: 'system',
+            role: 'assistant',
+            content: errorContent,
+            createdAt: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+        }
       }
     } catch (err: any) {
       console.warn('Send message notice:', err);
@@ -1150,6 +1378,140 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
 
+
+  const createNote = async (input: Partial<Note> & { title: string }): Promise<Note | null> => {
+    const now = new Date().toISOString();
+    const note: Note = {
+      id: input.id || `note_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      userId: user?.id || 'usr_default_main',
+      title: input.title,
+      content: input.content || '',
+      folderId: input.folderId,
+      color: input.color || 'cream',
+      category: input.category,
+      isPinned: input.isPinned,
+      goalId: input.goalId,
+      goalTitle: input.goalTitle,
+      createdAt: input.createdAt || now,
+      updatedAt: now,
+    };
+    setNotes((prev) => [note, ...prev.filter((n) => n.id !== note.id)]);
+    try {
+      const res = await apiFetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(note),
+      });
+      const data = await safeJson(res);
+      if (data?.note) {
+        setNotes((prev) => prev.map((n) => (n.id === note.id ? data.note : n)));
+        return data.note;
+      }
+    } catch (err) {
+      console.warn('Note sync notice:', err);
+    }
+    return note;
+  };
+
+  const updateNote = async (id: string, patch: Partial<Note>): Promise<Note | null> => {
+    const now = new Date().toISOString();
+    let optimistic: Note | null = null;
+    setNotes((prev) =>
+      prev.map((n) => {
+        if (n.id !== id) return n;
+        optimistic = { ...n, ...patch, updatedAt: now };
+        return optimistic;
+      }),
+    );
+    try {
+      const res = await apiFetch(`/api/notes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const data = await safeJson(res);
+      if (data?.note) {
+        setNotes((prev) => prev.map((n) => (n.id === id ? data.note : n)));
+        return data.note;
+      }
+    } catch (err) {
+      console.warn('Note update sync notice:', err);
+    }
+    return optimistic;
+  };
+
+  const deleteNote = async (id: string): Promise<void> => {
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    try {
+      await apiFetch(`/api/notes/${id}`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('Note delete sync notice:', err);
+    }
+  };
+
+  const createNoteFolder = async (input: Partial<NoteFolder> & { name: string }): Promise<NoteFolder | null> => {
+    const folder: NoteFolder = {
+      id: input.id || `folder_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      userId: user?.id || 'usr_default_main',
+      name: input.name,
+      icon: input.icon || '📁',
+      badge: input.badge,
+      themeColor: input.themeColor || 'slate',
+      createdAt: input.createdAt || new Date().toISOString(),
+    };
+    setNoteFolders((prev) => [...prev.filter((f) => f.id !== folder.id), folder]);
+    try {
+      const res = await apiFetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...folder, kind: 'folder' }),
+      });
+      const data = await safeJson(res);
+      if (data?.folder) {
+        setNoteFolders((prev) => prev.map((f) => (f.id === folder.id ? data.folder : f)));
+        return data.folder;
+      }
+    } catch (err) {
+      console.warn('Folder sync notice:', err);
+    }
+    return folder;
+  };
+
+  const updateNoteFolder = async (id: string, patch: Partial<NoteFolder>): Promise<NoteFolder | null> => {
+    let optimistic: NoteFolder | null = null;
+    setNoteFolders((prev) =>
+      prev.map((f) => {
+        if (f.id !== id) return f;
+        optimistic = { ...f, ...patch };
+        return optimistic;
+      }),
+    );
+    try {
+      const res = await apiFetch(`/api/notes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...patch, kind: 'folder' }),
+      });
+      const data = await safeJson(res);
+      if (data?.folder) {
+        setNoteFolders((prev) => prev.map((f) => (f.id === id ? data.folder : f)));
+        return data.folder;
+      }
+    } catch (err) {
+      console.warn('Folder update sync notice:', err);
+    }
+    return optimistic;
+  };
+
+  const deleteNoteFolder = async (id: string): Promise<void> => {
+    setNoteFolders((prev) => prev.filter((f) => f.id !== id));
+    setNotes((prev) => prev.map((n) => (n.folderId === id ? { ...n, folderId: undefined } : n)));
+    try {
+      await apiFetch(`/api/notes/${id}?kind=folder`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('Folder delete sync notice:', err);
+    }
+  };
 
   const deleteConversation = async (id: string) => {
     try {
@@ -1863,6 +2225,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         reminders,
         goals,
         ledgerEntries,
+        notes,
+        noteFolders,
+        createNote,
+        updateNote,
+        deleteNote,
+        createNoteFolder,
+        updateNoteFolder,
+        deleteNoteFolder,
         agentActions,
         notifications,
         unreadNotificationCount,

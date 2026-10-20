@@ -12,6 +12,9 @@ import {
   AppNotification,
   ConfirmationRequest,
   LedgerEntry,
+  Note,
+  NoteFolder,
+  DropboxIntegration,
 } from '@/types';
 
 // 1. User Schema
@@ -252,6 +255,54 @@ const LedgerEntrySchema = new Schema<LedgerEntry>(
   { timestamps: true }
 );
 
+// 14. Note Schema
+const NoteSchema = new Schema<Note>(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    userId: { type: String, required: true, index: true },
+    title: { type: String, required: true },
+    content: { type: String, default: '' },
+    folderId: { type: String },
+    color: { type: String },
+    category: { type: String },
+    isPinned: { type: Boolean, default: false },
+    goalId: { type: String },
+    goalTitle: { type: String },
+    createdAt: { type: String, required: true },
+    updatedAt: { type: String, required: true },
+  },
+  { timestamps: true }
+);
+
+// 15. NoteFolder Schema
+const NoteFolderSchema = new Schema<NoteFolder>(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    userId: { type: String, required: true, index: true },
+    name: { type: String, required: true },
+    icon: { type: String, default: '📁' },
+    badge: { type: String },
+    themeColor: { type: String, default: 'slate' },
+    createdAt: { type: String, required: true },
+  },
+  { timestamps: true }
+);
+
+// 16. Dropbox Integration Schema
+const DropboxIntegrationSchema = new Schema<DropboxIntegration>(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    userId: { type: String, required: true, unique: true, index: true },
+    refreshToken: { type: String, required: true },
+    email: { type: String },
+    scope: { type: String },
+    connectedAt: { type: String, required: true },
+    lastBackupAt: { type: String },
+    lastBackupFileId: { type: String },
+  },
+  { timestamps: true }
+);
+
 // Export Mongoose Models (preventing OverwriteModelError in Next.js hot reload)
 export const UserModel: Model<User> = mongoose.models.User || mongoose.model<User>('User', UserSchema);
 export const CredentialModel: Model<any> = mongoose.models.Credential || mongoose.model('Credential', CredentialSchema);
@@ -266,3 +317,6 @@ export const AgentActionModel: Model<AgentAction> = mongoose.models.AgentAction 
 export const NotificationModel: Model<AppNotification> = mongoose.models.Notification || mongoose.model<AppNotification>('Notification', AppNotificationSchema);
 export const ConfirmationModel: Model<ConfirmationRequest> = mongoose.models.Confirmation || mongoose.model<ConfirmationRequest>('Confirmation', ConfirmationRequestSchema);
 export const LedgerModel: Model<LedgerEntry> = mongoose.models.LedgerEntry || mongoose.model<LedgerEntry>('LedgerEntry', LedgerEntrySchema);
+export const NoteModel: Model<Note> = mongoose.models.Note || mongoose.model<Note>('Note', NoteSchema);
+export const NoteFolderModel: Model<NoteFolder> = mongoose.models.NoteFolder || mongoose.model<NoteFolder>('NoteFolder', NoteFolderSchema);
+export const DropboxIntegrationModel: Model<DropboxIntegration> = mongoose.models.DropboxIntegration || mongoose.model<DropboxIntegration>('DropboxIntegration', DropboxIntegrationSchema);
