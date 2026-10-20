@@ -15,6 +15,7 @@ import {
 import { useApp } from '@/lib/context/AppContext';
 import { apiFetch, safeJson } from '@/lib/api';
 import MarkdownNoteRenderer from '@/components/notes/MarkdownNoteRenderer';
+import TaskConfirmationCard from './TaskConfirmationCard';
 import { Message, Conversation } from '@/types';
 
 const SUGGESTIONS = [
@@ -261,6 +262,14 @@ function MessageBubble({ message }: { message: Message }) {
       <div className="max-w-[85%] min-w-0">
         <div className="px-4.5 py-3.5 rounded-[22px] rounded-tl-sm bg-white border border-slate-200/80 shadow-2xs text-slate-900">
           <MarkdownNoteRenderer content={message.content} className="text-sm" />
+
+          {message.confirmation && (
+            <TaskConfirmationCard
+              toolName={message.confirmation.toolName}
+              action={message.confirmation.action}
+              payload={message.confirmation.payload}
+            />
+          )}
         </div>
 
         <p className="mt-1 text-[10px] text-slate-400 font-mono">{formatTime(message.createdAt)}</p>

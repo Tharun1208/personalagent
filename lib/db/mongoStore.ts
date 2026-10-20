@@ -19,6 +19,8 @@ import {
   NotificationModel,
   ConfirmationModel,
   LedgerModel,
+  NoteModel,
+  NoteFolderModel,
 } from './models';
 
 /**
@@ -50,6 +52,8 @@ export interface DbSchema {
   notifications: any[];
   confirmations: any[];
   ledger: any[];
+  notes: any[];
+  noteFolders: any[];
 }
 
 const COLLECTION_MAP = {
@@ -66,6 +70,8 @@ const COLLECTION_MAP = {
   notifications: NotificationModel,
   confirmations: ConfirmationModel,
   ledger: LedgerModel,
+  notes: NoteModel,
+  noteFolders: NoteFolderModel,
 } as const;
 
 export type CollectionName = keyof typeof COLLECTION_MAP;
@@ -88,6 +94,8 @@ function emptySchema(): DbSchema {
     notifications: [],
     confirmations: [],
     ledger: [],
+    notes: [],
+    noteFolders: [],
   };
 }
 

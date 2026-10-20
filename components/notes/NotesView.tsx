@@ -261,10 +261,20 @@ function formatRelativeTime(dateStr?: string): string {
 }
 
 export default function NotesView() {
-  const { showConfirm, showToast } = useApp();
+  const {
+    showConfirm,
+    showToast,
+    notes,
+    noteFolders,
+    createNote,
+    updateNote,
+    deleteNote,
+    createNoteFolder,
+    deleteNoteFolder,
+  } = useApp();
 
-  const [notes, setNotes] = useState<AppNote[]>(loadLocalNotes);
-  const [folders, setFolders] = useState<NoteFolder[]>(loadLocalFolders);
+  // Notes & folders are now shared (DB-backed) so the AI agent can edit them.
+  const folders = noteFolders as NoteFolder[];
 
   // Active view: 'home' | 'folder' | 'editor' | 'all'
   const [viewMode, setViewMode] = useState<'home' | 'folder' | 'editor' | 'all'>('home');
@@ -313,23 +323,53 @@ export default function NotesView() {
     };
   }, [isDownloadMenuOpen]);
 
-  // Persist notes & folders
+  // One-time migration: move notes previously stored in this browser into the
+  // shared database so the AI agent (and other devices) can read/edit them.
+  const migratedRef = useRef(false);
   useEffect(() => {
-    try {
-      localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
-      window.dispatchEvent(new Event('storage'));
-    } catch (e) {
-      console.error('Failed to save notes locally', e);
+    if (migratedRef.current || typeof window === 'undefined') return;
+    const flag = localStorage.getItem('recall_notes_db_migrated');
+    const rawNotes = localStorage.getItem(NOTES_STORAGE_KEY);
+    const rawFolders = localStorage.getItem(FOLDERS_STORAGE_KEY);
+    if (flag) return;
+    if (!rawNotes && !rawFolders) {
+      localStorage.setItem('recall_notes_db_migrated', 'true');
+      return;
     }
-  }, [notes]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(folders));
-    } catch (e) {
-      console.error('Failed to save folders locally', e);
-    }
-  }, [folders]);
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      if (cancelled) return;
+      migratedRef.current = true;
+      try {
+        if (rawFolders) {
+          const parsedFolders = JSON.parse(rawFolders) as NoteFolder[];
+          for (const folder of parsedFolders) {
+            if (!noteFolders.some((f) => f.id === folder.id)) {
+              await createNoteFolder(folder);
+            }
+          }
+        }
+        if (rawNotes) {
+          const parsedNotes = JSON.parse(rawNotes) as AppNote[];
+          for (const note of parsedNotes) {
+            if (!notes.some((n) => n.id === note.id)) {
+              await createNote(note as any);
+            }
+          }
+        }
+        localStorage.setItem('recall_notes_db_migrated', 'true');
+      } catch (err) {
+        console.warn('Local notes migration skipped', err);
+      }
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Derived active folder
   const activeFolder = useMemo(() => {
@@ -441,16 +481,20 @@ export default function NotesView() {
     const finalFolderId = editorFolderId.trim() ? editorFolderId.trim() : undefined;
 
     if (currentEditingNote) {
-      const updated: AppNote = {
+      void updateNote(currentEditingNote.id, {
+        title: cleanTitle,
+        content: editorContent,
+        folderId: finalFolderId,
+        color: editorColor,
+      });
+      setCurrentEditingNote({
         ...currentEditingNote,
         title: cleanTitle,
         content: editorContent,
         folderId: finalFolderId,
         color: editorColor,
         updatedAt: now,
-      };
-      setNotes((prev) => prev.map((n) => (n.id === currentEditingNote.id ? updated : n)));
-      setCurrentEditingNote(updated);
+      });
     } else {
       const newNote: AppNote = {
         id: `note_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
@@ -461,7 +505,7 @@ export default function NotesView() {
         createdAt: now,
         updatedAt: now,
       };
-      setNotes((prev) => [newNote, ...prev]);
+      void createNote(newNote as any);
       setCurrentEditingNote(newNote);
     }
 
@@ -507,11 +551,7 @@ export default function NotesView() {
       confirmText: 'Delete',
       type: 'danger',
       onConfirm: () => {
-        setNotes((prev) => {
-          const next = prev.filter((n) => n.id !== noteId);
-          try { localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(next)); } catch {}
-          return next;
-        });
+        void deleteNote(noteId);
         showToast?.('Note deleted', 'info');
         if (viewMode === 'editor') {
           setViewMode(activeFolderId ? 'folder' : 'home');
@@ -530,11 +570,7 @@ export default function NotesView() {
       badge: newFolderBadge.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
-    setFolders((prev) => {
-      const next = [...prev, newF];
-      try { localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(next)); } catch {}
-      return next;
-    });
+    void createNoteFolder(newF);
     setNewFolderName('');
     setNewFolderBadge('');
     setIsFolderModalOpen(false);
@@ -549,16 +585,7 @@ export default function NotesView() {
       confirmText: 'Delete',
       type: 'danger',
       onConfirm: () => {
-        const nextFolders = folders.filter((f) => f.id !== folder.id);
-        const nextNotes = notes.map((n) =>
-          n.folderId === folder.id ? { ...n, folderId: undefined } : n
-        );
-        setFolders(nextFolders);
-        setNotes(nextNotes);
-        try {
-          localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(nextFolders));
-          localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(nextNotes));
-        } catch {}
+        void deleteNoteFolder(folder.id);
         showToast?.('Folder deleted', 'info');
         if (activeFolderId === folder.id) {
           setActiveFolderId(null);

@@ -12,6 +12,8 @@ import {
   AgentAction,
   AppNotification,
   LedgerEntry,
+  Note,
+  NoteFolder,
 } from '@/types';
 import {
   isGuestEmail,
@@ -83,6 +85,14 @@ interface AppContextType {
   reminders: Reminder[];
   goals: Goal[];
   ledgerEntries: LedgerEntry[];
+  notes: Note[];
+  noteFolders: NoteFolder[];
+  createNote: (input: Partial<Note> & { title: string }) => Promise<Note | null>;
+  updateNote: (id: string, patch: Partial<Note>) => Promise<Note | null>;
+  deleteNote: (id: string) => Promise<void>;
+  createNoteFolder: (input: Partial<NoteFolder> & { name: string }) => Promise<NoteFolder | null>;
+  updateNoteFolder: (id: string, patch: Partial<NoteFolder>) => Promise<NoteFolder | null>;
+  deleteNoteFolder: (id: string) => Promise<void>;
   agentActions: AgentAction[];
   notifications: AppNotification[];
   unreadNotificationCount: number;
@@ -247,6 +257,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [reminders, setReminders] = useState<Reminder[]>(() => getInitialList<Reminder>('recall_reminders'));
   const [goals, setGoals] = useState<Goal[]>(() => getInitialList<Goal>('recall_goals'));
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>(() => getInitialList<LedgerEntry>('recall_ledger'));
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [noteFolders, setNoteFolders] = useState<NoteFolder[]>([]);
   const [agentActions, setAgentActions] = useState<AgentAction[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>(() => getInitialList<AppNotification>('recall_notifications'));
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -658,6 +670,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         actResult,
         notifResult,
         ledgerResult,
+        notesResult,
       ] = await Promise.allSettled([
         apiFetch('/api/conversations').then(safeJson),
         apiFetch('/api/memories').then(safeJson),
@@ -667,6 +680,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         apiFetch('/api/actions').then(safeJson),
         apiFetch('/api/notifications').then(safeJson),
         apiFetch('/api/ledger').then(safeJson),
+        apiFetch('/api/notes').then(safeJson),
       ]);
 
       // Smart non-destructive merge: preserve local data if server returns empty list (e.g. cold start)
@@ -878,6 +892,49 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const mergedList = Array.from(map.values());
           try { localStorage.setItem('recall_ledger', JSON.stringify(mergedList)); } catch {}
           return mergedList;
+        });
+      }
+
+      if (notesResult.status === 'fulfilled' && Array.isArray(notesResult.value?.notes)) {
+        const serverNotes: Note[] = notesResult.value.notes;
+        setNotes((prev) => {
+          if (serverNotes.length === 0 && prev.length > 0) {
+            // Migrate browser-only notes into the shared store on first run.
+            prev.forEach((n) => {
+              apiFetch('/api/notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(n),
+              }).catch(() => {});
+            });
+            return prev;
+          }
+          const map = new Map<string, Note>();
+          serverNotes.forEach((n) => map.set(n.id, n));
+          prev.forEach((n) => { if (!map.has(n.id)) map.set(n.id, n); });
+          return Array.from(map.values()).sort(
+            (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime(),
+          );
+        });
+      }
+
+      if (notesResult.status === 'fulfilled' && Array.isArray(notesResult.value?.folders)) {
+        const serverFolders: NoteFolder[] = notesResult.value.folders;
+        setNoteFolders((prev) => {
+          if (serverFolders.length === 0 && prev.length > 0) {
+            prev.forEach((f) => {
+              apiFetch('/api/notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...f, kind: 'folder' }),
+              }).catch(() => {});
+            });
+            return prev;
+          }
+          const map = new Map<string, NoteFolder>();
+          serverFolders.forEach((f) => map.set(f.id, f));
+          prev.forEach((f) => { if (!map.has(f.id)) map.set(f.id, f); });
+          return Array.from(map.values());
         });
       }
     } catch (err) {
@@ -1150,6 +1207,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               finished = true;
               if (evt.assistantMessage) {
                 const finalMessage = evt.assistantMessage as Message;
+                if (evt.requiresConfirmation && evt.confirmationPayload) {
+                  finalMessage.confirmation = {
+                    toolName: evt.confirmationPayload.toolName || 'TaskTool',
+                    action: evt.confirmationPayload.action || 'createTask',
+                    payload: evt.confirmationPayload,
+                    message: 'Review and confirm to save.',
+                  };
+                }
                 setMessages((prev) => prev.map((m) => (m.id === draftId ? finalMessage : m)));
               }
             }
@@ -1195,6 +1260,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (data?.success) {
           if (data.conversationId) attachConversation(data.conversationId);
 
+          if (data.requiresConfirmation && data.confirmationPayload && data.assistantMessage) {
+            data.assistantMessage.confirmation = {
+              toolName: data.confirmationPayload.toolName || 'TaskTool',
+              action: data.confirmationPayload.action || 'createTask',
+              payload: data.confirmationPayload,
+              message: 'Review and confirm to save.',
+            };
+          }
+
           // Replace temp message with server message and append assistant reply
           setMessages((prev) => [
             ...prev.filter((m) => m.id !== tempUserMsg.id && m.id !== draftId),
@@ -1235,6 +1309,140 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
 
+
+  const createNote = async (input: Partial<Note> & { title: string }): Promise<Note | null> => {
+    const now = new Date().toISOString();
+    const note: Note = {
+      id: input.id || `note_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      userId: user?.id || 'usr_default_main',
+      title: input.title,
+      content: input.content || '',
+      folderId: input.folderId,
+      color: input.color || 'cream',
+      category: input.category,
+      isPinned: input.isPinned,
+      goalId: input.goalId,
+      goalTitle: input.goalTitle,
+      createdAt: input.createdAt || now,
+      updatedAt: now,
+    };
+    setNotes((prev) => [note, ...prev.filter((n) => n.id !== note.id)]);
+    try {
+      const res = await apiFetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(note),
+      });
+      const data = await safeJson(res);
+      if (data?.note) {
+        setNotes((prev) => prev.map((n) => (n.id === note.id ? data.note : n)));
+        return data.note;
+      }
+    } catch (err) {
+      console.warn('Note sync notice:', err);
+    }
+    return note;
+  };
+
+  const updateNote = async (id: string, patch: Partial<Note>): Promise<Note | null> => {
+    const now = new Date().toISOString();
+    let optimistic: Note | null = null;
+    setNotes((prev) =>
+      prev.map((n) => {
+        if (n.id !== id) return n;
+        optimistic = { ...n, ...patch, updatedAt: now };
+        return optimistic;
+      }),
+    );
+    try {
+      const res = await apiFetch(`/api/notes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const data = await safeJson(res);
+      if (data?.note) {
+        setNotes((prev) => prev.map((n) => (n.id === id ? data.note : n)));
+        return data.note;
+      }
+    } catch (err) {
+      console.warn('Note update sync notice:', err);
+    }
+    return optimistic;
+  };
+
+  const deleteNote = async (id: string): Promise<void> => {
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    try {
+      await apiFetch(`/api/notes/${id}`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('Note delete sync notice:', err);
+    }
+  };
+
+  const createNoteFolder = async (input: Partial<NoteFolder> & { name: string }): Promise<NoteFolder | null> => {
+    const folder: NoteFolder = {
+      id: input.id || `folder_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      userId: user?.id || 'usr_default_main',
+      name: input.name,
+      icon: input.icon || '📁',
+      badge: input.badge,
+      themeColor: input.themeColor || 'slate',
+      createdAt: input.createdAt || new Date().toISOString(),
+    };
+    setNoteFolders((prev) => [...prev.filter((f) => f.id !== folder.id), folder]);
+    try {
+      const res = await apiFetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...folder, kind: 'folder' }),
+      });
+      const data = await safeJson(res);
+      if (data?.folder) {
+        setNoteFolders((prev) => prev.map((f) => (f.id === folder.id ? data.folder : f)));
+        return data.folder;
+      }
+    } catch (err) {
+      console.warn('Folder sync notice:', err);
+    }
+    return folder;
+  };
+
+  const updateNoteFolder = async (id: string, patch: Partial<NoteFolder>): Promise<NoteFolder | null> => {
+    let optimistic: NoteFolder | null = null;
+    setNoteFolders((prev) =>
+      prev.map((f) => {
+        if (f.id !== id) return f;
+        optimistic = { ...f, ...patch };
+        return optimistic;
+      }),
+    );
+    try {
+      const res = await apiFetch(`/api/notes/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...patch, kind: 'folder' }),
+      });
+      const data = await safeJson(res);
+      if (data?.folder) {
+        setNoteFolders((prev) => prev.map((f) => (f.id === id ? data.folder : f)));
+        return data.folder;
+      }
+    } catch (err) {
+      console.warn('Folder update sync notice:', err);
+    }
+    return optimistic;
+  };
+
+  const deleteNoteFolder = async (id: string): Promise<void> => {
+    setNoteFolders((prev) => prev.filter((f) => f.id !== id));
+    setNotes((prev) => prev.map((n) => (n.folderId === id ? { ...n, folderId: undefined } : n)));
+    try {
+      await apiFetch(`/api/notes/${id}?kind=folder`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('Folder delete sync notice:', err);
+    }
+  };
 
   const deleteConversation = async (id: string) => {
     try {
@@ -1948,6 +2156,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         reminders,
         goals,
         ledgerEntries,
+        notes,
+        noteFolders,
+        createNote,
+        updateNote,
+        deleteNote,
+        createNoteFolder,
+        updateNoteFolder,
+        deleteNoteFolder,
         agentActions,
         notifications,
         unreadNotificationCount,

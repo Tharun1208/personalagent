@@ -15,6 +15,8 @@ import {
   Habit,
   SubTask,
   LedgerEntry,
+  Note,
+  NoteFolder,
 } from '@/types';
 import { syncInitialDataToMongo, syncEntityToMongo } from './mongoSync';
 import { isMongoConfigured } from './mongodb';
@@ -43,6 +45,8 @@ interface Schema {
   notifications: AppNotification[];
   confirmations: ConfirmationRequest[];
   ledger: LedgerEntry[];
+  notes: Note[];
+  noteFolders: NoteFolder[];
 }
 
 const DB_DIR = path.join(process.cwd(), 'data');
@@ -103,6 +107,8 @@ function ensureDbFile(): Schema {
         parsed.notifications = parsed.notifications || [];
         parsed.confirmations = parsed.confirmations || [];
         parsed.ledger = parsed.ledger || [];
+        parsed.notes = parsed.notes || [];
+        parsed.noteFolders = parsed.noteFolders || [];
         memoryDb = parsed as Schema;
         
         // Sync to MongoDB in background once on startup if connection URI is provided
@@ -390,6 +396,8 @@ How can I assist you today?`,
     confirmations: [],
     habits: [],
     ledger: [],
+    notes: [],
+    noteFolders: [],
   };
 
   fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
@@ -1012,6 +1020,110 @@ export const db = {
     return conf;
   },
 
+  // --- NOTES & NOTE FOLDERS ---
+  getNotes(userId: string): Note[] {
+    const data = ensureDbFile();
+    data.notes = data.notes || [];
+    return data.notes
+      .filter((n) => n && (n.userId === userId || !n.userId))
+      .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
+  },
+
+  getNoteById(id: string, userId: string): Note | null {
+    const data = ensureDbFile();
+    data.notes = data.notes || [];
+    return data.notes.find((n) => n.id === id && (n.userId === userId || !n.userId)) || null;
+  },
+
+  createNote(note: Note): Note {
+    const data = ensureDbFile();
+    data.notes = data.notes || [];
+    data.notes.unshift(note);
+    persistDb();
+    persistDocs('notes', note);
+    return note;
+  },
+
+  updateNote(id: string, userId: string, patch: Partial<Note>): Note | null {
+    const data = ensureDbFile();
+    data.notes = data.notes || [];
+    let idx = data.notes.findIndex((n) => n.id === id && (n.userId === userId || !n.userId));
+    if (idx === -1) idx = data.notes.findIndex((n) => n.id === id);
+    if (idx === -1) return null;
+    data.notes[idx] = {
+      ...data.notes[idx],
+      ...patch,
+      id: data.notes[idx].id,
+      userId: data.notes[idx].userId || userId,
+      updatedAt: new Date().toISOString(),
+    };
+    persistDb();
+    persistDocs('notes', data.notes[idx]);
+    return data.notes[idx];
+  },
+
+  deleteNote(id: string, userId: string): boolean {
+    const data = ensureDbFile();
+    data.notes = data.notes || [];
+    const initialLen = data.notes.length;
+    data.notes = data.notes.filter((n) => !(n.id === id && (n.userId === userId || !n.userId)));
+    persistDb();
+    deleteFromStore('notes', id);
+    return data.notes.length < initialLen;
+  },
+
+  getNoteFolders(userId: string): NoteFolder[] {
+    const data = ensureDbFile();
+    data.noteFolders = data.noteFolders || [];
+    return data.noteFolders.filter((f) => f && (f.userId === userId || !f.userId));
+  },
+
+  createNoteFolder(folder: NoteFolder): NoteFolder {
+    const data = ensureDbFile();
+    data.noteFolders = data.noteFolders || [];
+    data.noteFolders.push(folder);
+    persistDb();
+    persistDocs('noteFolders', folder);
+    return folder;
+  },
+
+  updateNoteFolder(id: string, userId: string, patch: Partial<NoteFolder>): NoteFolder | null {
+    const data = ensureDbFile();
+    data.noteFolders = data.noteFolders || [];
+    let idx = data.noteFolders.findIndex((f) => f.id === id && (f.userId === userId || !f.userId));
+    if (idx === -1) idx = data.noteFolders.findIndex((f) => f.id === id);
+    if (idx === -1) return null;
+    data.noteFolders[idx] = {
+      ...data.noteFolders[idx],
+      ...patch,
+      id: data.noteFolders[idx].id,
+      userId: data.noteFolders[idx].userId || userId,
+    };
+    persistDb();
+    persistDocs('noteFolders', data.noteFolders[idx]);
+    return data.noteFolders[idx];
+  },
+
+  deleteNoteFolder(id: string, userId: string): { deleted: boolean; unassignedNotes: number } {
+    const data = ensureDbFile();
+    data.noteFolders = data.noteFolders || [];
+    data.notes = data.notes || [];
+    const initialLen = data.noteFolders.length;
+    data.noteFolders = data.noteFolders.filter((f) => !(f.id === id && (f.userId === userId || !f.userId)));
+    const touched: Note[] = [];
+    data.notes.forEach((n) => {
+      if (n.folderId === id) {
+        n.folderId = undefined;
+        n.updatedAt = new Date().toISOString();
+        touched.push(n);
+      }
+    });
+    persistDb();
+    deleteFromStore('noteFolders', id);
+    touched.forEach((n) => persistDocs('notes', n));
+    return { deleted: data.noteFolders.length < initialLen, unassignedNotes: touched.length };
+  },
+
   // --- HABITS ---
   getHabits(userId: string): Habit[] {
     const data = ensureDbFile();
@@ -1300,6 +1412,8 @@ export const db = {
       goals: (data.goals || []).filter((g) => g.userId === userId),
       habits: (data.habits || []).filter((h) => h.userId === userId),
       ledger: (data.ledger || []).filter((l) => l.userId === userId),
+      notes: (data.notes || []).filter((n) => n.userId === userId),
+      noteFolders: (data.noteFolders || []).filter((f) => f.userId === userId),
       agentActions: data.agentActions.filter((a) => a.userId === userId),
     };
   },
@@ -1315,6 +1429,8 @@ export const db = {
       goals: 0,
       habits: 0,
       ledger: 0,
+      notes: 0,
+      noteFolders: 0,
     };
 
     if (!backupData || typeof backupData !== 'object') {
@@ -1353,6 +1469,8 @@ export const db = {
     mergeCollection('goals', 'goals');
     mergeCollection('habits', 'habits');
     mergeCollection('ledger', 'ledger');
+    mergeCollection('notes', 'notes');
+    mergeCollection('noteFolders', 'noteFolders');
 
     persistDb();
     return { imported };
@@ -1368,6 +1486,8 @@ export const db = {
     const gls = (data.goals || []).filter((g) => g.userId === userId);
     const hbts = (data.habits || []).filter((h) => h.userId === userId);
     const ldg = (data.ledger || []).filter((l) => l.userId === userId);
+    const nts = (data.notes || []).filter((n) => n.userId === userId);
+    const nflds = (data.noteFolders || []).filter((f) => f.userId === userId);
     const acts = data.agentActions.filter((a) => a.userId === userId);
     const nots = data.notifications.filter((n) => n.userId === userId);
     data.conversations = data.conversations.filter((c) => c.userId !== userId);
@@ -1378,6 +1498,8 @@ export const db = {
     data.goals = (data.goals || []).filter((g) => g.userId !== userId);
     data.habits = (data.habits || []).filter((h) => h.userId !== userId);
     data.ledger = (data.ledger || []).filter((l) => l.userId !== userId);
+    data.notes = (data.notes || []).filter((n) => n.userId !== userId);
+    data.noteFolders = (data.noteFolders || []).filter((f) => f.userId !== userId);
     data.agentActions = data.agentActions.filter((a) => a.userId !== userId);
     data.notifications = data.notifications.filter((n) => n.userId !== userId);
     persistDb();
@@ -1389,6 +1511,8 @@ export const db = {
     gls.forEach((d) => deleteFromStore('goals', d.id));
     hbts.forEach((d) => deleteFromStore('habits', d.id));
     ldg.forEach((d) => deleteFromStore('ledger', d.id));
+    nts.forEach((d) => deleteFromStore('notes', d.id));
+    nflds.forEach((d) => deleteFromStore('noteFolders', d.id));
     acts.forEach((d) => deleteFromStore('agentActions', d.id));
     nots.forEach((d) => deleteFromStore('notifications', d.id));
     return true;

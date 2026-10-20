@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { memoryEngine } from '@/lib/memory';
 import { Task, Reminder, Goal, Memory, LedgerEntry } from '@/types';
+import { crudTools } from './crud';
 
 export type ToolPermissionLevel = 'READ' | 'WRITE' | 'DESTRUCTIVE';
 
@@ -25,6 +26,9 @@ export interface ToolModule {
 }
 
 export const toolRegistry: Record<string, ToolModule> = {
+  // ── CRUD TOOLS: habits, notes, notifications, preferences, conversations, projects ──
+  ...crudTools,
+
   // ── 1. MEMORY TOOL ──────────────────────────────────────────
   MemoryTool: {
     name: 'MemoryTool',
@@ -36,6 +40,17 @@ export const toolRegistry: Record<string, ToolModule> = {
         parameters: {
           content: { type: 'string', description: 'The exact memory content to remember', required: true },
           category: { type: 'string', description: 'Optional category (Design, Engineering, Career, etc.)' },
+        },
+        permissionLevel: 'WRITE',
+      },
+      updateMemory: {
+        name: 'updateMemory',
+        description: 'Rewrites an existing memory entry, or pins/unpins it.',
+        parameters: {
+          memoryQuery: { type: 'string', description: 'Memory ID or text to match', required: true },
+          content: { type: 'string', description: 'New memory content' },
+          category: { type: 'string', description: 'New category' },
+          pinned: { type: 'boolean', description: 'Pin or unpin the memory' },
         },
         permissionLevel: 'WRITE',
       },
@@ -95,6 +110,27 @@ export const toolRegistry: Record<string, ToolModule> = {
           message: `You have ${memories.length} stored memories.`,
         };
       }
+      if (action === 'updateMemory') {
+        const memories = db.getMemories(userId);
+        const q = String(args.memoryQuery || '').toLowerCase().trim();
+        const target =
+          memories.find((m) => m.id === args.memoryQuery) ||
+          memories.find((m) => m.content.toLowerCase().includes(q)) ||
+          null;
+        if (!target) {
+          return { success: false, message: `No memory found matching "${args.memoryQuery}".` };
+        }
+        const patch: Partial<Memory> = {};
+        if (args.content) patch.content = String(args.content).trim();
+        if (args.category) patch.category = args.category;
+        if (typeof args.pinned === 'boolean') patch.pinned = args.pinned;
+        const updated = db.updateMemory(target.id, userId, patch);
+        return {
+          success: !!updated,
+          data: updated,
+          message: updated ? `✓ Memory updated: "${updated.content}"` : 'Memory update failed.',
+        };
+      }
       return { success: false, message: `Unknown memory action: ${action}` };
     },
   },
@@ -147,6 +183,33 @@ export const toolRegistry: Record<string, ToolModule> = {
         description: 'Deletes a task.',
         parameters: {
           taskId: { type: 'string', description: 'Task ID', required: true },
+        },
+        permissionLevel: 'DESTRUCTIVE',
+      },
+      createSubtask: {
+        name: 'createSubtask',
+        description: 'Adds a checklist subtask inside an existing task.',
+        parameters: {
+          taskId: { type: 'string', description: 'Task ID or title', required: true },
+          title: { type: 'string', description: 'Subtask title', required: true },
+        },
+        permissionLevel: 'WRITE',
+      },
+      toggleSubtask: {
+        name: 'toggleSubtask',
+        description: 'Marks a subtask complete/incomplete (auto-completes the parent when all are done).',
+        parameters: {
+          taskId: { type: 'string', description: 'Task ID or title', required: true },
+          subtask: { type: 'string', description: 'Subtask ID or title', required: true },
+        },
+        permissionLevel: 'WRITE',
+      },
+      deleteSubtask: {
+        name: 'deleteSubtask',
+        description: 'Removes a subtask from a task.',
+        parameters: {
+          taskId: { type: 'string', description: 'Task ID or title', required: true },
+          subtask: { type: 'string', description: 'Subtask ID or title', required: true },
         },
         permissionLevel: 'DESTRUCTIVE',
       },
@@ -220,6 +283,65 @@ export const toolRegistry: Record<string, ToolModule> = {
           message: ok ? `✓ Task deleted.` : `Task not found.`,
         };
       }
+      if (action === 'createSubtask' || action === 'toggleSubtask' || action === 'deleteSubtask') {
+        const tasks = db.getTasks(userId);
+        const findTask = (q: string) => {
+          const query = String(q || '').toLowerCase();
+          return (
+            tasks.find((t) => t.id === q) ||
+            tasks.find((t) => t.title.toLowerCase().includes(query)) ||
+            tasks.find((t) => query.split(' ').some((w) => w.length > 3 && t.title.toLowerCase().includes(w))) ||
+            null
+          );
+        };
+        const task = findTask(args.taskId);
+        if (!task) return { success: false, message: `Task "${args.taskId}" not found.` };
+        const subtasks = task.subtasks || [];
+
+        if (action === 'createSubtask') {
+          if (!args.title) return { success: false, message: 'Subtask title is required.' };
+          const next = [
+            ...subtasks,
+            { id: `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`, title: String(args.title).trim(), completed: false },
+          ];
+          const updated = db.setTaskSubtasks(task.id, userId, next);
+          return {
+            success: !!updated,
+            data: updated,
+            message: updated ? `✓ Subtask added to "${task.title}".` : 'Could not add subtask.',
+          };
+        }
+
+        const findSub = (q: string) => {
+          const query = String(q || '').toLowerCase();
+          return (
+            subtasks.find((s) => s.id === q) ||
+            subtasks.find((s) => s.title.toLowerCase().includes(query)) ||
+            null
+          );
+        };
+        const subtask = findSub(args.subtask);
+        if (!subtask) return { success: false, message: `Subtask "${args.subtask}" not found in "${task.title}".` };
+
+        if (action === 'toggleSubtask') {
+          const updated = db.toggleSubTask(task.id, subtask.id, userId);
+          return {
+            success: !!updated,
+            data: updated,
+            message: updated
+              ? `✓ Subtask "${subtask.title}" is now ${subtask.completed ? 'incomplete' : 'complete'}.`
+              : 'Could not update subtask.',
+          };
+        }
+
+        const next = subtasks.filter((s) => s.id !== subtask.id);
+        const updated = db.setTaskSubtasks(task.id, userId, next);
+        return {
+          success: !!updated,
+          data: updated,
+          message: updated ? `✓ Subtask "${subtask.title}" deleted.` : 'Could not delete subtask.',
+        };
+      }
       return { success: false, message: `Unknown task action: ${action}` };
     },
   },
@@ -246,6 +368,19 @@ export const toolRegistry: Record<string, ToolModule> = {
         description: 'Fetches active or upcoming reminders.',
         parameters: {},
         permissionLevel: 'READ',
+      },
+      updateReminder: {
+        name: 'updateReminder',
+        description: 'Reschedules or renames an existing reminder.',
+        parameters: {
+          reminderId: { type: 'string', description: 'Reminder ID or title', required: true },
+          title: { type: 'string', description: 'New title' },
+          dueDateTime: { type: 'string', description: 'New ISO date or target timestamp' },
+          recurrence: { type: 'string', description: 'none | daily | weekly | monthly' },
+          priority: { type: 'string', description: 'low | medium | high' },
+          notes: { type: 'string', description: 'Updated notes' },
+        },
+        permissionLevel: 'WRITE',
       },
       deleteReminder: {
         name: 'deleteReminder',
@@ -303,6 +438,38 @@ export const toolRegistry: Record<string, ToolModule> = {
           message: ok ? `✓ Reminder deleted.` : `Reminder not found.`,
         };
       }
+      if (action === 'updateReminder') {
+        const reminders = db.getReminders(userId);
+        const q = String(args.reminderId || '').toLowerCase().trim();
+        const target =
+          reminders.find((r) => r.id === args.reminderId) ||
+          reminders.find((r) => r.title.toLowerCase().includes(q)) ||
+          null;
+        if (!target) return { success: false, message: `Reminder "${args.reminderId}" not found.` };
+
+        const patch: Partial<Reminder> = {};
+        if (args.title) patch.title = String(args.title).trim();
+        if (args.dueDateTime) {
+          const parsed = new Date(args.dueDateTime);
+          if (isNaN(parsed.getTime())) {
+            return { success: false, message: `Could not understand date "${args.dueDateTime}".` };
+          }
+          patch.dueDateTime = parsed.toISOString();
+          patch.status = 'pending';
+        }
+        if (args.recurrence) patch.recurrence = args.recurrence;
+        if (args.priority) patch.priority = args.priority;
+        if (args.notes !== undefined) patch.notes = args.notes;
+
+        const updated = db.updateReminder(target.id, userId, patch);
+        return {
+          success: !!updated,
+          data: updated,
+          message: updated
+            ? `✓ Reminder updated: "${updated.title}" due ${new Date(updated.dueDateTime).toLocaleString()}.`
+            : 'Reminder update failed.',
+        };
+      }
       return { success: false, message: `Unknown reminder action: ${action}` };
     },
   },
@@ -345,6 +512,47 @@ export const toolRegistry: Record<string, ToolModule> = {
         parameters: {
           goalTitle: { type: 'string', description: 'Goal title or ID', required: true },
           notes: { type: 'string', description: 'The strategic notes content to save', required: true },
+        },
+        permissionLevel: 'WRITE',
+      },
+      updateGoal: {
+        name: 'updateGoal',
+        description: 'Updates goal title, description, category, target date, progress or status.',
+        parameters: {
+          goalTitle: { type: 'string', description: 'Goal title or ID', required: true },
+          title: { type: 'string', description: 'New title' },
+          description: { type: 'string', description: 'New description' },
+          category: { type: 'string', description: 'career | health | finance | learning | personal' },
+          targetDate: { type: 'string', description: 'New target date (YYYY-MM-DD)' },
+          progress: { type: 'number', description: 'Progress percentage 0-100' },
+          status: { type: 'string', description: 'active | completed | paused' },
+        },
+        permissionLevel: 'WRITE',
+      },
+      deleteGoal: {
+        name: 'deleteGoal',
+        description: 'Deletes a goal and its milestones.',
+        parameters: {
+          goalTitle: { type: 'string', description: 'Goal title or ID', required: true },
+        },
+        permissionLevel: 'DESTRUCTIVE',
+      },
+      addMilestone: {
+        name: 'addMilestone',
+        description: 'Adds a milestone to a goal.',
+        parameters: {
+          goalTitle: { type: 'string', description: 'Goal title or ID', required: true },
+          title: { type: 'string', description: 'Milestone title', required: true },
+          targetDate: { type: 'string', description: 'Optional target date' },
+        },
+        permissionLevel: 'WRITE',
+      },
+      toggleMilestone: {
+        name: 'toggleMilestone',
+        description: 'Marks a goal milestone complete/incomplete and recalculates progress.',
+        parameters: {
+          goalTitle: { type: 'string', description: 'Goal title or ID', required: true },
+          milestone: { type: 'string', description: 'Milestone title or ID', required: true },
         },
         permissionLevel: 'WRITE',
       },
@@ -419,6 +627,66 @@ export const toolRegistry: Record<string, ToolModule> = {
           success: true,
           data: updated,
           message: `✓ Strategic notes updated for "${goal.title}".`,
+        };
+      }
+      if (action === 'updateGoal' || action === 'deleteGoal' || action === 'addMilestone' || action === 'toggleMilestone') {
+        const goals = db.getGoals(userId);
+        const q = String(args.goalTitle || '').toLowerCase().trim();
+        const goal =
+          goals.find((g) => g.id === args.goalTitle) ||
+          goals.find((g) => g.title.toLowerCase() === q) ||
+          goals.find((g) => g.title.toLowerCase().includes(q)) ||
+          null;
+        if (!goal) return { success: false, message: `Goal "${args.goalTitle}" not found.` };
+
+        if (action === 'deleteGoal') {
+          const ok = db.deleteGoal(goal.id, userId);
+          return { success: ok, message: ok ? `✓ Goal "${goal.title}" deleted.` : 'Delete failed.' };
+        }
+
+        if (action === 'updateGoal') {
+          const patch: Partial<Goal> = {};
+          if (args.title) patch.title = String(args.title).trim();
+          if (args.description !== undefined) patch.description = args.description;
+          if (args.category) patch.category = args.category;
+          if (args.targetDate) patch.targetDate = args.targetDate;
+          if (args.progress !== undefined) patch.progress = Math.max(0, Math.min(100, Number(args.progress)));
+          if (args.status) patch.status = args.status;
+          if (patch.progress === 100) patch.status = 'completed';
+          const updated = db.updateGoal(goal.id, userId, patch);
+          return { success: !!updated, data: updated, message: updated ? `✓ Goal "${updated.title}" updated.` : 'Update failed.' };
+        }
+
+        const milestones = goal.milestones || [];
+
+        if (action === 'addMilestone') {
+          if (!args.title) return { success: false, message: 'Milestone title is required.' };
+          const next = [
+            ...milestones,
+            {
+              id: `m_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+              title: String(args.title).trim(),
+              completed: false,
+              targetDate: args.targetDate,
+            },
+          ];
+          const updated = db.updateGoal(goal.id, userId, { milestones: next });
+          return { success: !!updated, data: updated, message: updated ? `✓ Milestone added to "${goal.title}".` : 'Could not add milestone.' };
+        }
+
+        const mq = String(args.milestone || '').toLowerCase().trim();
+        const milestone =
+          milestones.find((m) => m.id === args.milestone) ||
+          milestones.find((m) => m.title.toLowerCase().includes(mq)) ||
+          null;
+        if (!milestone) return { success: false, message: `Milestone "${args.milestone}" not found.` };
+        const updated = db.toggleGoalMilestone(goal.id, milestone.id, userId);
+        return {
+          success: !!updated,
+          data: updated,
+          message: updated
+            ? `✓ Milestone "${milestone.title}" ${milestone.completed ? 'completed' : 'reopened'} — goal progress ${updated.progress}%.`
+            : 'Could not update milestone.',
         };
       }
       return { success: false, message: `Unknown goal action: ${action}` };
@@ -739,6 +1007,21 @@ export const toolRegistry: Record<string, ToolModule> = {
         },
         permissionLevel: 'WRITE',
       },
+      updateLedgerEntry: {
+        name: 'updateLedgerEntry',
+        description: 'Edits a ledger entry amount, person, direction, note, category or due date.',
+        parameters: {
+          id: { type: 'string', description: 'Entry ID or person name', required: true },
+          personName: { type: 'string', description: 'New person name' },
+          amount: { type: 'number', description: 'New amount' },
+          type: { type: 'string', description: "'give' or 'receive'" },
+          currency: { type: 'string', description: "Currency symbol like '₹'" },
+          description: { type: 'string', description: 'New note/reason' },
+          category: { type: 'string', description: 'New category' },
+          dueDate: { type: 'string', description: 'New due date' },
+        },
+        permissionLevel: 'WRITE',
+      },
       deleteLedgerEntry: {
         name: 'deleteLedgerEntry',
         description: 'Deletes a ledger debt record.',
@@ -823,6 +1106,36 @@ export const toolRegistry: Record<string, ToolModule> = {
         return {
           success: ok,
           message: ok ? `✓ Removed ledger entry.` : `Could not find entry with ID ${args.id}.`,
+        };
+      }
+
+      if (action === 'updateLedgerEntry') {
+        const all = db.getLedgerEntries(userId);
+        const q = String(args.id || '').toLowerCase().trim();
+        const target =
+          all.find((e) => e.id === args.id) ||
+          all.find((e) => e.personName.toLowerCase().includes(q)) ||
+          null;
+        if (!target) return { success: false, message: `Ledger entry "${args.id}" not found.` };
+
+        const patch: Partial<LedgerEntry> = {};
+        if (args.personName) patch.personName = String(args.personName).trim();
+        if (args.amount !== undefined) {
+          const amount = parseFloat(args.amount);
+          if (isNaN(amount) || amount <= 0) return { success: false, message: 'Invalid amount.' };
+          patch.amount = amount;
+        }
+        if (args.type) patch.type = args.type === 'give' ? 'give' : 'receive';
+        if (args.currency) patch.currency = args.currency;
+        if (args.description !== undefined) patch.description = args.description;
+        if (args.category) patch.category = args.category;
+        if (args.dueDate) patch.dueDate = args.dueDate;
+
+        const updated = db.updateLedgerEntry(target.id, userId, patch);
+        return {
+          success: !!updated,
+          data: updated,
+          message: updated ? `✓ Ledger entry for ${updated.personName} updated (${updated.currency}${updated.amount}).` : 'Update failed.',
         };
       }
 

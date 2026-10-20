@@ -61,6 +61,33 @@ export interface Habit {
   createdAt: string;
 }
 
+export type NoteColor = 'cream' | 'mint' | 'peach' | 'lavender' | 'slate';
+
+export interface Note {
+  id: string;
+  userId: string;
+  title: string;
+  content: string;
+  folderId?: string;
+  color?: NoteColor;
+  category?: string;
+  isPinned?: boolean;
+  goalId?: string;
+  goalTitle?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NoteFolder {
+  id: string;
+  userId: string;
+  name: string;
+  icon: string;
+  badge?: string;
+  themeColor: 'amber' | 'peach' | 'slate' | 'mint' | 'lavender';
+  createdAt: string;
+}
+
 export type LedgerType = 'give' | 'receive'; // 'give' (You owe/payable) | 'receive' (They owe you/receivable)
 export type LedgerStatus = 'pending' | 'settled';
 
@@ -183,6 +210,12 @@ export interface Message {
   content: string;
   attachments?: MessageAttachment[];
   toolSteps?: ToolExecutionStep[];
+  confirmation?: {
+    toolName: string;
+    action: string;
+    payload: Record<string, any>;
+    message?: string;
+  };
   memorySaved?: {
     id: string;
     content: string;
