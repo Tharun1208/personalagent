@@ -181,6 +181,10 @@ export default function LedgerView() {
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [historyCategoryFilter, setHistoryCategoryFilter] = useState('all');
   const [historySortBy, setHistorySortBy] = useState<'newest' | 'highest' | 'lowest'>('newest');
+  const [showHistoryFilters, setShowHistoryFilters] = useState(false);
+  const [historyPeriod, setHistoryPeriod] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [historyMinAmount, setHistoryMinAmount] = useState('');
+  const [historyMaxAmount, setHistoryMaxAmount] = useState('');
 
   // Monthly Budget state & modal
   const [monthlyBudget, setMonthlyBudget] = useState<number>(loadBudget);
@@ -598,8 +602,41 @@ export default function LedgerView() {
 
   // ── Dedicated Full Transaction History Page ──
   if (isTransactionHistoryPageOpen) {
+    const now = new Date();
+    const todayKey = toLocalDateString(now);
+    let periodStart: string | null = null;
+    let periodEnd: string | null = null;
+
+    if (historyPeriod === 'today') {
+      periodStart = todayKey;
+      periodEnd = todayKey;
+    } else if (historyPeriod === 'week') {
+      // Monday → today, matching the weekly budget calculation below.
+      const dayOfWeek = now.getDay() === 0 ? 6 : now.getDay() - 1;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - dayOfWeek);
+      periodStart = toLocalDateString(monday);
+      periodEnd = todayKey;
+    } else if (historyPeriod === 'month') {
+      periodStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      periodEnd = todayKey;
+    }
+
+    const minAmount = parseFloat(historyMinAmount);
+    const maxAmount = parseFloat(historyMaxAmount);
+
     let filteredSpending = spendingEntries.filter((e) => {
       if (historyCategoryFilter !== 'all' && e.category !== historyCategoryFilter) return false;
+
+      const entryDate = e.date || (e.createdAt ? e.createdAt.split('T')[0] : '');
+      if (periodStart && (!entryDate || entryDate < periodStart || entryDate > (periodEnd as string))) {
+        return false;
+      }
+
+      const amount = Number(e.amount) || 0;
+      if (!Number.isNaN(minAmount) && amount < minAmount) return false;
+      if (!Number.isNaN(maxAmount) && amount > maxAmount) return false;
+
       if (!historySearchQuery.trim()) return true;
       const q = historySearchQuery.toLowerCase();
       return (
@@ -615,10 +652,30 @@ export default function LedgerView() {
     } else if (historySortBy === 'lowest') {
       filteredSpending = [...filteredSpending].sort((a, b) => Number(a.amount) - Number(b.amount));
     } else {
-      filteredSpending = [...filteredSpending].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      filteredSpending = [...filteredSpending].sort((a, b) => {
+        const aKey = a.date || a.createdAt || '';
+        const bKey = b.date || b.createdAt || '';
+        return bKey.localeCompare(aKey);
+      });
     }
 
+    const activeHistoryFilterCount =
+      (historyCategoryFilter !== 'all' ? 1 : 0) +
+      (historyPeriod !== 'all' ? 1 : 0) +
+      (historyMinAmount.trim() ? 1 : 0) +
+      (historyMaxAmount.trim() ? 1 : 0);
+
+    const resetHistoryFilters = () => {
+      setHistoryCategoryFilter('all');
+      setHistoryPeriod('all');
+      setHistoryMinAmount('');
+      setHistoryMaxAmount('');
+    };
+
+    const hasActiveHistoryFilters = Boolean(historySearchQuery.trim()) || activeHistoryFilterCount > 0;
+
     const totalSpendingSum = spendingEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const filteredSpendingSum = filteredSpending.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
     const maxSpend = spendingEntries.length > 0 ? Math.max(...spendingEntries.map((e) => Number(e.amount) || 0)) : 0;
     const avgSpend = spendingEntries.length > 0 ? Math.round(totalSpendingSum / spendingEntries.length) : 0;
 
@@ -709,7 +766,7 @@ export default function LedgerView() {
             </div>
           </div>
 
-          {/* Search Bar & Sort Dropdown */}
+          {/* Search Bar, Filters & Sort */}
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
@@ -732,24 +789,136 @@ export default function LedgerView() {
                 )}
               </div>
 
-              {/* Sort Buttons */}
-              <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white border border-slate-200/90 shrink-0 shadow-2xs">
-                {(['newest', 'highest', 'lowest'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setHistorySortBy(mode)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer capitalize ${
-                      historySortBy === mode
-                        ? 'bg-[#1C1C1E] text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    }`}
-                  >
-                    {mode === 'newest' ? 'Newest' : mode === 'highest' ? 'Highest ₹' : 'Lowest ₹'}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2 shrink-0 overflow-x-auto no-scrollbar pb-0.5 sm:pb-0">
+                {/* More Filters Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowHistoryFilters((open) => !open)}
+                  aria-expanded={showHistoryFilters}
+                  className={`shrink-0 h-[46px] px-3.5 rounded-2xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                    showHistoryFilters || activeHistoryFilterCount > 0
+                      ? 'bg-[#1C1C1E] text-white border-[#1C1C1E]'
+                      : 'bg-white text-slate-700 border-slate-200/90 hover:border-slate-300'
+                  }`}
+                >
+                  <Filter size={15} />
+                  <span>Filters</span>
+                  {activeHistoryFilterCount > 0 && (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${
+                        showHistoryFilters ? 'bg-white/20 text-white' : 'bg-[#1C1C1E] text-white'
+                      }`}
+                    >
+                      {activeHistoryFilterCount}
+                    </span>
+                  )}
+                  {showHistoryFilters ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+
+                {/* Sort Buttons */}
+                <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white border border-slate-200/90 shrink-0 shadow-2xs">
+                  {(['newest', 'highest', 'lowest'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setHistorySortBy(mode)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer capitalize ${
+                        historySortBy === mode
+                          ? 'bg-[#1C1C1E] text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      {mode === 'newest' ? 'Newest' : mode === 'highest' ? 'Highest ₹' : 'Lowest ₹'}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
+
+            {/* Expandable Filter Panel */}
+            {showHistoryFilters && (
+              <div className="rounded-[24px] bg-white border border-slate-200/90 shadow-2xs p-4 sm:p-5 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-500">
+                    More filters
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={resetHistoryFilters}
+                    disabled={activeHistoryFilterCount === 0}
+                    className="text-[11px] font-bold text-slate-600 hover:text-slate-900 disabled:text-slate-300 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    Reset filters
+                  </button>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-bold text-slate-500 block mb-2">Period</span>
+                  <div className="flex flex-wrap gap-2">
+                    {(
+                      [
+                        { key: 'all', label: 'All time' },
+                        { key: 'today', label: 'Today' },
+                        { key: 'week', label: 'This week' },
+                        { key: 'month', label: 'This month' },
+                      ] as const
+                    ).map((period) => (
+                      <button
+                        key={period.key}
+                        type="button"
+                        onClick={() => setHistoryPeriod(period.key)}
+                        className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer ${
+                          historyPeriod === period.key
+                            ? 'bg-[#1C1C1E] text-white border-[#1C1C1E] shadow-2xs'
+                            : 'bg-white text-slate-600 border-slate-200/90 hover:border-slate-300'
+                        }`}
+                      >
+                        {period.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[11px] font-bold text-slate-500 block mb-2">Amount range</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">₹</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        value={historyMinAmount}
+                        onChange={(e) => setHistoryMinAmount(e.target.value)}
+                        placeholder="Min"
+                        className="w-full pl-7 pr-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1C1C1E]/20 focus:bg-white"
+                      />
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">₹</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        value={historyMaxAmount}
+                        onChange={(e) => setHistoryMaxAmount(e.target.value)}
+                        placeholder="Max"
+                        className="w-full pl-7 pr-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1C1C1E]/20 focus:bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                  <span className="text-xs font-semibold text-slate-500">
+                    {filteredSpending.length} matching record{filteredSpending.length === 1 ? '' : 's'}
+                  </span>
+                  <span className="text-xs font-black text-[#1C1C1E]">
+                    Total ₹{filteredSpendingSum.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Category Filter Chips */}
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -857,16 +1026,16 @@ export default function LedgerView() {
               </div>
               <h3 className="text-base font-bold text-slate-800">No transactions match your search</h3>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                {historySearchQuery || historyCategoryFilter !== 'all'
-                  ? 'Try clearing your search query or choosing another category filter.'
+                {hasActiveHistoryFilters
+                  ? 'Try clearing your search query or adjusting the filters.'
                   : 'You have not recorded any daily expense entries yet.'}
               </p>
-              {(historySearchQuery || historyCategoryFilter !== 'all') && (
+              {hasActiveHistoryFilters && (
                 <button
                   type="button"
                   onClick={() => {
                     setHistorySearchQuery('');
-                    setHistoryCategoryFilter('all');
+                    resetHistoryFilters();
                   }}
                   className="px-4 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
                 >
