@@ -22,6 +22,7 @@ import {
   NoteModel,
   NoteFolderModel,
   IntegrationModel,
+  DropboxIntegrationModel,
 } from './models';
 
 /**
@@ -56,6 +57,7 @@ export interface DbSchema {
   notes: any[];
   noteFolders: any[];
   integrations: any[];
+  dropboxIntegrations: any[];
 }
 
 const COLLECTION_MAP = {
@@ -75,6 +77,7 @@ const COLLECTION_MAP = {
   notes: NoteModel,
   noteFolders: NoteFolderModel,
   integrations: IntegrationModel,
+  dropboxIntegrations: DropboxIntegrationModel,
 } as const;
 
 export type CollectionName = keyof typeof COLLECTION_MAP;
@@ -100,6 +103,7 @@ function emptySchema(): DbSchema {
     notes: [],
     noteFolders: [],
     integrations: [],
+    dropboxIntegrations: [],
   };
 }
 

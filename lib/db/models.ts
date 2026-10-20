@@ -15,6 +15,7 @@ import {
   Note,
   NoteFolder,
   GoogleDriveIntegration,
+  DropboxIntegration,
 } from '@/types';
 
 // 1. User Schema
@@ -303,6 +304,21 @@ const IntegrationSchema = new Schema<GoogleDriveIntegration>(
   { timestamps: true }
 );
 
+// 17. Dropbox Integration Schema
+const DropboxIntegrationSchema = new Schema<DropboxIntegration>(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    userId: { type: String, required: true, unique: true, index: true },
+    refreshToken: { type: String, required: true },
+    email: { type: String },
+    scope: { type: String },
+    connectedAt: { type: String, required: true },
+    lastBackupAt: { type: String },
+    lastBackupFileId: { type: String },
+  },
+  { timestamps: true }
+);
+
 // Export Mongoose Models (preventing OverwriteModelError in Next.js hot reload)
 export const UserModel: Model<User> = mongoose.models.User || mongoose.model<User>('User', UserSchema);
 export const CredentialModel: Model<any> = mongoose.models.Credential || mongoose.model('Credential', CredentialSchema);
@@ -320,3 +336,4 @@ export const LedgerModel: Model<LedgerEntry> = mongoose.models.LedgerEntry || mo
 export const NoteModel: Model<Note> = mongoose.models.Note || mongoose.model<Note>('Note', NoteSchema);
 export const NoteFolderModel: Model<NoteFolder> = mongoose.models.NoteFolder || mongoose.model<NoteFolder>('NoteFolder', NoteFolderSchema);
 export const IntegrationModel: Model<GoogleDriveIntegration> = mongoose.models.Integration || mongoose.model<GoogleDriveIntegration>('Integration', IntegrationSchema);
+export const DropboxIntegrationModel: Model<DropboxIntegration> = mongoose.models.DropboxIntegration || mongoose.model<DropboxIntegration>('DropboxIntegration', DropboxIntegrationSchema);

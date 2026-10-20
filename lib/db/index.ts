@@ -18,6 +18,7 @@ import {
   Note,
   NoteFolder,
   GoogleDriveIntegration,
+  DropboxIntegration,
 } from '@/types';
 import { syncInitialDataToMongo, syncEntityToMongo } from './mongoSync';
 import { isMongoConfigured } from './mongodb';
@@ -49,6 +50,7 @@ interface Schema {
   notes: Note[];
   noteFolders: NoteFolder[];
   integrations: GoogleDriveIntegration[];
+  dropboxIntegrations: DropboxIntegration[];
 }
 
 const DB_DIR = path.join(process.cwd(), 'data');
@@ -112,6 +114,7 @@ function ensureDbFile(): Schema {
         parsed.notes = parsed.notes || [];
         parsed.noteFolders = parsed.noteFolders || [];
         parsed.integrations = parsed.integrations || [];
+        parsed.dropboxIntegrations = parsed.dropboxIntegrations || [];
         memoryDb = parsed as Schema;
         
         // Sync to MongoDB in background once on startup if connection URI is provided
@@ -402,6 +405,7 @@ How can I assist you today?`,
     notes: [],
     noteFolders: [],
     integrations: [],
+    dropboxIntegrations: [],
   };
 
   fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
@@ -1067,6 +1071,58 @@ export const db = {
     return true;
   },
 
+  // --- INTEGRATIONS (Dropbox OAuth) ---
+  getDropboxIntegration(userId: string): DropboxIntegration | null {
+    const data = ensureDbFile();
+    data.dropboxIntegrations = data.dropboxIntegrations || [];
+    return data.dropboxIntegrations.find((i) => i && i.userId === userId) || null;
+  },
+
+  saveDropboxIntegration(integration: DropboxIntegration): DropboxIntegration {
+    const data = ensureDbFile();
+    data.dropboxIntegrations = data.dropboxIntegrations || [];
+    const idx = data.dropboxIntegrations.findIndex((i) => i.userId === integration.userId);
+    if (idx >= 0) {
+      data.dropboxIntegrations[idx] = { ...data.dropboxIntegrations[idx], ...integration };
+    } else {
+      data.dropboxIntegrations.push(integration);
+    }
+    persistDb();
+    const saved = data.dropboxIntegrations.find((i) => i.userId === integration.userId)!;
+    persistDocs('dropboxIntegrations', saved);
+    return saved;
+  },
+
+  updateDropboxIntegration(
+    userId: string,
+    patch: Partial<DropboxIntegration>,
+  ): DropboxIntegration | null {
+    const data = ensureDbFile();
+    data.dropboxIntegrations = data.dropboxIntegrations || [];
+    const idx = data.dropboxIntegrations.findIndex((i) => i.userId === userId);
+    if (idx === -1) return null;
+    data.dropboxIntegrations[idx] = {
+      ...data.dropboxIntegrations[idx],
+      ...patch,
+      id: data.dropboxIntegrations[idx].id,
+      userId,
+    };
+    persistDb();
+    persistDocs('dropboxIntegrations', data.dropboxIntegrations[idx]);
+    return data.dropboxIntegrations[idx];
+  },
+
+  deleteDropboxIntegration(userId: string): boolean {
+    const data = ensureDbFile();
+    data.dropboxIntegrations = data.dropboxIntegrations || [];
+    const existing = data.dropboxIntegrations.find((i) => i.userId === userId);
+    if (!existing) return false;
+    data.dropboxIntegrations = data.dropboxIntegrations.filter((i) => i.userId !== userId);
+    persistDb();
+    deleteFromStore('dropboxIntegrations', existing.id);
+    return true;
+  },
+
   // --- NOTES & NOTE FOLDERS ---
   getNotes(userId: string): Note[] {
     const data = ensureDbFile();
@@ -1538,6 +1594,7 @@ export const db = {
     const acts = data.agentActions.filter((a) => a.userId === userId);
     const nots = data.notifications.filter((n) => n.userId === userId);
     const intg = (data.integrations || []).filter((i) => i.userId === userId);
+    const dbxi = (data.dropboxIntegrations || []).filter((i) => i.userId === userId);
     data.conversations = data.conversations.filter((c) => c.userId !== userId);
     data.messages = data.messages.filter((m) => m.userId !== userId);
     data.memories = data.memories.filter((m) => m.userId !== userId);
@@ -1551,6 +1608,7 @@ export const db = {
     data.agentActions = data.agentActions.filter((a) => a.userId !== userId);
     data.notifications = data.notifications.filter((n) => n.userId !== userId);
     data.integrations = (data.integrations || []).filter((i) => i.userId !== userId);
+    data.dropboxIntegrations = (data.dropboxIntegrations || []).filter((i) => i.userId !== userId);
     persistDb();
     convs.forEach((d) => deleteFromStore('conversations', d.id));
     msgs.forEach((d) => deleteFromStore('messages', d.id));
@@ -1565,6 +1623,7 @@ export const db = {
     acts.forEach((d) => deleteFromStore('agentActions', d.id));
     nots.forEach((d) => deleteFromStore('notifications', d.id));
     intg.forEach((d) => deleteFromStore('integrations', d.id));
+    dbxi.forEach((d) => deleteFromStore('dropboxIntegrations', d.id));
     return true;
   },
 };

@@ -43,6 +43,7 @@ export interface UserPreferences {
   githubToken?: string;
   autoExtractMemories?: boolean;
   autoBackupEnabled?: boolean;
+  autoDropboxBackupEnabled?: boolean;
 }
 
 export interface SubTask {
@@ -90,6 +91,17 @@ export interface NoteFolder {
 }
 
 export interface GoogleDriveIntegration {
+  id: string;
+  userId: string;
+  refreshToken: string;
+  email?: string;
+  scope?: string;
+  connectedAt: string;
+  lastBackupAt?: string;
+  lastBackupFileId?: string;
+}
+
+export interface DropboxIntegration {
   id: string;
   userId: string;
   refreshToken: string;
