@@ -14,7 +14,7 @@ import {
   LedgerEntry,
   Note,
   NoteFolder,
-  DropboxIntegration,
+  SpendingEntry,
 } from '@/types';
 
 // 1. User Schema
@@ -288,17 +288,17 @@ const NoteFolderSchema = new Schema<NoteFolder>(
   { timestamps: true }
 );
 
-// 16. Dropbox Integration Schema
-const DropboxIntegrationSchema = new Schema<DropboxIntegration>(
+// 16. Spending Entry Schema
+const SpendingSchema = new Schema<SpendingEntry>(
   {
     id: { type: String, required: true, unique: true, index: true },
-    userId: { type: String, required: true, unique: true, index: true },
-    refreshToken: { type: String, required: true },
-    email: { type: String },
-    scope: { type: String },
-    connectedAt: { type: String, required: true },
-    lastBackupAt: { type: String },
-    lastBackupFileId: { type: String },
+    userId: { type: String, required: true, index: true },
+    amount: { type: Number, required: true },
+    category: { type: String, default: 'other' },
+    note: { type: String },
+    date: { type: String, required: true },
+    createdAt: { type: String, required: true },
+    updatedAt: { type: String },
   },
   { timestamps: true }
 );
@@ -319,4 +319,4 @@ export const ConfirmationModel: Model<ConfirmationRequest> = mongoose.models.Con
 export const LedgerModel: Model<LedgerEntry> = mongoose.models.LedgerEntry || mongoose.model<LedgerEntry>('LedgerEntry', LedgerEntrySchema);
 export const NoteModel: Model<Note> = mongoose.models.Note || mongoose.model<Note>('Note', NoteSchema);
 export const NoteFolderModel: Model<NoteFolder> = mongoose.models.NoteFolder || mongoose.model<NoteFolder>('NoteFolder', NoteFolderSchema);
-export const DropboxIntegrationModel: Model<DropboxIntegration> = mongoose.models.DropboxIntegration || mongoose.model<DropboxIntegration>('DropboxIntegration', DropboxIntegrationSchema);
+export const SpendingModel: Model<SpendingEntry> = mongoose.models.Spending || mongoose.model<SpendingEntry>('Spending', SpendingSchema);

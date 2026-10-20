@@ -4,7 +4,9 @@ import dns from 'node:dns';
 /** Hard ceiling for DNS + TCP + TLS + auth handshake to Atlas. */
 const SERVER_SELECTION_TIMEOUT_MS = 5000;
 /** After a failed attempt, skip reconnecting briefly so requests fail fast. */
-const FAILURE_COOLDOWN_MS = 60_000;
+const FAILURE_COOLDOWN_MS = 5 * 60_000;
+/** Avoid flooding the terminal with one identical error per request. */
+const ERROR_LOG_INTERVAL_MS = 5 * 60_000;
 
 let resolversChecked = false;
 
@@ -41,6 +43,8 @@ declare global {
         lastError: string | null;
       }
     | undefined;
+  // eslint-disable-next-line no-var
+  var __mongoErrorLoggedAt: number | undefined;
 }
 
 function getCache() {
@@ -122,10 +126,17 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
         cached.conn = null;
         cached.lastFailureAt = Date.now();
         cached.lastError = err?.message || 'MongoDB connection failed';
-        console.error(
-          `❌ MongoDB connection error (${SERVER_SELECTION_TIMEOUT_MS}ms budget):`,
-          cached.lastError,
-        );
+        const lastLogged = globalThis.__mongoErrorLoggedAt || 0;
+        if (Date.now() - lastLogged > ERROR_LOG_INTERVAL_MS) {
+          globalThis.__mongoErrorLoggedAt = Date.now();
+          const hint = /bad auth|authentication failed/i.test(cached.lastError || '')
+            ? ' The Atlas user/password in MONGODB_URI was rejected — reset it under Atlas → Database Access.'
+            : '';
+          console.warn(
+            `⚠️ MongoDB unavailable (${SERVER_SELECTION_TIMEOUT_MS}ms budget): ${cached.lastError}. ` +
+              `Running on the local durable store; retrying in 5 minutes.${hint}`,
+          );
+        }
         throw err;
       });
   }

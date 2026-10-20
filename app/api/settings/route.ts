@@ -41,7 +41,7 @@ export async function PATCH(req: NextRequest) {
   await ensureDbReady();
   const user = getOrCreateUser(req);
 
-  const body = await req.json();
+  const body = await req.json().catch(() => ({}));
   const { name, email, avatar, preferences, ...rest } = body;
 
   let updatedUser = user;
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
   await ensureDbReady();
   const user = getOrCreateUser(req);
 
-  const body = await req.json();
+  const body = await req.json().catch(() => ({}));
   const { action, backupData } = body;
 
   if (action === 'export') {

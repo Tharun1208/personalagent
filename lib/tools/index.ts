@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { memoryEngine } from '@/lib/memory';
-import { Task, Reminder, Goal, Memory, LedgerEntry } from '@/types';
+import { Task, Reminder, Goal, Memory, LedgerEntry, SpendingEntry } from '@/types';
 import { crudTools } from './crud';
 
 export type ToolPermissionLevel = 'READ' | 'WRITE' | 'DESTRUCTIVE';
@@ -29,7 +29,96 @@ export const toolRegistry: Record<string, ToolModule> = {
   // ── CRUD TOOLS: habits, notes, notifications, preferences, conversations, projects ──
   ...crudTools,
 
-  // ── 1. MEMORY TOOL ──────────────────────────────────────────
+  // ── 1. SPENDING TOOL ────────────────────────────────────────
+  SpendingTool: {
+    name: 'SpendingTool',
+    description: "Tracks the user's day-to-day expenses and spending history.",
+    actions: {
+      addExpense: {
+        name: 'addExpense',
+        description: 'Records a daily expense (food, transport, shopping, bills, etc.).',
+        parameters: {
+          amount: { type: 'number', description: 'Amount spent', required: true },
+          note: { type: 'string', description: 'What the expense was for' },
+          category: { type: 'string', description: "Category: food, coffee, transport, shopping, groceries, bills, rent, health, phone, other" },
+          date: { type: 'string', description: 'Date as YYYY-MM-DD (defaults to today)' },
+        },
+        permissionLevel: 'WRITE',
+      },
+      getExpenses: {
+        name: 'getExpenses',
+        description: 'Lists recorded expenses, optionally for a specific date.',
+        parameters: {
+          date: { type: 'string', description: 'Filter by date as YYYY-MM-DD' },
+        },
+        permissionLevel: 'READ',
+      },
+      deleteExpense: {
+        name: 'deleteExpense',
+        description: 'Deletes a recorded expense by ID.',
+        parameters: {
+          id: { type: 'string', description: 'Expense entry ID', required: true },
+        },
+        permissionLevel: 'DESTRUCTIVE',
+      },
+    },
+    async execute(action, args, userId) {
+      if (action === 'addExpense') {
+        const amount = parseFloat(args.amount);
+        if (isNaN(amount) || amount <= 0) {
+          return { success: false, message: 'Please provide a valid expense amount.' };
+        }
+        const category = (args.category || 'other').toString().toLowerCase();
+        const entry: SpendingEntry = {
+          id: `spend_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          userId,
+          amount: Math.round(amount * 100) / 100,
+          category,
+          note: args.note ? args.note.toString().trim() : undefined,
+          date: args.date || new Date().toISOString().slice(0, 10),
+          createdAt: new Date().toISOString(),
+        };
+        db.createSpendingEntry(entry);
+        const label = category.charAt(0).toUpperCase() + category.slice(1);
+        return {
+          success: true,
+          data: entry,
+          message: `Logged **₹${entry.amount}**${entry.note ? ` for "${entry.note}"` : ''} under **${label}**.`,
+        };
+      }
+
+      if (action === 'getExpenses') {
+        const entries = db
+          .getSpendingEntries(userId)
+          .filter((entry) => !args.date || entry.date === args.date);
+        if (entries.length === 0) {
+          return { success: true, data: [], message: 'No expenses recorded for that period.' };
+        }
+        const total = entries.reduce((sum, entry) => sum + entry.amount, 0);
+        const rows = entries
+          .slice(0, 20)
+          .map((entry) => `• ${entry.date} — ₹${entry.amount} · ${entry.note || entry.category}`)
+          .join('\n');
+        return {
+          success: true,
+          data: entries,
+          message: `### Expenses\n\n${rows}\n\n**Total:** ₹${Math.round(total * 100) / 100}`,
+        };
+      }
+
+      if (action === 'deleteExpense') {
+        if (!args.id) return { success: false, message: 'Expense ID is required.' };
+        const deleted = db.deleteSpendingEntry(args.id.toString(), userId);
+        return deleted
+          ? { success: true, message: 'Expense deleted.' }
+          : { success: false, message: 'Expense not found.' };
+      }
+
+      return { success: false, message: `Unknown SpendingTool action: ${action}` };
+    },
+  },
+
+  // ── 2. MEMORY TOOL ──────────────────────────────────────────
   MemoryTool: {
     name: 'MemoryTool',
     description: 'Manages user persistent memories, preferences, facts, and deadlines.',
@@ -135,7 +224,7 @@ export const toolRegistry: Record<string, ToolModule> = {
     },
   },
 
-  // ── 2. TASK TOOL ───────────────────────────────────────────
+  // ── 3. TASK TOOL ───────────────────────────────────────────
   TaskTool: {
     name: 'TaskTool',
     description: 'Manages tasks, to-dos, priorities, due dates, and completion status.',
@@ -346,7 +435,7 @@ export const toolRegistry: Record<string, ToolModule> = {
     },
   },
 
-  // ── 3. REMINDER TOOL ───────────────────────────────────────
+  // ── 4. REMINDER TOOL ───────────────────────────────────────
   ReminderTool: {
     name: 'ReminderTool',
     description: 'Schedules and manages natural language reminders and notifications.',
@@ -474,7 +563,7 @@ export const toolRegistry: Record<string, ToolModule> = {
     },
   },
 
-  // ── 4. GOAL TOOL ───────────────────────────────────────────
+  // ── 5. GOAL TOOL ───────────────────────────────────────────
   GoalTool: {
     name: 'GoalTool',
     description: 'Tracks user goals, objectives, OKRs, and milestone progress.',
@@ -693,7 +782,7 @@ export const toolRegistry: Record<string, ToolModule> = {
     },
   },
 
-  // ── 5. GITHUB TOOL ─────────────────────────────────────────
+  // ── 6. GITHUB TOOL ─────────────────────────────────────────
   GitHubTool: {
     name: 'GitHubTool',
     description: 'Inspects repositories, commits, branches, pull requests, and drafts PR summaries.',
@@ -802,7 +891,7 @@ export const toolRegistry: Record<string, ToolModule> = {
     },
   },
 
-  // ── 6. WEB SEARCH TOOL ─────────────────────────────────────
+  // ── 7. WEB SEARCH TOOL ─────────────────────────────────────
   WebSearchTool: {
     name: 'WebSearchTool',
     description: 'Searches the live web for current documentation, news, libraries, and benchmarks.',
@@ -828,7 +917,7 @@ export const toolRegistry: Record<string, ToolModule> = {
     },
   },
 
-  // ── 7. CALENDAR TOOL ───────────────────────────────────────
+  // ── 8. CALENDAR TOOL ───────────────────────────────────────
   CalendarTool: {
     name: 'CalendarTool',
     description: 'Manages events, schedules meetings, and checks calendar availability.',
@@ -898,7 +987,7 @@ export const toolRegistry: Record<string, ToolModule> = {
     },
   },
 
-  // ── 8. EMAIL TOOL ──────────────────────────────────────────
+  // ── 9. EMAIL TOOL ──────────────────────────────────────────
   EmailTool: {
     name: 'EmailTool',
     description: 'Reads emails, summarizes threads, and prepares drafts. Never sends without user approval.',
@@ -972,7 +1061,7 @@ export const toolRegistry: Record<string, ToolModule> = {
     },
   },
 
-  // ── 9. MONEY LEDGER & DUES TOOL ────────────────────────────
+  // ── 10. MONEY LEDGER & DUES TOOL ────────────────────────────
   LedgerTool: {
     name: 'LedgerTool',
     description: 'Tracks money you need to give (you owe) or money you need to receive (owed to you), debts, loans, split expenses, and payment settlements.',
@@ -1143,7 +1232,7 @@ export const toolRegistry: Record<string, ToolModule> = {
     },
   },
 
-  // ── 10. REAL-TIME WEATHER TOOL ─────────────────────────────
+  // ── 11. REAL-TIME WEATHER TOOL ─────────────────────────────
   WeatherTool: {
     name: 'WeatherTool',
     description: 'Fetches 100% live weather conditions, temperature, humidity, wind, and forecasts for any city or location globally.',
@@ -1168,7 +1257,7 @@ export const toolRegistry: Record<string, ToolModule> = {
     },
   },
 
-  // ── 11. REAL-TIME MARKET & STOCK TOOL ───────────────────────
+  // ── 12. REAL-TIME MARKET & STOCK TOOL ───────────────────────
   StockTool: {
     name: 'StockTool',
     description: 'Fetches real-time live stock prices, cryptocurrency quotes (BTC, ETH, SOL), 24h change, and market caps.',

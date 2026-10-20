@@ -1766,7 +1766,12 @@ CORE GUIDELINES:
 1. Act as a high-agency, deeply capable personal intelligence assistant.
 2. The current day of the week is strictly ${dayOfWeek} (${fullDate}) and current local time is ${fullTime} (${tz}).
 3. When the user asks about personal preferences, schedule, dues, or goals, use their context accurately.
-4. Format output with clean Markdown, tables, and highlighted sections.${webSearchContext ? `\n\n${webSearchContext}\n\n5. Synthesize a direct, intelligent, clear answer to the user's prompt using the live search findings above. Do not dump raw links.` : ''}`;
+4. Format output with clean Markdown, tables, and highlighted sections.${webSearchContext ? `\n\n${webSearchContext}\n\n5. Synthesize a direct, intelligent, clear answer to the user's prompt using the live search findings above. Do not dump raw links.` : ''}
+
+ACTION HONESTY (CRITICAL):
+- The application executes create/update/delete actions through tools, and tool results are shown to the user separately.
+- Never claim that you created, updated, deleted, logged, scheduled, or saved something unless a tool call actually succeeded in this turn.
+- If a requested action could not be performed, say so plainly and explain what is missing instead of inventing a confirmation.`;
 
     let fallbackText = '';
     if (

@@ -37,7 +37,8 @@ import {
   Filter,
 } from 'lucide-react';
 import { useApp } from '@/lib/context/AppContext';
-import { LedgerEntry, LedgerType } from '@/types';
+import { LedgerEntry, LedgerType, SpendingEntry } from '@/types';
+import { apiFetch } from '@/lib/api';
 import { DebtGraph } from '@/lib/dsa/DebtGraph';
 import CustomSelect, { SelectOption } from '@/components/common/CustomSelect';
 import DatePickerDropdown from '@/components/common/DatePickerDropdown';
@@ -69,15 +70,6 @@ const DUE_TYPE_OPTIONS: SelectOption[] = [
 ];
 
 // ── Daily Spending Types ──────────────────────────────────────────────────────
-interface SpendingEntry {
-  id: string;
-  amount: number;
-  currency: string;
-  category: string;
-  note: string;
-  date: string; // ISO date string YYYY-MM-DD
-  createdAt: string;
-}
 
 const SPENDING_CATEGORIES = [
   { key: 'food',      label: 'Food & Beverages', icon: Utensils,      color: '#A855F7', bg: 'bg-purple-500' },
@@ -102,16 +94,38 @@ const getCatMeta = (key: string) =>
   SPENDING_CATEGORIES.find((c) => c.key === key) ?? SPENDING_CATEGORIES[SPENDING_CATEGORIES.length - 1];
 
 const STORAGE_KEY = 'assistance_daily_spending';
+let lastSyncedSpending: Map<string, string> | null = null;
 
 function loadSpending(): SpendingEntry[] {
   if (typeof window === 'undefined') return [];
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
 }
 
+/** Push local changes to the server so the AI and other devices see them. */
+function syncSpendingToServer(data: SpendingEntry[]) {
+  if (typeof window === 'undefined' || !lastSyncedSpending) return;
+  const next = new Map(data.map((entry) => [entry.id, JSON.stringify(entry)]));
+  const changed = data.filter((entry) => lastSyncedSpending!.get(entry.id) !== next.get(entry.id));
+  const removed = [...lastSyncedSpending.keys()].filter((id) => !next.has(id));
+  lastSyncedSpending = next;
+
+  changed.forEach((entry) => {
+    apiFetch('/api/spending', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry),
+    }).catch(() => {});
+  });
+  removed.forEach((id) => {
+    apiFetch(`/api/spending?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
+  });
+}
+
 function saveSpending(data: SpendingEntry[]) {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   window.dispatchEvent(new CustomEvent('spending_updated', { detail: data }));
+  syncSpendingToServer(data);
 }
 
 function toLocalDateString(d: Date = new Date()): string {
@@ -125,6 +139,7 @@ function todayStr() { return toLocalDateString(new Date()); }
 
 export default function LedgerView() {
   const {
+    user,
     ledgerEntries,
     createLedgerEntry,
     updateLedgerEntry,
@@ -201,6 +216,45 @@ export default function LedgerView() {
     return () => {
       window.removeEventListener('spending_updated', handleSync);
       window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
+  // Hydrate expenses from the server (includes expenses logged by the AI).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch('/api/spending');
+        const data = await res.json();
+        if (cancelled || !Array.isArray(data?.spending)) return;
+
+        const serverEntries: SpendingEntry[] = data.spending;
+        const serverIds = new Set(serverEntries.map((entry) => entry.id));
+        const merged = new Map(serverEntries.map((entry) => [entry.id, entry]));
+        loadSpending().forEach((entry) => {
+          if (!merged.has(entry.id)) merged.set(entry.id, entry);
+        });
+        const all = Array.from(merged.values());
+        lastSyncedSpending = new Map(all.map((entry) => [entry.id, JSON.stringify(entry)]));
+
+        // Upload expenses that only exist on this device yet.
+        const localOnly = all.filter((entry) => !serverIds.has(entry.id));
+        localOnly.forEach((entry) => {
+          apiFetch('/api/spending', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(entry),
+          }).catch(() => {});
+        });
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+        setSpendingEntries(all);
+      } catch {
+        /* keep the local cache when the server is unreachable */
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -478,8 +532,8 @@ export default function LedgerView() {
     } else {
       const newEntry: SpendingEntry = {
         id: `sp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        userId: user?.id || '',
         amount: num,
-        currency: '₹',
         category: expCategory,
         note: expNote.trim(),
         date: expDate || todayStr(),
