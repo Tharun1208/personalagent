@@ -1527,6 +1527,26 @@ Explain what you see clearly, extract any key text/details, and answer the user'
     }
 
     // ─────────────────────────────────────────────────────────────
+    // STEP 6.4: JSON DATA EXPORT
+    // ─────────────────────────────────────────────────────────────
+    const isExportQuery =
+      /\b(?:export|download)\b/i.test(lower) &&
+      /\b(?:data|json|backup|everything|all|records)\b/i.test(lower) &&
+      !/\b(?:restore|import)\b/i.test(lower);
+
+    if (isExportQuery) {
+      return {
+        reply:
+          `### Export your data\n\n` +
+          `Download a complete JSON snapshot of your tasks, reminders, memories, goals, habits, notes, ledger, spending and conversations.\n\n` +
+          `[**Download JSON backup**](/api/export)\n\n` +
+          `You can also open **Settings → Data & Backup → Export Data (.json)** or the backup page's **Download .JSON Backup** button. ` +
+          `The file can be imported again from Settings if you ever need to restore it.`,
+        toolSteps,
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // STEP 6.5: CALENDAR & SCHEDULE VIEW (deterministic)
     // ─────────────────────────────────────────────────────────────
     const isCalendarQuery =
