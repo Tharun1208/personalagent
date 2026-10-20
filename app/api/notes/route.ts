@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady } from '@/lib/db';
+import { db, ensureDbReady, flushDb } from '@/lib/db';
 import { Note, NoteFolder, NoteColor } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -40,7 +40,9 @@ export async function POST(req: NextRequest) {
       themeColor: FOLDER_THEMES.includes(body.themeColor) ? body.themeColor : 'slate',
       createdAt: body.createdAt || new Date().toISOString(),
     };
-    return NextResponse.json({ folder: db.createNoteFolder(folder) }, { status: 201 });
+    const savedFolder = db.createNoteFolder(folder);
+    await flushDb();
+    return NextResponse.json({ folder: savedFolder }, { status: 201 });
   }
 
   if (!body.title || !String(body.title).trim()) {
@@ -63,5 +65,7 @@ export async function POST(req: NextRequest) {
     updatedAt: now,
   };
 
-  return NextResponse.json({ note: db.createNote(note) }, { status: 201 });
+  const savedNote = db.createNote(note);
+  await flushDb();
+  return NextResponse.json({ note: savedNote }, { status: 201 });
 }

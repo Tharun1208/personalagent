@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady } from '@/lib/db';
+import { db, ensureDbReady, flushDb } from '@/lib/db';
 import { Task } from '@/types';
 
 export async function GET(req: NextRequest) {
@@ -36,5 +36,6 @@ export async function POST(req: NextRequest) {
   };
 
   db.createTask(newTask);
+  await flushDb();
   return NextResponse.json({ task: newTask }, { status: 201 });
 }

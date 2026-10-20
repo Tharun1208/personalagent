@@ -1647,6 +1647,62 @@ Explain what you see clearly, extract any key text/details, and answer the user'
           reply += `* **${timeOf(event.at)}** — **${event.title}** (${event.kind})${state}\n`;
         }
       }
+      if (events.length) {
+        const nowMs = Date.now();
+        const upcoming = events.filter((event) => new Date(event.at).getTime() >= nowMs);
+        const nextEvent = upcoming[0];
+
+        const days = new Map<string, typeof events>();
+        for (const event of events) {
+          const list = days.get(event.key) || [];
+          list.push(event);
+          days.set(event.key, list);
+        }
+        const busiest = [...days.entries()].sort((a, b) => b[1].length - a[1].length)[0];
+
+        const conflicts: string[] = [];
+        for (const [, list] of days) {
+          const sorted = [...list].sort(
+            (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime(),
+          );
+          for (let i = 1; i < sorted.length; i += 1) {
+            const gap = new Date(sorted[i].at).getTime() - new Date(sorted[i - 1].at).getTime();
+            if (gap >= 0 && gap <= 15 * 60_000) {
+              conflicts.push(
+                `${sorted[i - 1].title} and ${sorted[i].title} (${sorted[i].label})`,
+              );
+            }
+          }
+        }
+
+        const overdue = db.getTasks(userId).filter((task) => {
+          if (task.status === 'completed' || task.status === 'cancelled' || !task.dueDate) {
+            return false;
+          }
+          const key = keyOf(task.dueDate);
+          return Boolean(key) && key < todayKey;
+        });
+
+        reply += `\n### Analysis\n`;
+        reply += `- **${events.length}** item${events.length === 1 ? '' : 's'} across **${days.size}** day${days.size === 1 ? '' : 's'}`;
+        if (busiest) {
+          reply += `; busiest is **${busiest[1][0].label}** with **${busiest[1].length}** item${busiest[1].length === 1 ? '' : 's'}`;
+        }
+        reply += `.\n`;
+        reply += nextEvent
+          ? `- Next up: **${nextEvent.title}** — ${nextEvent.label}, ${timeOf(nextEvent.at)}.\n`
+          : `- Everything in this window has already passed.\n`;
+        reply += conflicts.length
+          ? `- ⚠️ Tight or overlapping slots: ${conflicts.slice(0, 3).join('; ')}.\n`
+          : `- No overlapping time slots.\n`;
+        if (overdue.length) {
+          reply += `- ⚠️ **${overdue.length}** unfinished task${overdue.length === 1 ? '' : 's'} already overdue: ${overdue
+            .slice(0, 3)
+            .map((task) => task.title)
+            .join(', ')}${overdue.length > 3 ? '…' : ''}.\n`;
+        }
+      }
+
       reply += `\n*Ask about a specific day if you want more detail.*`;
 
       return { reply, toolSteps };

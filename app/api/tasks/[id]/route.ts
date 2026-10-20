@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady } from '@/lib/db';
+import { db, ensureDbReady, flushDb } from '@/lib/db';
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   await ensureDbReady();
@@ -11,6 +11,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json().catch(() => ({}));
 
   const updated = db.updateTask(id, user.id, body);
+  await flushDb();
   return NextResponse.json({ task: updated, success: true });
 }
 
@@ -21,5 +22,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { id } = await params;
   const ok = db.deleteTask(id, user.id);
+  await flushDb();
   return NextResponse.json({ success: ok });
 }

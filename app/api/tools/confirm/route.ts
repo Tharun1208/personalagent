@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady } from '@/lib/db';
+import { db, ensureDbReady, flushDb } from '@/lib/db';
 import { toolRegistry } from '@/lib/tools';
 
 export async function POST(req: NextRequest) {
@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
         createdAt: new Date().toISOString(),
       });
 
+      await flushDb();
       return NextResponse.json({
         success: false,
         cancelled: true,
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     });
 
+    await flushDb();
     return NextResponse.json({
       success: result.success,
       result,

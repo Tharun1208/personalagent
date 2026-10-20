@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { after } from 'next/server';
 import bcrypt from 'bcryptjs';
 import {
   User,
@@ -578,11 +579,35 @@ function persistDocs(collection: CollectionName, docs: any | any[]): void {
   if (!isMongoConfigured()) return;
   const arr = Array.isArray(docs) ? docs : [docs];
   arr.forEach((d) => persistDoc(collection, d));
+  scheduleFlush();
 }
 
 function deleteFromStore(collection: CollectionName, key: string | number): void {
   if (!isMongoConfigured()) return;
   deleteDoc(collection, key);
+  scheduleFlush();
+}
+
+let flushScheduled = false;
+
+/**
+ * Serverless runtimes freeze the function as soon as the response is sent, so
+ * fire-and-forget writes can be lost (deletes then "come back" on refresh).
+ * Register the flush with Next's `after()` so it completes before the runtime
+ * is frozen. Falls back to a plain flush outside a request context.
+ */
+function scheduleFlush(): void {
+  if (flushScheduled) return;
+  flushScheduled = true;
+  try {
+    after(() => {
+      flushScheduled = false;
+      return flushDb();
+    });
+  } catch {
+    flushScheduled = false;
+    flushDb().catch(() => {});
+  }
 }
 
 export const db = {

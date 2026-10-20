@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady } from '@/lib/db';
+import { db, ensureDbReady, flushDb } from '@/lib/db';
 import { callGroqAI } from '@/lib/agent/groq';
 import { SubTask } from '@/types';
 
@@ -67,6 +67,7 @@ Respond ONLY with a JSON array of strings representing the subtask titles, with 
   }));
 
   const updatedTask = db.setTaskSubtasks(id, user.id, subtasks);
+  await flushDb();
 
   return NextResponse.json({ task: updatedTask, subtasks });
 }
@@ -87,5 +88,6 @@ export async function PATCH(
   const updated = db.toggleSubTask(id, subtaskId, user.id);
   if (!updated) return NextResponse.json({ error: 'Task or Subtask not found' }, { status: 404 });
 
+  await flushDb();
   return NextResponse.json({ task: updated });
 }
