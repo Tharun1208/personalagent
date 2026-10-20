@@ -67,6 +67,12 @@ function loadSpending(): SpendingEntry[] {
   }
 }
 
+function formatMoney(value: number): string {
+  if (!Number.isFinite(value)) return '₹0';
+  if (Math.abs(value) >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
+  return `₹${Math.round(value).toLocaleString('en-IN')}`;
+}
+
 const ASSISTANCE_PROMPT_CHIPS = [
   { label: '⚡ Summarize today', prompt: 'Summarize my priorities and schedule for today' },
   { label: '📋 Pending tasks', prompt: 'What tasks are pending and high priority?' },
@@ -163,8 +169,16 @@ export default function DashboardView() {
   const pendingTasks = pendingTasksList.length;
   const totalNotes = localNoteCount;
   const pendingDues = useMemo(() => (ledgerEntries || []).filter((e) => e.status === 'pending'), [ledgerEntries]);
-  const totalDueAmount = useMemo(() => {
-    return pendingDues.reduce((sum, e) => sum + (e.amount - (e.paidAmount || 0)), 0);
+  const outstanding = useMemo(() => {
+    return pendingDues.reduce(
+      (acc, e) => {
+        const left = Math.max(0, (Number(e.amount) || 0) - (Number(e.paidAmount) || 0));
+        if (e.type === 'give') acc.payable += left;
+        else if (e.type === 'receive') acc.receivable += left;
+        return acc;
+      },
+      { payable: 0, receivable: 0 },
+    );
   }, [pendingDues]);
 
   const taskCompletionRate = useMemo(() => {
@@ -190,6 +204,9 @@ export default function DashboardView() {
       map[d] = 0;
     });
 
+    // Only real logged expenses count as spending. Ledger dues (money you owe
+    // or are owed) are not expenses, and adding them here inflated the weekly
+    // total and double-counted partial payments.
     spendingEntries.forEach((e) => {
       const d = normalizeDateStr(e.date) || normalizeDateStr(e.createdAt);
       if (d && map[d] !== undefined) {
@@ -197,25 +214,8 @@ export default function DashboardView() {
       }
     });
 
-    (ledgerEntries || []).forEach((e) => {
-      if (e.type === 'give') {
-        const d = normalizeDateStr(e.dueDate) || normalizeDateStr(e.createdAt);
-        if (d && map[d] !== undefined) {
-          map[d] += Number(e.amount) || 0;
-        }
-      }
-      if (Array.isArray(e.payments)) {
-        e.payments.forEach((p) => {
-          const d = normalizeDateStr(p.date);
-          if (d && map[d] !== undefined) {
-            map[d] += Number(p.amount) || 0;
-          }
-        });
-      }
-    });
-
     return map;
-  }, [spendingEntries, ledgerEntries, last7DaysKeys]);
+  }, [spendingEntries, last7DaysKeys]);
 
   const maxDailySpend = Math.max(...Object.values(dailyTotals), 1);
 
@@ -463,8 +463,8 @@ export default function DashboardView() {
                   <h3 className="text-lg sm:text-xl font-black text-[#1C1C1E] tracking-tight leading-snug">
                     Ledger &amp; Dues
                   </h3>
-                  <p className="text-xs sm:text-[13px] font-semibold text-[#1C1C1E]/75 mt-0.5">
-                    ₹{totalDueAmount >= 100000 ? `${(totalDueAmount / 100000).toFixed(1)}L` : totalDueAmount.toLocaleString()} active due balance
+                  <p className="text-xs sm:text-[13px] font-semibold text-[#1C1C1E]/75 mt-0.5 leading-relaxed">
+                    {formatMoney(outstanding.payable)} to pay · {formatMoney(outstanding.receivable)} to collect
                   </p>
                 </div>
 
@@ -564,7 +564,7 @@ export default function DashboardView() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-3xl sm:text-4xl font-black text-[#1C1C1E]">
-                    ₹{total7DaySpend >= 100000 ? `${(total7DaySpend / 100000).toFixed(1)}L` : total7DaySpend.toLocaleString()}
+                    {formatMoney(total7DaySpend)}
                   </span>
                   <span className="px-2.5 py-0.5 rounded-full bg-[#E8F8EE] text-[#1E9E4A] text-[11px] font-black flex items-center gap-1">
                     <TrendingUp size={12} className="stroke-[2.5]" />
@@ -572,7 +572,7 @@ export default function DashboardView() {
                   </span>
                 </div>
                 <p className="text-xs font-semibold text-slate-400 mt-0.5">
-                  Total weekly spend
+                  Total expenses · last 7 days
                 </p>
               </div>
             </div>

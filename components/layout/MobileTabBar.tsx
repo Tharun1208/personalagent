@@ -34,7 +34,7 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {
   } = useApp();
 
   const [hasDomModal, setHasDomModal] = useState(false);
-  const [isTypingInNotes, setIsTypingInNotes] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
 
   // Check for any open pop-up / modal in context or DOM
   useEffect(() => {
@@ -54,16 +54,31 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {
     };
 
     const handleFocusChange = () => {
-      const activeEl = document.activeElement;
-      if (
-        activeEl &&
-        (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT') &&
-        (activeEl.closest('[data-notes-view="true"]') || activeEl.closest('[data-notes-editor="true"]'))
-      ) {
-        setIsTypingInNotes(true);
-      } else {
-        setIsTypingInNotes(false);
+      const activeEl = document.activeElement as HTMLElement | null;
+      const tag = activeEl?.tagName;
+      let isTextField = false;
+
+      if (tag === 'TEXTAREA' || tag === 'SELECT') {
+        isTextField = true;
+      } else if (tag === 'INPUT') {
+        const type = ((activeEl as HTMLInputElement).type || 'text').toLowerCase();
+        isTextField = ![
+          'checkbox',
+          'radio',
+          'button',
+          'submit',
+          'reset',
+          'range',
+          'color',
+          'file',
+        ].includes(type);
+      } else if (activeEl?.isContentEditable) {
+        isTextField = true;
       }
+
+      // Hide the floating tab bar whenever a text field is focused (keyboard
+      // open) so it never covers the search bar, filters or results.
+      setIsTyping(isTextField);
     };
 
     checkDomModals();
@@ -97,7 +112,7 @@ export default function MobileTabBar({ onOpenMobileMenu }: MobileTabBarProps = {
 
   const isAnyModalOpen =
     hasDomModal ||
-    isTypingInNotes ||
+    isTyping ||
     authModalOpen ||
     commandPaletteOpen ||
     notificationDrawerOpen ||
