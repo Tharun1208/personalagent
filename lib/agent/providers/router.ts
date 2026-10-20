@@ -10,7 +10,7 @@ import { LRUCache } from '@/lib/dsa/LRUCache';
 // Global DSA LRU Cache: capacity = 150 items, TTL = 10 minutes
 const llmResponseCache = new LRUCache<string, RouteLLMResult>(150, 10 * 60 * 1000);
 
-const DEFAULT_GROQ_MODEL = 'llama-3.1-8b-instant';
+const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash-lite';
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 
@@ -157,12 +157,14 @@ export async function routeLLMRequest({
   // 2. Groq LPU — fastest text path, streamed by default.
   if (groqKey) {
     try {
+      const groqMessages = systemInstruction
+        ? [{ role: 'system' as const, content: systemInstruction }, ...augmentedMessages]
+        : augmentedMessages;
+
       const res = await callGroqAI({
         apiKey: groqKey,
         model: groqModel,
-        messages: systemInstruction
-          ? [{ role: 'system', content: systemInstruction }, ...augmentedMessages]
-          : augmentedMessages,
+        messages: groqMessages,
         onToken,
       });
       if (res.success && res.content) {
@@ -174,6 +176,30 @@ export async function routeLLMRequest({
         });
       }
       console.warn('Groq provider failed:', res.error);
+
+      // The configured model may be retired or unavailable on this account.
+      // Retry once with the current default before moving to another provider.
+      const unavailable = /model_not_found|does not exist|do not have access|not have access|decommission/i.test(
+        res.error || '',
+      );
+      if (unavailable && groqModel !== DEFAULT_GROQ_MODEL) {
+        console.warn(`Groq model ${groqModel} unavailable, retrying with ${DEFAULT_GROQ_MODEL}`);
+        const retry = await callGroqAI({
+          apiKey: groqKey,
+          model: DEFAULT_GROQ_MODEL,
+          messages: groqMessages,
+          onToken,
+        });
+        if (retry.success && retry.content) {
+          return finish({
+            success: true,
+            content: retry.content,
+            provider: 'Groq High-Speed LPU',
+            model: retry.model || DEFAULT_GROQ_MODEL,
+          });
+        }
+        console.warn('Groq default model retry failed:', retry.error);
+      }
     } catch (e) {
       console.warn('Groq provider error, trying fallback:', e);
     }
@@ -282,14 +308,16 @@ export async function routeLLMRequest({
     fallbackContent || "I'm ready to assist you. Ask me anything, or schedule tasks and reminders.";
   if (attachments && attachments.length > 0) {
     const attSummaries = attachments
-      .map(
-        (a) =>
-          `• **${a.name}** (${a.type}): ${
-            a.extractedText ? a.extractedText.slice(0, 300) + '...' : 'Uploaded successfully.'
-          }`,
-      )
-      .join('\n');
-    fallbackReply = `### Analyzed Uploaded Files\n\nI have received and processed your attachments:\n\n${attSummaries}\n\nHow would you like me to analyze or use these files?`;
+      .map((a) => {
+        if (a.extractedText && a.extractedText.trim()) {
+          const text = a.extractedText.trim();
+          const clipped = text.length > 4000 ? `${text.slice(0, 4000)}\n…(truncated)` : text;
+          return `#### 📄 ${a.name}\n\n${clipped}`;
+        }
+        return `• **${a.name}** (${a.type}): uploaded successfully.`;
+      })
+      .join('\n\n');
+    fallbackReply = `### Analyzed Uploaded Files\n\n${attSummaries}\n\n---\n\nI extracted the content above. Ask me anything about it, or tell me what you'd like done with it.`;
   }
 
   if (onToken) onToken(fallbackReply);

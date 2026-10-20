@@ -29,6 +29,8 @@ const allowedOrigins: string[] = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   devIndicators: false,
+  // Keep native/server-only PDF tooling out of the webpack bundle.
+  serverExternalPackages: ["pdf-parse", "@napi-rs/canvas"],
   // Allow the dev server to accept requests coming from any local IP
   // (needed when accessing from physical Android device / emulator / tunnel)
   allowedDevOrigins: allowedOrigins,
