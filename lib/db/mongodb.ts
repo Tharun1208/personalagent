@@ -69,6 +69,15 @@ export function isMongoConfigured(): boolean {
   return Boolean(getUri().trim());
 }
 
+/**
+ * Static generation runs inside `next build`. Connecting to Atlas there adds
+ * seconds of latency, logs auth failures into the deployment output, and can
+ * never persist anything useful. Runtime requests connect normally.
+ */
+function isBuildPhase(): boolean {
+  return process.env.NEXT_PHASE === 'phase-production-build';
+}
+
 /** True while we are inside the post-failure cooldown window. */
 export function isMongoCoolingDown(): boolean {
   return Date.now() - cached.lastFailureAt < FAILURE_COOLDOWN_MS;
@@ -87,6 +96,10 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
   const uri = getUri().trim();
 
   if (!uri) {
+    return null;
+  }
+
+  if (isBuildPhase()) {
     return null;
   }
 
@@ -129,12 +142,13 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
         const lastLogged = globalThis.__mongoErrorLoggedAt || 0;
         if (Date.now() - lastLogged > ERROR_LOG_INTERVAL_MS) {
           globalThis.__mongoErrorLoggedAt = Date.now();
-          const hint = /bad auth|authentication failed/i.test(cached.lastError || '')
-            ? ' The Atlas user/password in MONGODB_URI was rejected — reset it under Atlas → Database Access.'
-            : '';
+          const authFailed = /bad auth|authentication failed/i.test(cached.lastError || '');
+          const hint = authFailed
+            ? ' Fix MONGODB_URI credentials (Atlas → Database Access) — until then, data written on this host will not persist.'
+            : ' The app is running on the local fallback store; fix MONGODB_URI to restore persistent storage.';
           console.warn(
-            `⚠️ MongoDB unavailable (${SERVER_SELECTION_TIMEOUT_MS}ms budget): ${cached.lastError}. ` +
-              `Running on the local durable store; retrying in 5 minutes.${hint}`,
+            `⚠️ MongoDB is configured but unreachable (${SERVER_SELECTION_TIMEOUT_MS}ms budget): ${cached.lastError}.` +
+              ` Continuing on the local fallback store; next retry in 5 minutes.${hint}`,
           );
         }
         throw err;

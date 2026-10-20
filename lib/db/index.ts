@@ -153,22 +153,30 @@ function ensureDbFile(): Schema {
   }
 
   if (fs.existsSync(DB_FILE)) {
-    try {
-      const content = fs.readFileSync(DB_FILE, 'utf-8');
-      if (content && content.trim().length > 0) {
-        const parsed = normalizeSchema(JSON.parse(content));
-        memoryDb = parsed as Schema;
-        
-        // Sync to MongoDB in background once on startup if connection URI is provided
-        if (!hasSyncedToMongo) {
-          hasSyncedToMongo = true;
-          syncInitialDataToMongo(memoryDb).catch(() => {});
+    // Read + parse with a single short retry. Combined with the atomic
+    // temp-file rename in persistDb this makes torn/partial reads impossible;
+    // the retry only guards rare transient filesystem hiccups.
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const content = fs.readFileSync(DB_FILE, 'utf-8');
+        if (content && content.trim().length > 0) {
+          const parsed = normalizeSchema(JSON.parse(content));
+          memoryDb = parsed as Schema;
+
+          // Sync to MongoDB in background once on startup if connection URI is provided
+          if (!hasSyncedToMongo) {
+            hasSyncedToMongo = true;
+            syncInitialDataToMongo(memoryDb).catch(() => {});
+          }
+          return memoryDb;
         }
-        return memoryDb;
+        break;
+      } catch (err) {
+        if (attempt === 1) {
+          if (memoryDb) return memoryDb as Schema;
+          console.error('Error reading DB file, reinitializing', err);
+        }
       }
-    } catch (err) {
-      if (memoryDb) return memoryDb as Schema;
-      console.error('Error reading DB file, reinitializing', err);
     }
   }
 
@@ -471,11 +479,19 @@ function persistDb(): void {
   persistTimer = setTimeout(async () => {
     if (isWriting || !memoryDb) return;
     isWriting = true;
+    // Write to a temp file and atomically rename it into place. A plain
+    // writeFile can be observed mid-write by a concurrent read, producing
+    // "Unexpected end of JSON input" errors on the API routes.
+    const tmpFile = `${DB_FILE}.tmp`;
     try {
       const dataStr = JSON.stringify(memoryDb);
-      await fs.promises.writeFile(DB_FILE, dataStr, 'utf-8');
+      await fs.promises.writeFile(tmpFile, dataStr, 'utf-8');
+      await fs.promises.rename(tmpFile, DB_FILE);
     } catch (err) {
       console.error('Failed to persist database:', err);
+      try {
+        await fs.promises.rm(tmpFile, { force: true });
+      } catch {}
     } finally {
       isWriting = false;
     }
