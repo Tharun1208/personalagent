@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { db, ensureDbReady, flushDb } from '@/lib/db';
+import { db, ensureDbReady, flushDb, isStorageDegraded } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +31,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   await ensureDbReady();
   const user = auth.getUserFromRequest(req);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (isStorageDegraded()) {
+    return NextResponse.json({ error: 'Storage temporarily unavailable', success: false }, { status: 503 });
+  }
 
   const { id } = await params;
   const kind = req.nextUrl.searchParams.get('kind');

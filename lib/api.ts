@@ -118,6 +118,12 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
       ...init,
       headers,
       credentials: isRemote ? 'omit' : 'same-origin',
+      // Deletes must survive an immediate page refresh: without keepalive the
+      // browser cancels the request on unload and the item reappears.
+      keepalive: init.keepalive ?? method === 'DELETE',
+      // Never let a stale browser cache serve an old collection after a
+      // mutation — always revalidate collection reads.
+      cache: init.cache ?? (method === 'GET' ? 'no-store' : 'default'),
     });
 
     // Server unreachable / gateway failure: keep the mutation for later.

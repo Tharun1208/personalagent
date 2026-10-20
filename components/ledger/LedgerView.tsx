@@ -39,6 +39,7 @@ import {
 import { useApp } from '@/lib/context/AppContext';
 import { LedgerEntry, LedgerType, SpendingEntry } from '@/types';
 import { apiFetch } from '@/lib/api';
+import { markDeleted } from '@/lib/offline/tombstones';
 import { DebtGraph } from '@/lib/dsa/DebtGraph';
 import CustomSelect, { SelectOption } from '@/components/common/CustomSelect';
 import DatePickerDropdown from '@/components/common/DatePickerDropdown';
@@ -117,6 +118,7 @@ function syncSpendingToServer(data: SpendingEntry[]) {
     }).catch(() => {});
   });
   removed.forEach((id) => {
+    markDeleted('spending', id);
     apiFetch(`/api/spending?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
   });
 }
