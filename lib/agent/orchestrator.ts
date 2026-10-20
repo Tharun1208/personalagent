@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { db, getStorageStatus } from '@/lib/db';
 import { memoryEngine } from '@/lib/memory';
 import { toolRegistry } from '@/lib/tools';
 import { routeLLMRequest } from './providers/router';
@@ -381,7 +381,13 @@ export function parseLedgerIntent(text: string): {
     lower.includes('who should i give') ||
     lower.includes('how much do i owe') ||
     lower.includes('who i have to pay') ||
-    lower.includes('my dues')
+    lower.includes('my dues') ||
+    lower.includes('my ledger') ||
+    lower.includes('the ledger') ||
+    lower.includes('ledger summary') ||
+    lower.includes('show ledger') ||
+    lower.includes('check ledger') ||
+    /^ledger\??$/.test(lower)
   ) {
     return {
       isLedger: true,
@@ -453,6 +459,14 @@ export class AgentOrchestrator {
     const trimmed = userPrompt.trim();
     const lower = trimmed.toLowerCase();
     const toolSteps: ToolExecutionStep[] = [];
+    // When Atlas is configured but unreachable the app runs on a volatile
+    // fallback store. Reads can legitimately be empty in that state, so never
+    // present an empty result as "you have nothing".
+    const storageStatus = getStorageStatus();
+    const storageUnavailable = storageStatus.degraded;
+    const storageWarning =
+      '> ⚠️ **Storage is offline.** I cannot reliably read your saved data right now, so an empty result does **not** mean your tasks/dues are gone. ' +
+      'The database connection needs to be fixed (MongoDB Atlas credentials/network access) before changes can be trusted or saved.';
     const memorySavedList: { id: string; content: string; type: any }[] = [];
     let requiresConfirmation = false;
     let confirmationPayload: any = null;
@@ -946,9 +960,15 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       const pending = tasks.filter((t) => t.status !== 'completed' && t.status !== 'cancelled');
       const completed = tasks.filter((t) => t.status === 'completed');
 
+      if (!tasks.length && storageUnavailable) {
+        return { reply: `### Your Tasks\n\n${storageWarning}`, toolSteps };
+      }
+
       let reply = `###  Your Tasks (${pending.length} Pending, ${completed.length} Completed)\n\n`;
       if (!pending.length) {
-        reply += `*You have no unfinished tasks right now.*\n\n`;
+        reply += storageUnavailable
+          ? `${storageWarning}\n\n`
+          : `*You have no unfinished tasks right now.*\n\n`;
       } else {
         reply += `#### ⏳ Pending Tasks (${pending.length}):\n`;
         for (const t of pending) {
@@ -1090,9 +1110,15 @@ Explain what you see clearly, extract any key text/details, and answer the user'
       const reminders = res.data as any[];
       const pendingReminders = reminders.filter((r) => r.status === 'pending');
 
+      if (!reminders.length && storageUnavailable) {
+        return { reply: `### Your Reminders\n\n${storageWarning}`, toolSteps };
+      }
+
       let reply = `###  Your Scheduled Reminders & Alarms (${pendingReminders.length} active)\n\n`;
       if (!pendingReminders.length) {
-        reply += `*You have no upcoming reminders scheduled right now.*\n\n`;
+        reply += storageUnavailable
+          ? `${storageWarning}\n\n`
+          : `*You have no upcoming reminders scheduled right now.*\n\n`;
       } else {
         for (const r of pendingReminders) {
           const formattedDate = new Date(r.dueDateTime).toLocaleString([], {
@@ -1285,13 +1311,19 @@ Explain what you see clearly, extract any key text/details, and answer the user'
         const { entries, summary } = res.data;
         const pending = entries.filter((e: any) => e.status === 'pending');
 
+        if (!entries.length && storageUnavailable) {
+          return { reply: `### Your Financial Ledger\n\n${storageWarning}`, toolSteps };
+        }
+
         let reply = `###  Your Financial Dues & Money Ledger\n\n`;
         reply += `* **Total You Owe (To Give):** \`₹${summary.totalToGive.toLocaleString()}\`\n`;
         reply += `* **Total Owed to You (To Receive):** \`₹${summary.totalToReceive.toLocaleString()}\`\n`;
         reply += `* **Net Financial Balance:** \`${summary.netBalance >= 0 ? '+' : ''}₹${summary.netBalance.toLocaleString()}\`\n\n`;
 
         if (!pending.length) {
-          reply += `*✓ You have no active pending debts or dues right now.*\n`;
+          reply += storageUnavailable
+            ? `${storageWarning}\n`
+            : `*✓ You have no active pending debts or dues right now.*\n`;
         } else {
           reply += `**Active Dues (${pending.length}):**\n`;
           for (const e of pending) {
@@ -1735,10 +1767,42 @@ Explain what you see clearly, extract any key text/details, and answer the user'
     const allTasks = db.getTasks(userId).filter((t) => t.status !== 'completed');
     const allReminders = db.getReminders(userId).filter((r) => r.status === 'pending');
     const allGoals = db.getGoals(userId).filter((g) => g.status === 'active');
-    const allLedger = db.getLedgerEntries(userId).filter((l) => l.status === 'pending');
+    const allLedgerEntries = db.getLedgerEntries(userId);
+    const allLedger = allLedgerEntries.filter((l) => l.status === 'pending');
+    const allSpending = db.getSpendingEntries(userId);
+
+    // Local calendar date (YYYY-MM-DD) in the user's timezone.
+    const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(now);
+    const isToday = (value?: string) => Boolean(value && String(value).slice(0, 10) === todayKey);
+
+    const agenda = [
+      ...allTasks
+        .filter((t) => isToday(t.dueDate))
+        .map((t) => `- TASK: ${t.title} — due ${new Date(t.dueDate as string).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} [${t.priority}]`),
+      ...allReminders
+        .filter((r) => isToday(r.dueDateTime))
+        .map((r) => `- REMINDER: ${r.title} — due ${new Date(r.dueDateTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`),
+    ];
+
+    const recentLedger = [...allLedgerEntries].slice(-10).reverse();
+    const recentSpending = [...allSpending].slice(-10).reverse();
+    const todaySpent = allSpending
+      .filter((e) => e.date === todayKey)
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+    const emptyText = (offline: string, normal: string) => (storageUnavailable ? offline : normal);
+    const taskLines = allTasks.map((t) => `- ${t.title} [Priority: ${t.priority.toUpperCase()}]${t.dueDate ? ` (Due: ${t.dueDate})` : ''}`);
+    const reminderLines = allReminders.map((r) => `- ${r.title} (Due: ${r.dueDateTime})`);
+    const ledgerLines = allLedger.map(
+      (l) => `- ${l.type === 'give' ? 'Payable (User owes)' : 'Receivable (Owed to user)'}: ${l.currency}${l.amount} with ${l.personName}`,
+    );
+    const ledgerActivityLines = recentLedger.map(
+      (l) => `- ${l.status === 'settled' ? '[SETTLED]' : '[PENDING]'} ${l.type === 'give' ? 'You owe' : 'Owed to you'} ${l.personName} ${l.currency}${l.amount}${l.description ? ` — ${l.description}` : ''}`,
+    );
+    const spendingLines = recentSpending.map((e) => `- ${e.date}: ${e.category} ${e.amount}${e.note ? ` — ${e.note}` : ''}`);
 
     const systemPrompt = `You are Assistance, an expert Personal AI Assistant & Life Strategist.
-You know the user (${userName}) well and have live access to their persistent memory vault, goals, tasks, financial dues, and alarm reminders.
+You know the user (${userName}) well and have live access to their persistent memory vault, goals, tasks, calendar, financial ledger, daily expenses, and alarm reminders.
 
 CURRENT REAL-WORLD CONTEXT:
 - User Name: ${userName}
@@ -1753,19 +1817,34 @@ ${allMemories.length ? allMemories.map((m) => `- [${m.type.toUpperCase()} / ${m.
 ACTIVE GOALS & OKRS:
 ${allGoals.length ? allGoals.map((g) => `- ${g.title} [${g.progress}% complete, Category: ${g.category}]`).join('\n') : 'No active goals yet.'}
 
-MONEY LEDGER & DUES:
-${allLedger.length ? allLedger.map((l) => `- ${l.type === 'give' ? 'Payable (User owes)' : 'Receivable (Owed to user)'}: ${l.currency}${l.amount} with ${l.personName}`).join('\n') : 'No pending dues.'}
-
 ACTIVE UNFINISHED TASKS:
-${allTasks.length ? allTasks.map((t) => `- ${t.title} [Priority: ${t.priority.toUpperCase()}]`).join('\n') : 'No pending tasks.'}
+${taskLines.length ? taskLines.join('\n') : emptyText('Task data is unavailable while storage is offline.', 'No pending tasks.')}
+
+TODAY'S AGENDA (tasks + reminders due today):
+${agenda.length ? agenda.join('\n') : emptyText('Agenda is unavailable while storage is offline.', 'Nothing scheduled for today.')}
+
+MONEY LEDGER — PENDING DUES:
+${ledgerLines.length ? ledgerLines.join('\n') : emptyText('Ledger data is unavailable while storage is offline.', 'No pending dues.')}
+
+RECENT LEDGER ACTIVITY (newest first):
+${ledgerActivityLines.length ? ledgerActivityLines.join('\n') : emptyText('Ledger data is unavailable while storage is offline.', 'No ledger entries yet.')}
+
+DAILY SPENDING & EXPENSES:
+- Spent today (${todayKey}): ${allSpending.length ? `${todaySpent}` : emptyText('unavailable while storage is offline', '0')}
+${spendingLines.length ? spendingLines.join('\n') : emptyText('Expense data is unavailable while storage is offline.', 'No expenses recorded yet.')}
 
 UPCOMING REMINDERS & ALARMS:
-${allReminders.length ? allReminders.map((r) => `- ${r.title} (Due: ${r.dueDateTime})`).join('\n') : 'No pending reminders.'}
-
+${reminderLines.length ? reminderLines.join('\n') : emptyText('Reminder data is unavailable while storage is offline.', 'No pending reminders.')}
+${storageUnavailable ? `
+STORAGE STATUS (CRITICAL):
+- The persistent database is configured but unreachable (${storageStatus.lastError || 'connection failed'}).
+- You are reading a temporary fallback store that may be empty or incomplete.
+- Never tell the user they have zero tasks, reminders, dues or expenses based on this view. If a section is empty, say their saved data could not be loaded because storage is offline.
+` : ''}
 CORE GUIDELINES:
 1. Act as a high-agency, deeply capable personal intelligence assistant.
 2. The current day of the week is strictly ${dayOfWeek} (${fullDate}) and current local time is ${fullTime} (${tz}).
-3. When the user asks about personal preferences, schedule, dues, or goals, use their context accurately.
+3. When the user asks about personal preferences, schedule, tasks, calendar, dues, goals, or spending, use the context above accurately. Treat the task, calendar, ledger and spending sections as authoritative data sources.
 4. Format output with clean Markdown, tables, and highlighted sections.${webSearchContext ? `\n\n${webSearchContext}\n\n5. Synthesize a direct, intelligent, clear answer to the user's prompt using the live search findings above. Do not dump raw links.` : ''}
 
 ACTION HONESTY (CRITICAL):

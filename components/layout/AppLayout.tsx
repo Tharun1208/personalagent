@@ -25,6 +25,7 @@ import CustomToastAlert from '@/components/common/CustomToastAlert';
 import SplashScreen from '@/components/common/SplashScreen';
 import SecurityLockScreen from '@/components/common/SecurityLockScreen';
 import MobileTabBar from '@/components/layout/MobileTabBar';
+import { apiFetch } from '@/lib/api';
 
 export default function AppLayout() {
   const {
@@ -51,6 +52,8 @@ export default function AppLayout() {
 
   // â”€â”€ SSR-safe mount gate (no localStorage on server) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [mounted, setMounted] = useState(false);
+  const [storageDegraded, setStorageDegraded] = useState(false);
+  const [storageBannerDismissed, setStorageBannerDismissed] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -60,6 +63,29 @@ export default function AppLayout() {
       continueAsGuest().catch(() => {});
     }
   }, [continueAsGuest, mounted]);
+
+  // ── Storage health: warn when the configured database is unreachable ──
+  useEffect(() => {
+    if (!mounted) return;
+    let cancelled = false;
+
+    const checkStorage = async () => {
+      try {
+        const res = await apiFetch('/api/db/status');
+        const data = await res.json();
+        if (!cancelled) setStorageDegraded(Boolean(data?.degraded));
+      } catch {
+        /* status endpoint itself unreachable — leave banner as-is */
+      }
+    };
+
+    checkStorage();
+    const timer = setInterval(checkStorage, 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [mounted]);
 
   // ── Tab history initialization ────────────────────────────────────────
   useEffect(() => {
@@ -245,6 +271,21 @@ export default function AppLayout() {
           onToggleSidebar={() => setSidebarCollapsed((p) => !p)}
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
         />
+        {storageDegraded && !storageBannerDismissed && (
+          <div className="flex items-center gap-3 px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-900 text-xs sm:text-sm">
+            <span className="shrink-0">⚠️</span>
+            <p className="flex-1 leading-snug">
+              <strong>Storage is offline.</strong> Tasks, reminders, ledger and expenses may not load or save.
+              Fix the database connection (<code className="font-mono">MONGODB_URI</code>) in your deployment environment.
+            </p>
+            <button
+              onClick={() => setStorageBannerDismissed(true)}
+              className="shrink-0 rounded-md px-2 py-1 font-medium text-amber-800 hover:bg-amber-100 transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
         <main className="flex-1 flex flex-col h-full overflow-hidden relative">
           <AnimatePresence mode="wait">
             <motion.div

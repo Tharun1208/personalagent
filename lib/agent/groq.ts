@@ -10,8 +10,8 @@ export interface GroqMessage {
  * Ordered by latency: 8b-instant first for snappy chat.
  */
 const GROQ_MODELS = {
-  fast: 'llama-3.1-8b-instant',
-  balanced: 'llama-3.3-70b-versatile',
+  fast: 'openai/gpt-oss-20b',
+  balanced: 'openai/gpt-oss-120b',
   reasoning: 'openai/gpt-oss-120b',
 } as const;
 

@@ -29,7 +29,7 @@ const UserSchema = new Schema<User>(
       theme: { type: String, default: 'dark' },
       aiProvider: { type: String, default: 'groq' },
       apiKey: { type: String },
-      model: { type: String, default: 'llama-3.3-70b-versatile' },
+      model: { type: String, default: 'openai/gpt-oss-120b' },
       voiceEnabled: { type: Boolean, default: true },
       voiceAutoRead: { type: Boolean, default: false },
       proactiveReminders: { type: Boolean, default: true },

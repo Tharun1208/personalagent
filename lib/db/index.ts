@@ -20,7 +20,7 @@ import {
   SpendingEntry,
 } from '@/types';
 import { syncInitialDataToMongo, syncEntityToMongo } from './mongoSync';
-import { isMongoConfigured } from './mongodb';
+import { isMongoConfigured, getMongoStatus } from './mongodb';
 import {
   hydrateStore,
   getMirror,
@@ -61,6 +61,33 @@ export async function ensureDbReady(): Promise<void> {
   if (!isMongoConfigured()) return;
   const store = await hydrateStore();
   if (!memoryDb) memoryDb = store as unknown as Schema;
+
+  // If Atlas is unreachable the mirror can come back empty. Never let that
+  // replace a recoverable local snapshot — otherwise the app would report
+  // zero tasks/reminders even though durable data exists on disk.
+  if (memoryDb && !memoryDb.users?.length) {
+    recoverLocalSnapshot(memoryDb);
+  }
+}
+
+/**
+ * Describes the storage backend actually serving requests. `degraded` means
+ * Atlas is configured but unreachable, so we are running on the volatile
+ * fallback store and writes may not persist.
+ */
+export function getStorageStatus() {
+  const configured = isMongoConfigured();
+  const mongo = getMongoStatus();
+  // If Atlas is configured but this process has no live connection, reads are
+  // served from the fallback store. That is inherently not trustworthy, so
+  // treat it as degraded even if the connection attempt is still in flight.
+  return {
+    driver: configured ? 'mongodb' : 'local-json',
+    configured,
+    connected: configured ? mongo.connected : true,
+    degraded: configured && !mongo.connected,
+    lastError: mongo.lastError,
+  };
 }
 
 /**
@@ -133,7 +160,14 @@ function recoverLocalSnapshot(target: Schema): boolean {
 }
 
 function ensureDbFile(): Schema {
-  if (memoryDb) return memoryDb;
+  if (memoryDb) {
+    // A previous hydrate may have installed an empty mirror before Atlas
+    // failed. Give durable local data a chance to fill it in.
+    if (isMongoConfigured() && !memoryDb.users?.length) {
+      recoverLocalSnapshot(memoryDb);
+    }
+    return memoryDb;
+  }
 
   // Mongo mirror is the primary store when configured
   if (isMongoConfigured()) {
